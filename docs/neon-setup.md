@@ -25,8 +25,11 @@ When we are ready to use Neon:
 
 ```bash
 PRACTICE_LOOP_DATA_SOURCE=neon
-DATABASE_URL=postgres://user:password@host/database?sslmode=require
+DATABASE_URL=
 ```
+
+Paste the real connection string after `DATABASE_URL=` in `.env.local` or the
+Netlify environment settings only.
 
 Keep `DATABASE_URL` private. It belongs in `.env.local`, never in client code
 and never committed to git.
