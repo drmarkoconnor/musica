@@ -63,6 +63,12 @@ function stopStream(stream: MediaStream | null) {
   stream?.getTracks().forEach((track) => track.stop());
 }
 
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i.test(
+    value,
+  );
+}
+
 export function LessonRecorder({
   className,
   lessonId,
@@ -122,7 +128,7 @@ export function LessonRecorder({
     formData.append("title", lessonTitle(startedAt));
     formData.append("teacher", "Leo");
     formData.append("lessonDate", localDateInputValue(startedAt));
-    if (lessonId) {
+    if (lessonId && isUuid(lessonId)) {
       formData.append("lessonId", lessonId);
     }
     formData.append(

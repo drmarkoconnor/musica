@@ -103,7 +103,8 @@ export async function POST(request: Request) {
 
   const now = new Date();
   const recordedAt = now.toISOString();
-  const requestedLessonId = formString(formData, "lessonId");
+  const rawLessonId = formString(formData, "lessonId");
+  const requestedLessonId = rawLessonId && isUuid(rawLessonId) ? rawLessonId : "";
   const lessonDate = formString(formData, "lessonDate") || todayDate();
   const teacher = formString(formData, "teacher") || "Leo";
   const title =
@@ -136,33 +137,26 @@ export async function POST(request: Request) {
   }
 
   const db = createDatabaseClient();
-  let lessonId: string;
-  let recordingId: string;
+  let lessonId = "";
+  let recordingId = "";
 
   try {
     if (requestedLessonId) {
-      if (!isUuid(requestedLessonId)) {
-        return NextResponse.json(
-          { error: "Lesson ID is invalid." },
-          { status: 400 },
-        );
-      }
-
       const [existingLesson] = await db
         .select({ id: lessons.id })
         .from(lessons)
         .where(eq(lessons.id, requestedLessonId));
 
-      if (!existingLesson) {
-        return NextResponse.json({ error: "Lesson not found." }, { status: 404 });
+      if (existingLesson) {
+        lessonId = existingLesson.id;
+        await db
+          .update(lessons)
+          .set({ status: "recorded", updatedAt: recordedAt })
+          .where(eq(lessons.id, lessonId));
       }
+    }
 
-      lessonId = existingLesson.id;
-      await db
-        .update(lessons)
-        .set({ status: "recorded", updatedAt: recordedAt })
-        .where(eq(lessons.id, lessonId));
-    } else {
+    if (!lessonId) {
       const [lesson] = await db
         .insert(lessons)
         .values({
