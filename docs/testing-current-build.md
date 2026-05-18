@@ -10,9 +10,9 @@ The GitHub repo is public, so private lesson audio, generated transcripts, and
 lead-sheet PDFs are intentionally gitignored. Keep those files local until the
 app has private object storage.
 
-On Netlify the live upload route uses temporary `/tmp` storage. That is enough
-to smoke-test the phone microphone flow over HTTPS, but recordings are not
-durable there yet.
+On Netlify the live upload route stores audio in Netlify Blobs. Neon stores the
+lesson and recording metadata; the audio object lives in the `lesson-recordings`
+blob store.
 
 Netlify environment variables that are only needed by API routes should be
 scoped to Functions rather than Builds:

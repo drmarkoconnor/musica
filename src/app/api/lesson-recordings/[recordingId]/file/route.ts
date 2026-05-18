@@ -1,10 +1,9 @@
-import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { createDatabaseClient } from "@/db/client";
 import { lessonRecordings } from "@/db/schema";
-import { localLessonAudioPath } from "@/lib/server/test-audio-fixtures";
+import { readLessonAudioBuffer } from "@/lib/server/lesson-audio-storage";
 
 function contentTypeForPath(storagePath: string) {
   const extension = path.extname(storagePath).toLowerCase();
@@ -61,30 +60,30 @@ export async function GET(
     return NextResponse.json({ error: "Recording not found." }, { status: 404 });
   }
 
-  const filePath = localLessonAudioPath(
-    recording.storageBucket,
-    recording.storagePath,
-  );
-
-  if (!filePath) {
-    return NextResponse.json(
-      { error: "Only allow-listed local lesson audio is available." },
-      { status: 501 },
-    );
-  }
-
   try {
-    const [file, fileStat] = await Promise.all([readFile(filePath), stat(filePath)]);
+    const file = await readLessonAudioBuffer({
+      storageBucket: recording.storageBucket,
+      storagePath: recording.storagePath,
+    });
+
+    if (!file) {
+      return NextResponse.json(
+        { error: "Recording audio is not available." },
+        { status: 404 },
+      );
+    }
+
+    const fileSize = file.length;
     const contentType = contentTypeForPath(recording.storagePath);
     const rangeHeader = request.headers.get("range");
 
     if (rangeHeader) {
-      const range = parseRangeHeader(rangeHeader, fileStat.size);
+      const range = parseRangeHeader(rangeHeader, fileSize);
       if (!range) {
         return new Response(null, {
           status: 416,
           headers: {
-            "Content-Range": `bytes */${fileStat.size}`,
+            "Content-Range": `bytes */${fileSize}`,
           },
         });
       }
@@ -97,7 +96,7 @@ export async function GET(
           "Accept-Ranges": "bytes",
           "Cache-Control": "private, max-age=0, must-revalidate",
           "Content-Length": String(range.end - range.start + 1),
-          "Content-Range": `bytes ${range.start}-${range.end}/${fileStat.size}`,
+          "Content-Range": `bytes ${range.start}-${range.end}/${fileSize}`,
           "Content-Type": contentType,
         },
       });
@@ -107,7 +106,7 @@ export async function GET(
       headers: {
         "Accept-Ranges": "bytes",
         "Cache-Control": "private, max-age=0, must-revalidate",
-        "Content-Length": String(fileStat.size),
+        "Content-Length": String(fileSize),
         "Content-Type": contentType,
       },
     });

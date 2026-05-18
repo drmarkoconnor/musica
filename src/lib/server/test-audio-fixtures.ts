@@ -9,6 +9,9 @@ import {
 
 export const LOCAL_LESSON_AUDIO_BUCKET = "local-lesson-audio";
 export const LOCAL_LESSON_AUDIO_STORAGE_PREFIX = "docs/lesson-recordings/";
+export const NETLIFY_LESSON_AUDIO_BUCKET = "netlify-blobs";
+export const NETLIFY_LESSON_AUDIO_STORE = "lesson-recordings";
+export const NETLIFY_LESSON_AUDIO_STORAGE_PREFIX = "netlify-blobs/lesson-recordings/";
 export const LOCAL_LESSON_AUDIO_DIRECTORY = path.join(
   process.env.LOCAL_LESSON_AUDIO_DIRECTORY ??
     (process.env.NETLIFY
@@ -47,6 +50,31 @@ export function getTestAudioFixture(fixtureId: string) {
 
 export function localLessonRecordingStoragePath(fileName: string) {
   return `${LOCAL_LESSON_AUDIO_STORAGE_PREFIX}${fileName}`;
+}
+
+export function netlifyLessonRecordingStoragePath(fileName: string) {
+  return `${NETLIFY_LESSON_AUDIO_STORAGE_PREFIX}${fileName}`;
+}
+
+export function netlifyLessonAudioKey(storageBucket: string, storagePath: string) {
+  if (
+    storageBucket !== NETLIFY_LESSON_AUDIO_BUCKET ||
+    !storagePath.startsWith(NETLIFY_LESSON_AUDIO_STORAGE_PREFIX)
+  ) {
+    return null;
+  }
+
+  const key = storagePath.slice(NETLIFY_LESSON_AUDIO_STORAGE_PREFIX.length);
+
+  if (
+    key.length === 0 ||
+    key !== path.basename(key) ||
+    !/^[a-z0-9._-]+$/i.test(key)
+  ) {
+    return null;
+  }
+
+  return key;
 }
 
 export function localLessonAudioPath(storageBucket: string, storagePath: string) {

@@ -126,7 +126,10 @@ export function LessonRecorder({ className }: { className?: string }) {
     });
 
     if (!response.ok) {
-      throw new Error("Recording upload failed.");
+      const body = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+      throw new Error(body?.error ?? t("recordingUploadFailed"));
     }
   }
 
@@ -157,9 +160,11 @@ export function LessonRecorder({ className }: { className?: string }) {
       setRecordingState("saved");
       setMessage(t("liveRecordingSaved"));
       router.refresh();
-    } catch {
+    } catch (error) {
       setRecordingState("error");
-      setMessage(t("recordingUploadFailed"));
+      setMessage(
+        error instanceof Error ? error.message : t("recordingUploadFailed"),
+      );
     }
   }
 

@@ -63,7 +63,8 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
     : undefined;
   const recordingAudioSrc =
     recording?.storageBucket === "local-test-audio" ||
-    recording?.storageBucket === "local-lesson-audio"
+    recording?.storageBucket === "local-lesson-audio" ||
+    recording?.storageBucket === "netlify-blobs"
       ? `/api/lesson-recordings/${recording.id}/file`
       : undefined;
   const isTestAudioRecording =

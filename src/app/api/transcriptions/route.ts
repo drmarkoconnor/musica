@@ -4,11 +4,9 @@ import { NextResponse } from "next/server";
 import { createDatabaseClient } from "@/db/client";
 import { lessonRecordings, lessons, transcripts } from "@/db/schema";
 import { serverEnv } from "@/lib/server/env";
+import { materializeLessonAudioFile } from "@/lib/server/lesson-audio-storage";
 import { transcribeAudioFile } from "@/lib/server/openai-transcription";
-import {
-  getTestAudioFixture,
-  localLessonAudioPath,
-} from "@/lib/server/test-audio-fixtures";
+import { getTestAudioFixture } from "@/lib/server/test-audio-fixtures";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -160,22 +158,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Recording not found." }, { status: 404 });
   }
 
-  const filePath = localLessonAudioPath(
-    recording.storageBucket,
-    recording.storagePath,
-  );
+  const audioFile = await materializeLessonAudioFile({
+    storageBucket: recording.storageBucket,
+    storagePath: recording.storagePath,
+  });
 
-  if (!filePath) {
+  if (!audioFile) {
     return NextResponse.json(
-      { error: "Only local lesson audio can be transcribed in this build." },
-      { status: 501 },
+      { error: "Recording audio is not available for transcription." },
+      { status: 404 },
     );
   }
 
   const requestedAt = new Date().toISOString();
 
   try {
-    const transcription = await transcribeAudioFile({ filePath });
+    const transcription = await transcribeAudioFile({ filePath: audioFile.filePath });
     const completedAt = new Date().toISOString();
     const [existingTranscript] = await db
       .select({ id: transcripts.id })
@@ -240,5 +238,7 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({ error: errorMessage }, { status: 502 });
+  } finally {
+    await audioFile.cleanup();
   }
 }

@@ -33,7 +33,9 @@ export function FromLessonsScreen({ data }: { data: PracticeLoopReadModel }) {
               ? lessonRecordings.find((item) => item.id === task.linkedRecordingId)
               : null;
             const audioSrc =
-              recording?.storageBucket === "local-test-audio"
+              recording?.storageBucket === "local-test-audio" ||
+              recording?.storageBucket === "local-lesson-audio" ||
+              recording?.storageBucket === "netlify-blobs"
                 ? `/api/lesson-recordings/${recording.id}/file`
                 : undefined;
 

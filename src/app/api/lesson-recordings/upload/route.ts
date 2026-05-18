@@ -1,14 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
 import { createDatabaseClient } from "@/db/client";
 import { lessonRecordings, lessons } from "@/db/schema";
-import {
-  LOCAL_LESSON_AUDIO_BUCKET,
-  LOCAL_LESSON_AUDIO_DIRECTORY,
-  localLessonRecordingStoragePath,
-} from "@/lib/server/test-audio-fixtures";
+import { saveLessonAudio } from "@/lib/server/lesson-audio-storage";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -113,44 +108,66 @@ export async function POST(request: Request) {
   );
   const extension = extensionForUpload(audio);
   const fileName = `${recordedAt.replace(/[:.]/g, "-")}-${randomUUID()}.${extension}`;
-  const storagePath = localLessonRecordingStoragePath(fileName);
-  const filePath = path.join(LOCAL_LESSON_AUDIO_DIRECTORY, fileName);
   const buffer = Buffer.from(await audio.arrayBuffer());
+  let storedAudio: Awaited<ReturnType<typeof saveLessonAudio>>;
 
-  await mkdir(LOCAL_LESSON_AUDIO_DIRECTORY, { recursive: true });
-  await writeFile(filePath, buffer);
+  try {
+    storedAudio = await saveLessonAudio({
+      buffer,
+      contentType: audio.type || "application/octet-stream",
+      fileName,
+    });
+  } catch {
+    return NextResponse.json(
+      { error: "Audio storage is not available for this deployment." },
+      { status: 502 },
+    );
+  }
 
   const db = createDatabaseClient();
-  const [lesson] = await db
-    .insert(lessons)
-    .values({
-      title,
-      teacher,
-      lessonDate,
-      status: "recorded",
-      summary,
-      updatedAt: recordedAt,
-    })
-    .returning({ id: lessons.id });
+  let lessonId: string;
+  let recordingId: string;
 
-  const [recording] = await db
-    .insert(lessonRecordings)
-    .values({
-      lessonId: lesson.id,
-      title: "Live lesson recording",
-      storageBucket: LOCAL_LESSON_AUDIO_BUCKET,
-      storagePath,
-      durationSeconds,
-      recordedAt,
-      notes: "Recorded from the browser microphone.",
-    })
-    .returning({ id: lessonRecordings.id });
+  try {
+    const [lesson] = await db
+      .insert(lessons)
+      .values({
+        title,
+        teacher,
+        lessonDate,
+        status: "recorded",
+        summary,
+        updatedAt: recordedAt,
+      })
+      .returning({ id: lessons.id });
+
+    const [recording] = await db
+      .insert(lessonRecordings)
+      .values({
+        lessonId: lesson.id,
+        title: "Live lesson recording",
+        storageBucket: storedAudio.storageBucket,
+        storagePath: storedAudio.storagePath,
+        durationSeconds,
+        recordedAt,
+        notes: "Recorded from the browser microphone.",
+      })
+      .returning({ id: lessonRecordings.id });
+
+    lessonId = lesson.id;
+    recordingId = recording.id;
+  } catch {
+    return NextResponse.json(
+      { error: "Recording metadata could not be saved." },
+      { status: 502 },
+    );
+  }
 
   return NextResponse.json(
     {
-      lessonId: lesson.id,
-      recordingId: recording.id,
-      storagePath,
+      lessonId,
+      recordingId,
+      storagePath: storedAudio.storagePath,
     },
     { status: 201 },
   );
