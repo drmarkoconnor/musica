@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Check, Edit3, Plus, Trash2, Upload, X } from "lucide-react";
 import { AudioStrip } from "@/components/audio-strip";
 import { ComingSoonButton } from "@/components/coming-soon-button";
+import { LessonClipMarker } from "@/components/lesson-clip-marker";
 import { LessonRecorder } from "@/components/lesson-recorder";
 import { Section } from "@/components/section";
 import { StatusPill } from "@/components/status-pill";
@@ -41,6 +42,13 @@ function transcriptBulletItems(text: string) {
   return text
     .split(/\n+|(?<=[.!?])\s+/)
     .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function summaryBulletItems(text: string) {
+  return text
+    .split(/\n+/)
+    .map((item) => item.replace(/^[-*]\s*/, "").trim())
     .filter(Boolean);
 }
 
@@ -91,6 +99,8 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
   const extracts = activeLesson
     ? lessonExtracts.filter((item) => item.lessonId === activeLesson.id)
     : [];
+  const joinedTranscriptText = lessonTranscripts.map((item) => item.text).join("\n");
+  const executiveSummaryItems = summaryBulletItems(activeLesson?.summary ?? "");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formValues, setFormValues] = useState<LessonFormValues>(emptyLessonForm);
   const [saveState, setSaveState] = useState<
@@ -99,6 +109,9 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
   const [attachState, setAttachState] = useState<
     "idle" | "saving" | "saved" | "error"
   >("idle");
+  const [extractActionState, setExtractActionState] = useState<
+    Record<string, "idle" | "saving" | "saved" | "error">
+  >({});
   const [errorMessage, setErrorMessage] = useState("");
 
   function openModal() {
@@ -159,6 +172,27 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
     }
 
     setAttachState("saved");
+    router.refresh();
+  }
+
+  async function handleExtractAction(
+    extractId: string,
+    action: "keep" | "discard",
+  ) {
+    setExtractActionState((current) => ({ ...current, [extractId]: "saving" }));
+
+    const response = await fetch(`/api/lesson-extracts/${extractId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action }),
+    });
+
+    if (!response.ok) {
+      setExtractActionState((current) => ({ ...current, [extractId]: "error" }));
+      return;
+    }
+
+    setExtractActionState((current) => ({ ...current, [extractId]: "saved" }));
     router.refresh();
   }
 
@@ -224,7 +258,8 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
                   (item) => item.lessonId === lesson.id,
                 ).length;
                 const extractCount = lessonExtracts.filter(
-                  (item) => item.lessonId === lesson.id,
+                  (item) =>
+                    item.lessonId === lesson.id && item.status !== "discarded",
                 ).length;
                 const isSelected = activeLesson?.id === lesson.id;
 
@@ -316,6 +351,16 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
               recordingId={recording.id}
             />
           ) : null}
+          {activeLesson && recording && recordingAudioSrc ? (
+            <LessonClipMarker
+              audioSrc={recordingAudioSrc}
+              durationSeconds={recording.durationSeconds}
+              lessonId={activeLesson.id}
+              onSaved={() => router.refresh()}
+              recordingId={recording.id}
+              transcriptId={transcript?.id}
+            />
+          ) : null}
         </section>
       </div>
 
@@ -328,13 +373,11 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
       ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
-        <Section title={t("transcript")}>
+        <Section title={t("lessonSummary")}>
           <div className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
-            {transcript?.text ? (
+            {executiveSummaryItems.length > 0 ? (
               <ul className="space-y-2 text-sm leading-7 text-stone-700">
-                {transcriptBulletItems(
-                  lessonTranscripts.map((item) => item.text).join("\n"),
-                ).map((item, index) => (
+                {executiveSummaryItems.map((item, index) => (
                   <li className="flex gap-3" key={`${item}-${index}`}>
                     <span
                       aria-hidden="true"
@@ -347,6 +390,29 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
             ) : (
               <p className="text-sm leading-7 text-stone-700">{t("notYet")}</p>
             )}
+
+            {joinedTranscriptText ? (
+              <details className="mt-5 rounded-md border border-stone-200 bg-stone-50">
+                <summary className="cursor-pointer px-3 py-2 text-sm font-semibold text-stone-800">
+                  {t("rawTranscript")}
+                </summary>
+                <div className="border-t border-stone-200 bg-white px-3 py-3">
+                  <ul className="space-y-2 text-sm leading-7 text-stone-700">
+                    {transcriptBulletItems(joinedTranscriptText).map(
+                      (item, index) => (
+                        <li className="flex gap-3" key={`${item}-${index}`}>
+                          <span
+                            aria-hidden="true"
+                            className="mt-3 h-1.5 w-1.5 flex-none rounded-full bg-stone-400"
+                          />
+                          <span>{item}</span>
+                        </li>
+                      ),
+                    )}
+                  </ul>
+                </div>
+              </details>
+            ) : null}
           </div>
         </Section>
 
@@ -357,11 +423,14 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
                 {t("notYet")}
               </div>
             ) : null}
-            {extracts.map((extract) => (
-              <article
-                className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm"
-                key={extract.id}
-              >
+            {extracts.map((extract) => {
+              const actionState = extractActionState[extract.id] ?? "idle";
+
+              return (
+                <article
+                  className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm"
+                  key={extract.id}
+                >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="space-y-2">
                     <h3 className="text-base font-semibold text-stone-950">
@@ -389,18 +458,40 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
                   />
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <ComingSoonButton icon={Check} tone="primary">
-                    {t("keep")}
-                  </ComingSoonButton>
+                  {extract.status === "candidate" ? (
+                    <button
+                      className="inline-flex items-center justify-center gap-2 rounded-md bg-emerald-950 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-900 disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={actionState === "saving"}
+                      onClick={() => void handleExtractAction(extract.id, "keep")}
+                      type="button"
+                    >
+                      <Check aria-hidden="true" className="h-4 w-4" />
+                      {actionState === "saving" ? t("saving") : t("keep")}
+                    </button>
+                  ) : null}
                   <ComingSoonButton icon={Edit3}>
                     {t("edit")}
                   </ComingSoonButton>
-                  <ComingSoonButton icon={Trash2} tone="danger">
-                    {t("discard")}
-                  </ComingSoonButton>
+                  {extract.status === "candidate" ? (
+                    <button
+                      className="inline-flex items-center justify-center gap-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={actionState === "saving"}
+                      onClick={() => void handleExtractAction(extract.id, "discard")}
+                      type="button"
+                    >
+                      <Trash2 aria-hidden="true" className="h-4 w-4" />
+                      {t("discard")}
+                    </button>
+                  ) : null}
                 </div>
+                {actionState === "error" ? (
+                  <p className="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+                    {t("candidateActionFailed")}
+                  </p>
+                ) : null}
               </article>
-            ))}
+              );
+            })}
           </div>
         </Section>
       </div>

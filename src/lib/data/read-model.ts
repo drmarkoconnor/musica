@@ -105,25 +105,22 @@ function mergeWithFallback(model: PracticeLoopReadModel): PracticeLoopReadModel 
     tags: model.tags.length > 0 ? model.tags : fallback.tags,
     pieces: model.pieces.length > 0 ? model.pieces : fallback.pieces,
     exercises: model.exercises.length > 0 ? model.exercises : fallback.exercises,
-    lessons: model.lessons.length > 0 ? model.lessons : fallback.lessons,
-    lessonRecordings:
-      model.lessonRecordings.length > 0
-        ? model.lessonRecordings
-        : fallback.lessonRecordings,
-    transcripts: model.transcripts.length > 0 ? model.transcripts : fallback.transcripts,
-    lessonExtracts:
-      model.lessonExtracts.length > 0 ? model.lessonExtracts : fallback.lessonExtracts,
-    practiceTasks:
-      model.practiceTasks.length > 0 ? model.practiceTasks : fallback.practiceTasks,
+    lessons: model.lessons,
+    lessonRecordings: model.lessonRecordings,
+    transcripts: model.transcripts,
+    lessonExtracts: model.lessonExtracts,
+    practiceTasks: model.practiceTasks,
     pieceAssets: model.pieceAssets.length > 0 ? model.pieceAssets : fallback.pieceAssets,
     practiceSessions:
       model.practiceSessions.length > 0
         ? model.practiceSessions
         : fallback.practiceSessions,
-    sessionItems:
-      model.sessionItems.length > 0 ? model.sessionItems : fallback.sessionItems,
-    recordings: model.recordings.length > 0 ? model.recordings : fallback.recordings,
-    smartQueue: model.smartQueue.length > 0 ? model.smartQueue : fallback.smartQueue,
+    sessionItems: model.sessionItems,
+    recordings: model.recordings,
+    smartQueue:
+      model.smartQueue.length > 0
+        ? model.smartQueue
+        : fallback.smartQueue.filter((item) => item.kind !== "lesson_task"),
   };
 }
 

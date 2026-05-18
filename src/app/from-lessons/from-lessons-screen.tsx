@@ -21,6 +21,11 @@ export function FromLessonsScreen({ data }: { data: PracticeLoopReadModel }) {
         title={t("fromLessons")}
       >
         <div className="space-y-4">
+          {lessonTasks.length === 0 ? (
+            <div className="rounded-lg border border-stone-200 bg-white p-5 text-sm leading-6 text-stone-600 shadow-sm">
+              {t("notYet")}
+            </div>
+          ) : null}
           {lessonTasks.map((task) => {
             const piece = task.linkedPieceId
               ? pieces.find((item) => item.id === task.linkedPieceId)

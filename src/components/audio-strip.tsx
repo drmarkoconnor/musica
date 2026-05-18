@@ -1,7 +1,7 @@
 "use client";
 
-import { useRef } from "react";
-import { Headphones, Play } from "lucide-react";
+import { useRef, useState } from "react";
+import { Headphones, Pause, Play, Square } from "lucide-react";
 import { ComingSoonButton } from "./coming-soon-button";
 import { useLanguage } from "@/lib/language";
 import { formatDuration } from "@/lib/utils";
@@ -21,13 +21,56 @@ export function AudioStrip({
 }) {
   const { t } = useLanguage();
   const audioRef = useRef<HTMLAudioElement>(null);
+  const pendingSeekRef = useRef<number | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [playbackError, setPlaybackError] = useState("");
 
-  function playFromStart() {
+  async function playFrom(seconds: number) {
     const player = audioRef.current;
     if (!player) return;
 
+    setPlaybackError("");
+    pendingSeekRef.current = seconds;
+
+    if (player.readyState >= HTMLMediaElement.HAVE_METADATA) {
+      player.currentTime = seconds;
+    } else {
+      player.load();
+    }
+
+    try {
+      await player.play();
+    } catch {
+      setPlaybackError(t("playbackFailed"));
+    }
+  }
+
+  function togglePlayback() {
+    const player = audioRef.current;
+
+    if (isPlaying && player) {
+      player.pause();
+      return;
+    }
+
+    void playFrom(startsAtSeconds ?? 0);
+  }
+
+  function stopPlayback() {
+    const player = audioRef.current;
+    if (!player) return;
+
+    player.pause();
     player.currentTime = startsAtSeconds ?? 0;
-    void player.play();
+    setIsPlaying(false);
+  }
+
+  function handleLoadedMetadata() {
+    const player = audioRef.current;
+    if (!player || pendingSeekRef.current === null) return;
+
+    player.currentTime = pendingSeekRef.current;
+    pendingSeekRef.current = null;
   }
 
   function handleTimeUpdate() {
@@ -38,6 +81,7 @@ export function AudioStrip({
       player.currentTime >= endsAtSeconds
     ) {
       player.pause();
+      setIsPlaying(false);
     }
   }
 
@@ -73,20 +117,48 @@ export function AudioStrip({
           <audio
             className="w-full"
             controls
+            controlsList="nodownload"
+            onCanPlay={() => {
+              pendingSeekRef.current = null;
+            }}
+            onEnded={() => setIsPlaying(false)}
+            onLoadedMetadata={handleLoadedMetadata}
+            onPause={() => setIsPlaying(false)}
+            onPlay={() => setIsPlaying(true)}
             onTimeUpdate={handleTimeUpdate}
-            preload="metadata"
+            playsInline
+            preload="auto"
             ref={audioRef}
             src={audioSrc}
           />
-          {typeof startsAtSeconds === "number" ? (
+          <div className="grid grid-cols-2 gap-2">
             <button
               className="inline-flex items-center justify-center gap-2 rounded-md border border-stone-300 px-3 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-100"
-              onClick={playFromStart}
+              onClick={togglePlayback}
               type="button"
             >
-              <Play aria-hidden="true" className="h-4 w-4" />
-              {t("listenToClip")}
+              {isPlaying ? (
+                <Pause aria-hidden="true" className="h-4 w-4" />
+              ) : (
+                <Play aria-hidden="true" className="h-4 w-4" />
+              )}
+              {typeof startsAtSeconds === "number"
+                ? t("listenToClip")
+                : isPlaying
+                  ? t("pause")
+                  : t("play")}
             </button>
+            <button
+              className="inline-flex items-center justify-center gap-2 rounded-md border border-stone-300 px-3 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-100"
+              onClick={stopPlayback}
+              type="button"
+            >
+              <Square aria-hidden="true" className="h-4 w-4" />
+              {t("stopClip")}
+            </button>
+          </div>
+          {playbackError ? (
+            <p className="text-xs leading-5 text-rose-700">{playbackError}</p>
           ) : null}
         </div>
       ) : (
