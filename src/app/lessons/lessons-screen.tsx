@@ -168,7 +168,7 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
               <StatusPill tone="green">{activeLesson.status}</StatusPill>
             ) : null}
           </div>
-          <p className="mt-4 text-sm leading-6 text-stone-600">
+          <p className="mt-4 whitespace-pre-line text-sm leading-6 text-stone-600">
             {activeLesson?.summary || t("notYet")}
           </p>
           <div className="mt-5 flex flex-col gap-2">
@@ -264,6 +264,11 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
 
         <Section title={t("extractedCandidates")}>
           <div className="space-y-3">
+            {extracts.length === 0 ? (
+              <div className="rounded-lg border border-stone-200 bg-white p-5 text-sm leading-6 text-stone-600 shadow-sm">
+                {t("notYet")}
+              </div>
+            ) : null}
             {extracts.map((extract) => (
               <article
                 className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm"
@@ -274,7 +279,7 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
                     <h3 className="text-base font-semibold text-stone-950">
                       {extract.title}
                     </h3>
-                    <p className="text-sm leading-6 text-stone-600">
+                    <p className="whitespace-pre-line text-sm leading-6 text-stone-600">
                       {extract.body}
                     </p>
                     {extract.similarExtractId ? (

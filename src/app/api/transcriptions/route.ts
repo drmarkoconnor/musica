@@ -2,8 +2,18 @@ import { timingSafeEqual } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { createDatabaseClient } from "@/db/client";
-import { lessonRecordings, lessons, transcripts } from "@/db/schema";
+import {
+  lessonExtracts,
+  lessonRecordings,
+  lessons,
+  transcripts,
+} from "@/db/schema";
 import { serverEnv } from "@/lib/server/env";
+import {
+  analyzeLessonTranscript,
+  lessonSummaryText,
+  type LessonAnalysisResult,
+} from "@/lib/server/lesson-analysis";
 import { materializeLessonAudioFile } from "@/lib/server/lesson-audio-storage";
 import { transcribeAudioFile } from "@/lib/server/openai-transcription";
 import { getTestAudioFixture } from "@/lib/server/test-audio-fixtures";
@@ -72,6 +82,52 @@ async function markTranscriptFailed({
     requestedAt,
     errorMessage,
   });
+}
+
+async function saveLessonAnalysis({
+  analysis,
+  lessonId,
+  transcriptId,
+}: {
+  analysis: LessonAnalysisResult;
+  lessonId: string;
+  transcriptId: string;
+}) {
+  const db = createDatabaseClient();
+  const summary = lessonSummaryText(analysis);
+  const updatedAt = new Date().toISOString();
+
+  await db
+    .delete(lessonExtracts)
+    .where(
+      and(
+        eq(lessonExtracts.lessonId, lessonId),
+        eq(lessonExtracts.status, "candidate"),
+      ),
+    );
+
+  if (analysis.practiceCandidates.length > 0) {
+    await db.insert(lessonExtracts).values(
+      analysis.practiceCandidates.map((item) => ({
+        lessonId,
+        transcriptId,
+        title: item.title,
+        body: `${item.body}\n\nPossible follow-up: ${item.suggestedPracticeNote}`,
+        startsAtSeconds: item.startsAtSeconds,
+        endsAtSeconds: item.endsAtSeconds,
+        status: "candidate" as const,
+      })),
+    );
+  }
+
+  await db
+    .update(lessons)
+    .set({
+      status: analysis.practiceCandidates.length > 0 ? "extracted" : "transcribed",
+      summary: summary || null,
+      updatedAt,
+    })
+    .where(eq(lessons.id, lessonId));
 }
 
 export async function POST(request: Request) {
@@ -175,6 +231,7 @@ export async function POST(request: Request) {
   try {
     const transcription = await transcribeAudioFile({ filePath: audioFile.filePath });
     const completedAt = new Date().toISOString();
+    let transcriptId: string;
     const [existingTranscript] = await db
       .select({ id: transcripts.id })
       .from(transcripts)
@@ -198,17 +255,22 @@ export async function POST(request: Request) {
           errorMessage: null,
         })
         .where(eq(transcripts.id, existingTranscript.id));
+      transcriptId = existingTranscript.id;
     } else {
-      await db.insert(transcripts).values({
-        lessonId: body.lessonId,
-        recordingId: body.recordingId,
-        language: "en",
-        status: "complete",
-        text: transcription.text,
-        model: transcription.model,
-        requestedAt,
-        completedAt,
-      });
+      const [createdTranscript] = await db
+        .insert(transcripts)
+        .values({
+          lessonId: body.lessonId,
+          recordingId: body.recordingId,
+          language: "en",
+          status: "complete",
+          text: transcription.text,
+          model: transcription.model,
+          requestedAt,
+          completedAt,
+        })
+        .returning({ id: transcripts.id });
+      transcriptId = createdTranscript.id;
     }
 
     await db
@@ -216,14 +278,40 @@ export async function POST(request: Request) {
       .set({ status: "transcribed", updatedAt: completedAt })
       .where(eq(lessons.id, body.lessonId));
 
+    let analysisStatus: "complete" | "failed" = "complete";
+    let practiceCandidateCount = 0;
+    let summaryBulletCount = 0;
+
+    try {
+      const analysis = await analyzeLessonTranscript({
+        transcriptText: transcription.text,
+      });
+      await saveLessonAnalysis({
+        analysis,
+        lessonId: body.lessonId,
+        transcriptId,
+      });
+      practiceCandidateCount = analysis.practiceCandidates.length;
+      summaryBulletCount = analysis.summaryBullets.length;
+    } catch (error) {
+      analysisStatus = "failed";
+      console.error("Lesson analysis failed", error);
+    }
+
     return NextResponse.json({
       ok: true,
-      status: "transcribed_recording",
+      status:
+        analysisStatus === "complete"
+          ? "transcribed_and_extracted"
+          : "transcribed_recording",
+      analysisStatus,
       lessonId: body.lessonId,
       recordingId: body.recordingId,
       model: transcription.model,
       durationMs: transcription.durationMs,
       characterCount: transcription.text.length,
+      practiceCandidateCount,
+      summaryBulletCount,
       text: transcription.text,
     });
   } catch (error) {

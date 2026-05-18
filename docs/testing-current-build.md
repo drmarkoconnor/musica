@@ -53,6 +53,8 @@ compiled output.
   fixture when explicitly requested
 - Password-gated transcription route can transcribe saved local lesson
   recordings after authorisation
+- After transcription, a second AI pass creates a lesson summary and candidate
+  practice items when the transcript contains clear teaching instructions.
 - Attach the central 15-minute fixture to a lesson
 - Play allow-listed lesson audio and browser-recorded lesson audio in the
   lesson screen
@@ -77,8 +79,8 @@ These controls are intentionally disabled and marked `Coming soon`:
 - Lead sheet import/write after review
 
 The transcription endpoint now calls OpenAI for local lesson recordings after
-password authorisation. It saves the transcript, but it does not yet generate
-the executive summary or practice-note suggestions automatically.
+password authorisation. It saves the transcript, then runs a second AI pass to
+populate the lesson summary and `Extracted candidate practice items`.
 
 ## Audio Test Fixture
 
