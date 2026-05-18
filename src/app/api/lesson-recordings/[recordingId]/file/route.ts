@@ -1,0 +1,117 @@
+import { readFile, stat } from "node:fs/promises";
+import path from "node:path";
+import { eq } from "drizzle-orm";
+import { NextResponse } from "next/server";
+import { createDatabaseClient } from "@/db/client";
+import { lessonRecordings } from "@/db/schema";
+import { localLessonAudioPath } from "@/lib/server/test-audio-fixtures";
+
+function contentTypeForPath(storagePath: string) {
+  const extension = path.extname(storagePath).toLowerCase();
+
+  if (extension === ".m4a" || extension === ".mp4") return "audio/mp4";
+  if (extension === ".aac") return "audio/aac";
+  if (extension === ".mp3") return "audio/mpeg";
+  if (extension === ".ogg") return "audio/ogg";
+  if (extension === ".wav") return "audio/wav";
+  if (extension === ".webm") return "audio/webm";
+
+  return "application/octet-stream";
+}
+
+function parseRangeHeader(rangeHeader: string, fileSize: number) {
+  const match = /^bytes=(\d*)-(\d*)$/.exec(rangeHeader);
+  if (!match) return null;
+
+  const [, startValue, endValue] = match;
+  let start = startValue ? Number(startValue) : 0;
+  let end = endValue ? Number(endValue) : fileSize - 1;
+
+  if (!startValue && endValue) {
+    const suffixLength = Number(endValue);
+    start = Math.max(fileSize - suffixLength, 0);
+    end = fileSize - 1;
+  }
+
+  if (
+    !Number.isInteger(start) ||
+    !Number.isInteger(end) ||
+    start < 0 ||
+    end < start ||
+    start >= fileSize
+  ) {
+    return null;
+  }
+
+  return { start, end: Math.min(end, fileSize - 1) };
+}
+
+export async function GET(
+  request: Request,
+  context: { params: Promise<{ recordingId: string }> },
+) {
+  const { recordingId } = await context.params;
+  const db = createDatabaseClient();
+  const [recording] = await db
+    .select()
+    .from(lessonRecordings)
+    .where(eq(lessonRecordings.id, recordingId));
+
+  if (!recording) {
+    return NextResponse.json({ error: "Recording not found." }, { status: 404 });
+  }
+
+  const filePath = localLessonAudioPath(
+    recording.storageBucket,
+    recording.storagePath,
+  );
+
+  if (!filePath) {
+    return NextResponse.json(
+      { error: "Only allow-listed local lesson audio is available." },
+      { status: 501 },
+    );
+  }
+
+  try {
+    const [file, fileStat] = await Promise.all([readFile(filePath), stat(filePath)]);
+    const contentType = contentTypeForPath(recording.storagePath);
+    const rangeHeader = request.headers.get("range");
+
+    if (rangeHeader) {
+      const range = parseRangeHeader(rangeHeader, fileStat.size);
+      if (!range) {
+        return new Response(null, {
+          status: 416,
+          headers: {
+            "Content-Range": `bytes */${fileStat.size}`,
+          },
+        });
+      }
+
+      const chunk = file.subarray(range.start, range.end + 1);
+
+      return new Response(new Uint8Array(chunk), {
+        status: 206,
+        headers: {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "private, max-age=0, must-revalidate",
+          "Content-Length": String(range.end - range.start + 1),
+          "Content-Range": `bytes ${range.start}-${range.end}/${fileStat.size}`,
+          "Content-Type": contentType,
+        },
+      });
+    }
+
+    return new Response(new Uint8Array(file), {
+      headers: {
+        "Accept-Ranges": "bytes",
+        "Cache-Control": "private, max-age=0, must-revalidate",
+        "Content-Length": String(fileStat.size),
+        "Content-Type": contentType,
+      },
+    });
+  } catch {
+    return NextResponse.json({ error: "Recording file not found." }, { status: 404 });
+  }
+}
