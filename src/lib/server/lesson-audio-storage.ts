@@ -31,12 +31,27 @@ function bufferArrayBuffer(buffer: Buffer) {
 function shouldUseNetlifyBlobs() {
   return (
     serverEnv("PRACTICE_LOOP_AUDIO_STORAGE") === "netlify-blobs" ||
-    serverEnv("NETLIFY") === "true"
+    serverEnv("NETLIFY") === "true" ||
+    Boolean(serverEnv("SITE_ID") || serverEnv("NETLIFY_SITE_ID"))
   );
 }
 
 async function netlifyBlobStore() {
   const { getStore } = await import("@netlify/blobs");
+  const siteID = serverEnv("NETLIFY_SITE_ID") ?? serverEnv("SITE_ID");
+  const token =
+    serverEnv("NETLIFY_BLOBS_TOKEN") ??
+    serverEnv("NETLIFY_AUTH_TOKEN") ??
+    serverEnv("NETLIFY_TOKEN");
+
+  if (siteID && token) {
+    return getStore({
+      name: NETLIFY_LESSON_AUDIO_STORE,
+      siteID,
+      token,
+    });
+  }
+
   return getStore(NETLIFY_LESSON_AUDIO_STORE);
 }
 

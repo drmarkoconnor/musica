@@ -20,6 +20,12 @@ scoped to Functions rather than Builds:
 - `TRANSCRIPTION_PASSWORD`
 - `OPENAI_API_KEY`
 - `DATABASE_URL`
+- optional fallback: `NETLIFY_BLOBS_TOKEN`
+
+Netlify normally supplies Blobs context automatically to Functions. If upload
+still reports `MissingBlobsEnvironmentError`, create a Netlify Personal Access
+Token and set it as `NETLIFY_BLOBS_TOKEN` with Functions scope. The function can
+combine that token with Netlify's built-in `SITE_ID` to access the blob store.
 
 Use a long unique transcription password; short common words can trigger
 Netlify's exact-value secret scanner because they naturally appear in docs or

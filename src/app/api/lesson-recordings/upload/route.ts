@@ -117,9 +117,12 @@ export async function POST(request: Request) {
       contentType: audio.type || "application/octet-stream",
       fileName,
     });
-  } catch {
+  } catch (error) {
+    const detail = error instanceof Error ? error.name : "UnknownError";
     return NextResponse.json(
-      { error: "Audio storage is not available for this deployment." },
+      {
+        error: `Audio storage is not available for this deployment (${detail}).`,
+      },
       { status: 502 },
     );
   }
