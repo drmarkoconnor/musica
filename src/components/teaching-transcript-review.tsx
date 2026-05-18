@@ -97,7 +97,7 @@ export function TeachingTranscriptReview({
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-emerald-800">
             {t("teachingReview")}
           </p>
-          <h2 className="mt-1 text-xl font-semibold text-stone-950">
+          <h2 className="mt-1 text-2xl font-semibold leading-tight text-stone-950">
             {t("lessonSummary")}
           </h2>
         </div>
@@ -112,7 +112,7 @@ export function TeachingTranscriptReview({
                 aria-hidden="true"
                 className="h-5 w-5 text-emerald-800"
               />
-              <h3 className="text-lg font-semibold text-stone-950">
+              <h3 className="text-xl font-semibold leading-tight text-stone-950">
                 {t("whatWasCovered")}
               </h3>
             </div>

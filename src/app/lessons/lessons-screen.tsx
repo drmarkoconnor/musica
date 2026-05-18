@@ -314,7 +314,7 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
         <section className="space-y-4 rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h2 className="text-xl font-semibold text-stone-950">
+              <h2 className="text-2xl font-semibold leading-tight text-stone-950">
                 {recording ? t("latestClip") : t("recordings")}
               </h2>
               <p className="mt-1 text-sm text-stone-500">

@@ -338,9 +338,11 @@ export function LessonSegmentReview({
     <section className="space-y-4 rounded-lg border border-stone-200 bg-stone-50 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2">
-            <Scissors aria-hidden="true" className="h-4 w-4 text-emerald-800" />
-            <h3 className="text-sm font-semibold text-stone-950">
+          <div className="flex items-center gap-3">
+            <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-emerald-950 text-white">
+              <Scissors aria-hidden="true" className="h-5 w-5" />
+            </span>
+            <h3 className="text-2xl font-semibold leading-tight text-stone-950">
               {t("teachingSegments")}
             </h3>
           </div>
@@ -359,7 +361,7 @@ export function LessonSegmentReview({
       >
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h4 className="text-sm font-semibold text-stone-950">
+            <h4 className="text-xl font-semibold leading-tight text-stone-950">
               {t("addTeachingSegment")}
             </h4>
             <p className="mt-1 text-xs text-stone-500">
