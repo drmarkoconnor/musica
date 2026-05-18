@@ -14,6 +14,10 @@ On Netlify the live upload route stores audio in Netlify Blobs. Neon stores the
 lesson and recording metadata; the audio object lives in the `lesson-recordings`
 blob store.
 
+Lead-sheet PDFs are still local-only fixtures in the repo workspace. For the
+hosted app they should move to object storage too, with Neon keeping
+`piece_assets` metadata and the object store keeping the private PDF/image.
+
 Netlify environment variables that are only needed by API routes should be
 scoped to Functions rather than Builds:
 
@@ -45,7 +49,7 @@ compiled output.
 - Lead-sheet assets linked to repertoire pieces
 - Actual lead-sheet PDF viewer on piece detail pages
 - Create draft lesson
-- Record live lesson audio in the browser and save it as a new lesson
+- Record live lesson audio in the browser and save it into the selected lesson
 - Transcription password modal
 - Server-side rejection of failed transcription passwords
 - Real OpenAI transcription test script for the central 15-minute fixture
@@ -58,6 +62,8 @@ compiled output.
 - Attach the central 15-minute fixture to a lesson
 - Play allow-listed lesson audio and browser-recorded lesson audio in the
   lesson screen
+- Use the compact lesson history to switch between previous lessons and inspect
+  their audio, narrative transcript, and extracted candidates.
 - View saved transcript text as a bulleted list
 - Review fixture transcript as a single executive-summary card with timestamped
   bullets

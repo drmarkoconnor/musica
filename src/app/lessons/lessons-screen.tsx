@@ -44,6 +44,18 @@ function transcriptBulletItems(text: string) {
     .filter(Boolean);
 }
 
+function audioSrcForRecording(recording?: { id: string; storageBucket: string }) {
+  if (
+    recording?.storageBucket === "local-test-audio" ||
+    recording?.storageBucket === "local-lesson-audio" ||
+    recording?.storageBucket === "netlify-blobs"
+  ) {
+    return `/api/lesson-recordings/${recording.id}/file`;
+  }
+
+  return undefined;
+}
+
 export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
   const { t } = useLanguage();
   const router = useRouter();
@@ -57,21 +69,25 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
         a.lessonDate,
     ),
   );
-  const activeLesson = sortedLessons[0];
-  const recording = activeLesson
-    ? lessonRecordings.find((item) => item.lessonId === activeLesson.id)
-    : undefined;
-  const recordingAudioSrc =
-    recording?.storageBucket === "local-test-audio" ||
-    recording?.storageBucket === "local-lesson-audio" ||
-    recording?.storageBucket === "netlify-blobs"
-      ? `/api/lesson-recordings/${recording.id}/file`
-      : undefined;
+  const [selectedLessonId, setSelectedLessonId] = useState(
+    sortedLessons[0]?.id ?? "",
+  );
+  const activeLesson =
+    sortedLessons.find((lesson) => lesson.id === selectedLessonId) ??
+    sortedLessons[0];
+  const recordingsForActiveLesson = activeLesson
+    ? lessonRecordings
+        .filter((item) => item.lessonId === activeLesson.id)
+        .sort((a, b) => a.recordedAt.localeCompare(b.recordedAt))
+    : [];
+  const recording = recordingsForActiveLesson.at(-1);
+  const recordingAudioSrc = audioSrcForRecording(recording);
   const isTestAudioRecording =
     recording?.storagePath === TEST_LESSON_FIXTURE_STORAGE_PATH;
-  const transcript = activeLesson
-    ? transcripts.find((item) => item.lessonId === activeLesson.id)
-    : undefined;
+  const lessonTranscripts = activeLesson
+    ? transcripts.filter((item) => item.lessonId === activeLesson.id)
+    : [];
+  const transcript = lessonTranscripts[0];
   const extracts = activeLesson
     ? lessonExtracts.filter((item) => item.lessonId === activeLesson.id)
     : [];
@@ -182,10 +198,65 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
                 {t("createLesson")}
               </span>
             </button>
-            <LessonRecorder />
+            <LessonRecorder
+              lessonId={activeLesson?.id}
+              onSaved={(lessonId) => {
+                setSelectedLessonId(lessonId);
+                router.refresh();
+              }}
+            />
             <ComingSoonButton className="min-h-12 w-full py-3" icon={Upload}>
               {t("uploadAudio")}
             </ComingSoonButton>
+          </div>
+          <div className="mt-6 border-t border-stone-200 pt-4">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-sm font-semibold text-stone-950">
+                {t("lessonHistory")}
+              </h2>
+              <span className="text-xs font-medium text-stone-500">
+                {sortedLessons.length}
+              </span>
+            </div>
+            <div className="mt-3 max-h-80 divide-y divide-stone-200 overflow-y-auto rounded-md border border-stone-200">
+              {sortedLessons.map((lesson) => {
+                const recordingCount = lessonRecordings.filter(
+                  (item) => item.lessonId === lesson.id,
+                ).length;
+                const extractCount = lessonExtracts.filter(
+                  (item) => item.lessonId === lesson.id,
+                ).length;
+                const isSelected = activeLesson?.id === lesson.id;
+
+                return (
+                  <button
+                    className={`grid w-full grid-cols-[1fr_auto] gap-3 px-3 py-2 text-left transition ${
+                      isSelected ? "bg-emerald-50" : "bg-white hover:bg-stone-50"
+                    }`}
+                    key={lesson.id}
+                    onClick={() => setSelectedLessonId(lesson.id)}
+                    type="button"
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-semibold text-stone-950">
+                        {lesson.title}
+                      </span>
+                      <span className="mt-0.5 block text-xs text-stone-500">
+                        {lesson.lessonDate} / {lesson.teacher || t("notYet")}
+                      </span>
+                    </span>
+                    <span className="flex flex-col items-end gap-1 text-xs text-stone-500">
+                      <span>
+                        {recordingCount} {t("clips")}
+                      </span>
+                      <span>
+                        {extractCount} {t("practiceElement")}
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </section>
 
@@ -193,7 +264,7 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="text-xl font-semibold text-stone-950">
-                {recording?.title ?? t("recordings")}
+                {recording ? t("latestClip") : t("recordings")}
               </h2>
               <p className="mt-1 text-sm text-stone-500">
                 {recording?.storagePath}
@@ -203,6 +274,21 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
           </div>
           {recording ? (
             <AudioStrip audioSrc={recordingAudioSrc} title={recording.title} />
+          ) : null}
+          {recordingsForActiveLesson.length > 1 ? (
+            <div className="space-y-2">
+              {recordingsForActiveLesson.map((item, index) => (
+                <div
+                  className="rounded-md border border-stone-200 p-2"
+                  key={item.id}
+                >
+                  <AudioStrip
+                    audioSrc={audioSrcForRecording(item)}
+                    title={`${t("recordings")} ${index + 1}`}
+                  />
+                </div>
+              ))}
+            </div>
           ) : null}
           {!recording && activeLesson ? (
             <button
@@ -246,7 +332,9 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
           <div className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
             {transcript?.text ? (
               <ul className="space-y-2 text-sm leading-7 text-stone-700">
-                {transcriptBulletItems(transcript.text).map((item, index) => (
+                {transcriptBulletItems(
+                  lessonTranscripts.map((item) => item.text).join("\n"),
+                ).map((item, index) => (
                   <li className="flex gap-3" key={`${item}-${index}`}>
                     <span
                       aria-hidden="true"

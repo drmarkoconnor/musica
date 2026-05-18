@@ -63,7 +63,15 @@ function stopStream(stream: MediaStream | null) {
   stream?.getTracks().forEach((track) => track.stop());
 }
 
-export function LessonRecorder({ className }: { className?: string }) {
+export function LessonRecorder({
+  className,
+  lessonId,
+  onSaved,
+}: {
+  className?: string;
+  lessonId?: string;
+  onSaved?: (lessonId: string) => void;
+}) {
   const { t } = useLanguage();
   const router = useRouter();
   const [recordingState, setRecordingState] = useState<RecordingState>("idle");
@@ -114,6 +122,9 @@ export function LessonRecorder({ className }: { className?: string }) {
     formData.append("title", lessonTitle(startedAt));
     formData.append("teacher", "Leo");
     formData.append("lessonDate", localDateInputValue(startedAt));
+    if (lessonId) {
+      formData.append("lessonId", lessonId);
+    }
     formData.append(
       "summary",
       "Recorded live in Practice Loop. Ready for authorised transcription.",
@@ -130,6 +141,14 @@ export function LessonRecorder({ className }: { className?: string }) {
         error?: string;
       } | null;
       throw new Error(body?.error ?? t("recordingUploadFailed"));
+    }
+
+    const body = (await response.json().catch(() => null)) as {
+      lessonId?: string;
+    } | null;
+
+    if (body?.lessonId) {
+      onSaved?.(body.lessonId);
     }
   }
 

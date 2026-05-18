@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import path from "node:path";
+import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { createDatabaseClient } from "@/db/client";
 import { lessonRecordings, lessons } from "@/db/schema";
@@ -64,6 +65,12 @@ function parseDurationSeconds(value: string) {
   return Math.min(Math.round(durationSeconds), 8 * 60 * 60);
 }
 
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i.test(
+    value,
+  );
+}
+
 export async function POST(request: Request) {
   const formData = await request.formData();
   const audio = formData.get("audio");
@@ -96,6 +103,7 @@ export async function POST(request: Request) {
 
   const now = new Date();
   const recordedAt = now.toISOString();
+  const requestedLessonId = formString(formData, "lessonId");
   const lessonDate = formString(formData, "lessonDate") || todayDate();
   const teacher = formString(formData, "teacher") || "Leo";
   const title =
@@ -132,22 +140,47 @@ export async function POST(request: Request) {
   let recordingId: string;
 
   try {
-    const [lesson] = await db
-      .insert(lessons)
-      .values({
-        title,
-        teacher,
-        lessonDate,
-        status: "recorded",
-        summary,
-        updatedAt: recordedAt,
-      })
-      .returning({ id: lessons.id });
+    if (requestedLessonId) {
+      if (!isUuid(requestedLessonId)) {
+        return NextResponse.json(
+          { error: "Lesson ID is invalid." },
+          { status: 400 },
+        );
+      }
+
+      const [existingLesson] = await db
+        .select({ id: lessons.id })
+        .from(lessons)
+        .where(eq(lessons.id, requestedLessonId));
+
+      if (!existingLesson) {
+        return NextResponse.json({ error: "Lesson not found." }, { status: 404 });
+      }
+
+      lessonId = existingLesson.id;
+      await db
+        .update(lessons)
+        .set({ status: "recorded", updatedAt: recordedAt })
+        .where(eq(lessons.id, lessonId));
+    } else {
+      const [lesson] = await db
+        .insert(lessons)
+        .values({
+          title,
+          teacher,
+          lessonDate,
+          status: "recorded",
+          summary,
+          updatedAt: recordedAt,
+        })
+        .returning({ id: lessons.id });
+      lessonId = lesson.id;
+    }
 
     const [recording] = await db
       .insert(lessonRecordings)
       .values({
-        lessonId: lesson.id,
+        lessonId,
         title: "Live lesson recording",
         storageBucket: storedAudio.storageBucket,
         storagePath: storedAudio.storagePath,
@@ -157,7 +190,6 @@ export async function POST(request: Request) {
       })
       .returning({ id: lessonRecordings.id });
 
-    lessonId = lesson.id;
     recordingId = recording.id;
   } catch {
     return NextResponse.json(
