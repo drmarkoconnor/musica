@@ -14,6 +14,17 @@ On Netlify the live upload route uses temporary `/tmp` storage. That is enough
 to smoke-test the phone microphone flow over HTTPS, but recordings are not
 durable there yet.
 
+Netlify environment variables that are only needed by API routes should be
+scoped to Functions rather than Builds:
+
+- `TRANSCRIPTION_PASSWORD`
+- `OPENAI_API_KEY`
+- `DATABASE_URL`
+
+Use a long unique transcription password; short common words can trigger
+Netlify's exact-value secret scanner because they naturally appear in docs or
+compiled output.
+
 ## Live Now
 
 - Navigation between pages

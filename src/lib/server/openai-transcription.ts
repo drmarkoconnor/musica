@@ -1,8 +1,9 @@
 import { createReadStream } from "node:fs";
 import OpenAI from "openai";
+import { serverEnv } from "@/lib/server/env";
 
 export const DEFAULT_TRANSCRIPTION_MODEL =
-  process.env.OPENAI_TRANSCRIPTION_MODEL || "gpt-4o-mini-transcribe";
+  serverEnv("OPENAI_TRANSCRIPTION_MODEL") || "gpt-4o-mini-transcribe";
 
 export const MUSIC_LESSON_TRANSCRIPTION_PROMPT = [
   "This is a private jazz piano and singing lesson between Mark and Leo.",
@@ -26,7 +27,7 @@ export async function transcribeAudioFile({
   model?: string;
   prompt?: string;
 }): Promise<AudioTranscriptionResult> {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = serverEnv("OPENAI_API_KEY");
 
   if (!apiKey) {
     throw new Error("OPENAI_API_KEY is required for transcription.");

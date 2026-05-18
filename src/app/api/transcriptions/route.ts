@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { createDatabaseClient } from "@/db/client";
 import { lessonRecordings, lessons, transcripts } from "@/db/schema";
+import { serverEnv } from "@/lib/server/env";
 import { transcribeAudioFile } from "@/lib/server/openai-transcription";
 import {
   getTestAudioFixture,
@@ -84,7 +85,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const expectedPassword = process.env.TRANSCRIPTION_PASSWORD;
+  const expectedPassword = serverEnv("TRANSCRIPTION_PASSWORD");
 
   if (!expectedPassword) {
     return NextResponse.json(
