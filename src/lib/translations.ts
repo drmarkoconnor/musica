@@ -82,6 +82,8 @@ export const translations = {
       "Mark only the parts that contain useful teaching. These selected minutes are what the passworded transcription will send by default.",
     teachingSegment: "Teaching segment",
     addTeachingSegment: "Add teaching segment",
+    fineTrim: "Fine trim",
+    dragToTrim: "Drag or scroll to trim",
     teachingSegmentPlaceholder:
       "Optional note, for example: rootless voicing explanation.",
     addSegment: "Add segment",
@@ -271,6 +273,8 @@ export const translations = {
       "Segna solo le parti con insegnamento utile. Per impostazione predefinita la trascrizione con password inviera questi minuti selezionati.",
     teachingSegment: "Segmento didattico",
     addTeachingSegment: "Aggiungi segmento didattico",
+    fineTrim: "Regolazione fine",
+    dragToTrim: "Trascina o scorri per regolare",
     teachingSegmentPlaceholder:
       "Nota opzionale, per esempio: spiegazione sui voicing rootless.",
     addSegment: "Aggiungi segmento",
