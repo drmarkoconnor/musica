@@ -4,6 +4,13 @@ export type LessonStatus = "draft" | "recorded" | "transcribed" | "extracted";
 
 export type ExtractStatus = "candidate" | "kept" | "discarded";
 
+export type LessonSegmentStatus = "selected" | "discarded" | "transcribed";
+
+export type LessonSegmentSource =
+  | "live_marker"
+  | "post_lesson_review"
+  | "ai_suggestion";
+
 export type PracticeStatus = "new" | "active" | "parked" | "mastered";
 
 export type PracticeSource = "lesson" | "manual" | "generated";
@@ -49,6 +56,18 @@ export type LessonRecording = {
   durationSeconds: number;
   recordedAt: string;
   storagePath: string;
+};
+
+export type LessonSegment = {
+  id: string;
+  lessonId: string;
+  recordingId: string;
+  title: string;
+  notes: string;
+  startsAtSeconds: number;
+  endsAtSeconds: number;
+  status: LessonSegmentStatus;
+  source: LessonSegmentSource;
 };
 
 export type Transcript = {

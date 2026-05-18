@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import { Check, Edit3, Plus, Trash2, Upload, X } from "lucide-react";
 import { AudioStrip } from "@/components/audio-strip";
 import { ComingSoonButton } from "@/components/coming-soon-button";
-import { LessonClipMarker } from "@/components/lesson-clip-marker";
 import { LessonRecorder } from "@/components/lesson-recorder";
+import { LessonSegmentReview } from "@/components/lesson-segment-review";
 import { Section } from "@/components/section";
 import { StatusPill } from "@/components/status-pill";
 import { TeachingTranscriptReview } from "@/components/teaching-transcript-review";
@@ -67,7 +67,8 @@ function audioSrcForRecording(recording?: { id: string; storageBucket: string })
 export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
   const { t } = useLanguage();
   const router = useRouter();
-  const { lessonExtracts, lessonRecordings, lessons, transcripts } = data;
+  const { lessonExtracts, lessonRecordings, lessons, lessonSegments, transcripts } =
+    data;
   const sortedLessons = [...lessons].sort((a, b) =>
     (
       lessonRecordings.find((item) => item.lessonId === b.id)?.recordedAt ??
@@ -90,6 +91,21 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
     : [];
   const recording = recordingsForActiveLesson.at(-1);
   const recordingAudioSrc = audioSrcForRecording(recording);
+  const segmentsForRecording = recording
+    ? lessonSegments
+        .filter((item) => item.recordingId === recording.id)
+        .sort((a, b) => a.startsAtSeconds - b.startsAtSeconds)
+    : [];
+  const selectedSegmentSeconds = segmentsForRecording
+    .filter((item) => item.status === "selected")
+    .reduce(
+      (total, item) =>
+        total + Math.max(item.endsAtSeconds - item.startsAtSeconds, 0),
+      0,
+    );
+  const selectedSegmentCount = segmentsForRecording.filter(
+    (item) => item.status === "selected",
+  ).length;
   const isTestAudioRecording =
     recording?.storagePath === TEST_LESSON_FIXTURE_STORAGE_PATH;
   const lessonTranscripts = activeLesson
@@ -345,20 +361,23 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
               {t("saveFailed")}
             </p>
           ) : null}
-          {recording ? (
-            <TranscriptionGate
-              lessonId={activeLesson?.id ?? ""}
-              recordingId={recording.id}
-            />
-          ) : null}
           {activeLesson && recording && recordingAudioSrc ? (
-            <LessonClipMarker
+            <LessonSegmentReview
               audioSrc={recordingAudioSrc}
               durationSeconds={recording.durationSeconds}
               lessonId={activeLesson.id}
-              onSaved={() => router.refresh()}
+              onChanged={() => router.refresh()}
               recordingId={recording.id}
-              transcriptId={transcript?.id}
+              segments={segmentsForRecording}
+            />
+          ) : null}
+          {recording ? (
+            <TranscriptionGate
+              lessonId={activeLesson?.id ?? ""}
+              recordingDurationSeconds={recording.durationSeconds}
+              recordingId={recording.id}
+              selectedSegmentCount={selectedSegmentCount}
+              selectedSegmentSeconds={selectedSegmentSeconds}
             />
           ) : null}
         </section>

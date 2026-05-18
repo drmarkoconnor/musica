@@ -6,6 +6,7 @@ import type {
   Lesson,
   LessonExtract,
   LessonRecording,
+  LessonSegment,
   Piece,
   PieceAsset,
   PracticeSession,
@@ -122,6 +123,20 @@ function mapLessonRecording(
     durationSeconds: row.durationSeconds ?? 0,
     recordedAt: row.recordedAt,
     storagePath: row.storagePath,
+  };
+}
+
+function mapLessonSegment(row: dbSchema.LessonSegmentRow): LessonSegment {
+  return {
+    id: row.id,
+    lessonId: row.lessonId,
+    recordingId: row.recordingId,
+    title: row.title,
+    notes: row.notes ?? "",
+    startsAtSeconds: row.startsAtSeconds,
+    endsAtSeconds: row.endsAtSeconds,
+    status: row.status,
+    source: row.source,
   };
 }
 
@@ -324,6 +339,7 @@ export function createNeonPracticeLoopRepository(
       exercises,
       lessons,
       lessonRecordingRows,
+      lessonSegmentRows,
       transcriptRows,
       lessonExtractRows,
       practiceTasks,
@@ -341,6 +357,10 @@ export function createNeonPracticeLoopRepository(
         .select()
         .from(dbSchema.lessonRecordings)
         .orderBy(asc(dbSchema.lessonRecordings.recordedAt)),
+      db
+        .select()
+        .from(dbSchema.lessonSegments)
+        .orderBy(asc(dbSchema.lessonSegments.startsAtSeconds)),
       db.select().from(dbSchema.transcripts),
       db.select().from(dbSchema.lessonExtracts),
       listPracticeTasks(),
@@ -359,6 +379,7 @@ export function createNeonPracticeLoopRepository(
       exercises,
       lessons,
       lessonRecordings: lessonRecordingRows.map(mapLessonRecording),
+      lessonSegments: lessonSegmentRows.map(mapLessonSegment),
       transcripts: transcriptRows.map(mapTranscript),
       lessonExtracts: lessonExtractRows.map(mapLessonExtract),
       practiceTasks,

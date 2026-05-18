@@ -3,6 +3,7 @@ import type {
   Lesson,
   LessonExtract,
   LessonRecording,
+  LessonSegment,
   Piece,
   PieceAsset,
   PracticeSession,
@@ -141,6 +142,8 @@ export const exercises: Exercise[] = [
 export const lessons: Lesson[] = [];
 
 export const lessonRecordings: LessonRecording[] = [];
+
+export const lessonSegments: LessonSegment[] = [];
 
 export const transcripts: Transcript[] = [];
 

@@ -1,10 +1,11 @@
 import { timingSafeEqual } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { createDatabaseClient } from "@/db/client";
 import {
   lessonExtracts,
   lessonRecordings,
+  lessonSegments,
   lessons,
   transcripts,
 } from "@/db/schema";
@@ -26,6 +27,7 @@ type TranscriptionRequest = {
   recordingId?: unknown;
   password?: unknown;
   testAudioFixture?: unknown;
+  includeFullRecording?: unknown;
 };
 
 function safeCompare(input: string, expected: string) {
@@ -37,6 +39,12 @@ function safeCompare(input: string, expected: string) {
   }
 
   return timingSafeEqual(inputBuffer, expectedBuffer);
+}
+
+function formatTimestamp(totalSeconds: number) {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
 async function markTranscriptFailed({
@@ -229,7 +237,74 @@ export async function POST(request: Request) {
   const requestedAt = new Date().toISOString();
 
   try {
-    const transcription = await transcribeAudioFile({ filePath: audioFile.filePath });
+    const selectedSegments = await db
+      .select({
+        endsAtSeconds: lessonSegments.endsAtSeconds,
+        id: lessonSegments.id,
+        startsAtSeconds: lessonSegments.startsAtSeconds,
+        title: lessonSegments.title,
+      })
+      .from(lessonSegments)
+      .where(
+        and(
+          eq(lessonSegments.lessonId, body.lessonId),
+          eq(lessonSegments.recordingId, body.recordingId),
+          eq(lessonSegments.status, "selected"),
+        ),
+      )
+      .orderBy(asc(lessonSegments.startsAtSeconds));
+
+    if (selectedSegments.length === 0 && body.includeFullRecording !== true) {
+      return NextResponse.json(
+        {
+          error:
+            "No teaching segments selected. Confirm full-recording transcription to continue.",
+        },
+        { status: 400 },
+      );
+    }
+
+    let transcriptionText = "";
+    let transcriptionModel = "";
+    let transcriptionDurationMs = 0;
+
+    if (selectedSegments.length > 0) {
+      const { clipAudioSegments } = await import("@/lib/server/audio-segments");
+      const clipped = await clipAudioSegments({
+        segments: selectedSegments,
+        sourceFilePath: audioFile.filePath,
+      });
+
+      try {
+        const segmentTexts: string[] = [];
+
+        for (const [index, clippedSegment] of clipped.clippedSegments.entries()) {
+          const transcription = await transcribeAudioFile({
+            filePath: clippedSegment.filePath,
+          });
+          transcriptionModel = transcription.model;
+          transcriptionDurationMs += transcription.durationMs;
+          segmentTexts.push(
+            [
+              `[Teaching segment ${index + 1}: ${clippedSegment.segment.title}. Original audio ${formatTimestamp(
+                clippedSegment.segment.startsAtSeconds,
+              )}-${formatTimestamp(clippedSegment.segment.endsAtSeconds)}.]`,
+              transcription.text,
+            ].join("\n"),
+          );
+        }
+
+        transcriptionText = segmentTexts.join("\n\n");
+      } finally {
+        await clipped.cleanup();
+      }
+    } else {
+      const transcription = await transcribeAudioFile({ filePath: audioFile.filePath });
+      transcriptionText = transcription.text;
+      transcriptionModel = transcription.model;
+      transcriptionDurationMs = transcription.durationMs;
+    }
+
     const completedAt = new Date().toISOString();
     let transcriptId: string;
     const [existingTranscript] = await db
@@ -248,8 +323,8 @@ export async function POST(request: Request) {
         .set({
           language: "en",
           status: "complete",
-          text: transcription.text,
-          model: transcription.model,
+          text: transcriptionText,
+          model: transcriptionModel,
           requestedAt,
           completedAt,
           errorMessage: null,
@@ -264,8 +339,8 @@ export async function POST(request: Request) {
           recordingId: body.recordingId,
           language: "en",
           status: "complete",
-          text: transcription.text,
-          model: transcription.model,
+          text: transcriptionText,
+          model: transcriptionModel,
           requestedAt,
           completedAt,
         })
@@ -284,7 +359,7 @@ export async function POST(request: Request) {
 
     try {
       const analysis = await analyzeLessonTranscript({
-        transcriptText: transcription.text,
+        transcriptText: transcriptionText,
       });
       await saveLessonAnalysis({
         analysis,
@@ -298,6 +373,17 @@ export async function POST(request: Request) {
       console.error("Lesson analysis failed", error);
     }
 
+    if (selectedSegments.length > 0) {
+      await Promise.all(
+        selectedSegments.map((segment) =>
+          db
+            .update(lessonSegments)
+            .set({ status: "transcribed", updatedAt: completedAt })
+            .where(eq(lessonSegments.id, segment.id)),
+        ),
+      );
+    }
+
     return NextResponse.json({
       ok: true,
       status:
@@ -307,12 +393,13 @@ export async function POST(request: Request) {
       analysisStatus,
       lessonId: body.lessonId,
       recordingId: body.recordingId,
-      model: transcription.model,
-      durationMs: transcription.durationMs,
-      characterCount: transcription.text.length,
+      model: transcriptionModel,
+      durationMs: transcriptionDurationMs,
+      characterCount: transcriptionText.length,
       practiceCandidateCount,
+      selectedSegmentCount: selectedSegments.length,
       summaryBulletCount,
-      text: transcription.text,
+      text: transcriptionText,
     });
   } catch (error) {
     const errorMessage =

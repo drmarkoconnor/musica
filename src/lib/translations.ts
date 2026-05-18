@@ -27,6 +27,10 @@ export const translations = {
     transcribeLesson: "Transcribe Lesson",
     transcriptionNote:
       "Transcription uses paid AI processing and requires authorisation.",
+    selectedSegmentsWillTranscribe: "Selected teaching segments will be transcribed:",
+    noSegmentsWillTranscribeFull:
+      "No teaching segments are selected. This would transcribe the full recording:",
+    confirmFullTranscription: "I understand this will send the full recording.",
     password: "Password",
     authorise: "Authorise",
     cancel: "Cancel",
@@ -73,6 +77,18 @@ export const translations = {
     markTeachingClip: "Mark teaching clip",
     markTeachingClipNote:
       "Choose the part of the recording that contains useful teaching, preview it, then save it as a review candidate.",
+    teachingSegments: "Teaching segments",
+    teachingSegmentsNote:
+      "Mark only the parts that contain useful teaching. These selected minutes are what the passworded transcription will send by default.",
+    teachingSegment: "Teaching segment",
+    addTeachingSegment: "Add teaching segment",
+    teachingSegmentPlaceholder:
+      "Optional note, for example: rootless voicing explanation.",
+    addSegment: "Add segment",
+    noTeachingSegments:
+      "No teaching segments selected yet. Add at least one segment to avoid transcribing the whole recording.",
+    segmentSaved: "Segment saved for transcription.",
+    segmentSaveFailed: "Segment could not be saved.",
     manualTeachingClip: "Teaching point",
     selectedTeachingClip: "Selected teaching clip",
     manualTeachingClipPlaceholder:
@@ -197,6 +213,12 @@ export const translations = {
     transcribeLesson: "Trascrivi la lezione",
     transcriptionNote:
       "La trascrizione usa elaborazione AI a pagamento e richiede autorizzazione.",
+    selectedSegmentsWillTranscribe:
+      "Saranno trascritti i segmenti didattici selezionati:",
+    noSegmentsWillTranscribeFull:
+      "Nessun segmento didattico e selezionato. Questo trascriverebbe tutta la registrazione:",
+    confirmFullTranscription:
+      "Ho capito che verra inviata tutta la registrazione.",
     password: "Password",
     authorise: "Autorizza",
     cancel: "Annulla",
@@ -244,6 +266,18 @@ export const translations = {
     markTeachingClip: "Segna clip didattica",
     markTeachingClipNote:
       "Scegli la parte della registrazione che contiene insegnamento utile, ascoltala, poi salvala come proposta da rivedere.",
+    teachingSegments: "Segmenti didattici",
+    teachingSegmentsNote:
+      "Segna solo le parti con insegnamento utile. Per impostazione predefinita la trascrizione con password inviera questi minuti selezionati.",
+    teachingSegment: "Segmento didattico",
+    addTeachingSegment: "Aggiungi segmento didattico",
+    teachingSegmentPlaceholder:
+      "Nota opzionale, per esempio: spiegazione sui voicing rootless.",
+    addSegment: "Aggiungi segmento",
+    noTeachingSegments:
+      "Nessun segmento didattico selezionato. Aggiungine almeno uno per evitare di trascrivere tutta la registrazione.",
+    segmentSaved: "Segmento salvato per la trascrizione.",
+    segmentSaveFailed: "Impossibile salvare il segmento.",
     manualTeachingClip: "Punto didattico",
     selectedTeachingClip: "Clip didattica selezionata",
     manualTeachingClipPlaceholder:

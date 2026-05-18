@@ -35,6 +35,18 @@ export const extractStatusEnum = pgEnum("extract_status", [
   "discarded",
 ]);
 
+export const lessonSegmentStatusEnum = pgEnum("lesson_segment_status", [
+  "selected",
+  "discarded",
+  "transcribed",
+]);
+
+export const lessonSegmentSourceEnum = pgEnum("lesson_segment_source", [
+  "live_marker",
+  "post_lesson_review",
+  "ai_suggestion",
+]);
+
 export const practiceSourceEnum = pgEnum("practice_source", [
   "lesson",
   "manual",
@@ -126,6 +138,45 @@ export const lessonRecordings = pgTable(
     check(
       "lesson_recordings_duration_positive",
       sql`${table.durationSeconds} is null or ${table.durationSeconds} > 0`,
+    ),
+  ],
+);
+
+export const lessonSegments = pgTable(
+  "lesson_segments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    lessonId: uuid("lesson_id")
+      .notNull()
+      .references(() => lessons.id, { onDelete: "cascade" }),
+    recordingId: uuid("recording_id")
+      .notNull()
+      .references(() => lessonRecordings.id, { onDelete: "cascade" }),
+    title: text("title").notNull().default("Teaching segment"),
+    notes: text("notes"),
+    startsAtSeconds: integer("starts_at_seconds").notNull(),
+    endsAtSeconds: integer("ends_at_seconds").notNull(),
+    status: lessonSegmentStatusEnum("status").notNull().default("selected"),
+    source: lessonSegmentSourceEnum("source")
+      .notNull()
+      .default("post_lesson_review"),
+    createdAt: timestamp("created_at", { mode: "string", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "string", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("lesson_segments_lesson_id_idx").on(table.lessonId),
+    index("lesson_segments_recording_status_idx").on(
+      table.recordingId,
+      table.status,
+    ),
+    check("lesson_segments_start_non_negative", sql`${table.startsAtSeconds} >= 0`),
+    check(
+      "lesson_segments_end_after_start",
+      sql`${table.endsAtSeconds} > ${table.startsAtSeconds}`,
     ),
   ],
 );
@@ -564,6 +615,8 @@ export type LessonRow = typeof lessons.$inferSelect;
 export type NewLessonRow = typeof lessons.$inferInsert;
 export type LessonRecordingRow = typeof lessonRecordings.$inferSelect;
 export type NewLessonRecordingRow = typeof lessonRecordings.$inferInsert;
+export type LessonSegmentRow = typeof lessonSegments.$inferSelect;
+export type NewLessonSegmentRow = typeof lessonSegments.$inferInsert;
 export type TranscriptRow = typeof transcripts.$inferSelect;
 export type NewTranscriptRow = typeof transcripts.$inferInsert;
 export type LessonExtractRow = typeof lessonExtracts.$inferSelect;

@@ -16,7 +16,10 @@ export const LOCAL_LESSON_AUDIO_DIRECTORY = path.join(
   process.env.LOCAL_LESSON_AUDIO_DIRECTORY ??
     (process.env.NETLIFY
       ? path.join(os.tmpdir(), "practice-loop/lesson-recordings")
-      : path.join(process.cwd(), "docs/lesson-recordings")),
+      : path.join(
+          /*turbopackIgnore: true*/ process.cwd(),
+          "docs/lesson-recordings",
+        )),
 );
 
 export type TestAudioFixture = {
@@ -36,7 +39,7 @@ export const testAudioFixtures: Record<string, TestAudioFixture> = {
     storageBucket: "local-test-audio",
     storagePath: TEST_LESSON_FIXTURE_STORAGE_PATH,
     filePath: path.join(
-      process.cwd(),
+      /*turbopackIgnore: true*/ process.cwd(),
       "docs/test-audio/Leo Lesson_20260424_1200.central-15m.m4a",
     ),
     durationSeconds: 900,

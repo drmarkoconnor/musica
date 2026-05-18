@@ -145,6 +145,7 @@ export async function analyzeLessonTranscript({
           "For summaryBullets, keep only musically useful teaching points, decisions, repertoire observations, and context worth remembering.",
           "Only create practiceCandidates when the teacher clearly asks for a repeatable practice task, drill, assignment, or technical focus.",
           "A clear assignment such as moving a voicing pattern through all 12 keys should be a practiceCandidate.",
+          "When the transcript contains bracketed teaching segment labels with original audio times, use those original audio times for startsAtSeconds and endsAtSeconds.",
           "If the transcript has no reliable timestamps, use startsAtSeconds 0 and omit endsAtSeconds.",
         ].join(" "),
       },

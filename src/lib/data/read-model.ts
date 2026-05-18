@@ -62,6 +62,7 @@ function createNeonCompatibleMockReadModel(): PracticeLoopReadModel {
     })),
     lessons: mockPracticeLoopReadModel.lessons,
     lessonRecordings: mockPracticeLoopReadModel.lessonRecordings,
+    lessonSegments: mockPracticeLoopReadModel.lessonSegments,
     transcripts: mockPracticeLoopReadModel.transcripts,
     lessonExtracts: mockPracticeLoopReadModel.lessonExtracts.map((extract) => ({
       ...extract,
@@ -107,6 +108,7 @@ function mergeWithFallback(model: PracticeLoopReadModel): PracticeLoopReadModel 
     exercises: model.exercises.length > 0 ? model.exercises : fallback.exercises,
     lessons: model.lessons,
     lessonRecordings: model.lessonRecordings,
+    lessonSegments: model.lessonSegments,
     transcripts: model.transcripts,
     lessonExtracts: model.lessonExtracts,
     practiceTasks: model.practiceTasks,

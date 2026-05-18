@@ -10,17 +10,27 @@ type RequestState = "idle" | "loading" | "success" | "error";
 
 export function TranscriptionGate({
   lessonId,
+  recordingDurationSeconds,
   recordingId,
+  selectedSegmentCount,
+  selectedSegmentSeconds,
 }: {
   lessonId: string;
+  recordingDurationSeconds: number;
   recordingId: string;
+  selectedSegmentCount: number;
+  selectedSegmentSeconds: number;
 }) {
   const { t } = useLanguage();
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [password, setPassword] = useState("");
+  const [includeFullRecording, setIncludeFullRecording] = useState(false);
   const [requestState, setRequestState] = useState<RequestState>("idle");
   const [message, setMessage] = useState("");
+  const hasSelectedSegments = selectedSegmentCount > 0;
+  const selectedMinutes = Math.ceil(selectedSegmentSeconds / 60);
+  const fullRecordingMinutes = Math.ceil((recordingDurationSeconds || 0) / 60);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -30,7 +40,12 @@ export function TranscriptionGate({
     const response = await fetch("/api/transcriptions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lessonId, recordingId, password }),
+      body: JSON.stringify({
+        includeFullRecording,
+        lessonId,
+        recordingId,
+        password,
+      }),
     });
 
     if (!response.ok) {
@@ -63,6 +78,7 @@ export function TranscriptionGate({
               className="inline-flex items-center gap-2 rounded-md bg-emerald-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-900"
               onClick={() => {
                 setIsOpen(true);
+                setIncludeFullRecording(false);
                 setRequestState("idle");
                 setMessage("");
               }}
@@ -98,6 +114,37 @@ export function TranscriptionGate({
             </div>
 
             <form className="space-y-4" onSubmit={handleSubmit}>
+              <div className="rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-sm leading-6 text-stone-700">
+                {hasSelectedSegments ? (
+                  <p>
+                    {t("selectedSegmentsWillTranscribe")}{" "}
+                    <strong>
+                      {selectedSegmentCount} / {selectedMinutes} {t("minutes")}
+                    </strong>
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    <p>
+                      {t("noSegmentsWillTranscribeFull")}{" "}
+                      <strong>
+                        {fullRecordingMinutes} {t("minutes")}
+                      </strong>
+                    </p>
+                    <label className="flex items-start gap-2">
+                      <input
+                        checked={includeFullRecording}
+                        className="mt-1 h-4 w-4 accent-emerald-900"
+                        onChange={(event) =>
+                          setIncludeFullRecording(event.target.checked)
+                        }
+                        type="checkbox"
+                      />
+                      <span>{t("confirmFullTranscription")}</span>
+                    </label>
+                  </div>
+                )}
+              </div>
+
               <label className="block">
                 <span className="text-sm font-medium text-stone-800">
                   {t("password")}
@@ -134,7 +181,11 @@ export function TranscriptionGate({
                 </button>
                 <button
                   className="inline-flex items-center gap-2 rounded-md bg-emerald-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-900 disabled:cursor-not-allowed disabled:opacity-60"
-                  disabled={requestState === "loading" || password.length === 0}
+                  disabled={
+                    requestState === "loading" ||
+                    password.length === 0 ||
+                    (!hasSelectedSegments && !includeFullRecording)
+                  }
                   type="submit"
                 >
                   {requestState === "loading" ? (

@@ -4,3 +4,6 @@
 
 [build.environment]
   SECRETS_SCAN_OMIT_KEYS = "PRACTICE_LOOP_DATA_SOURCE"
+
+[functions]
+  included_files = ["node_modules/ffmpeg-static/ffmpeg"]

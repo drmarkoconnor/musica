@@ -59,16 +59,24 @@ compiled output.
   recordings after authorisation
 - After transcription, a second AI pass creates a lesson summary and candidate
   practice items when the transcript contains clear teaching instructions.
+- Mark teaching segments on a saved recording before transcription.
+- See selected segment count and selected minutes before entering the
+  transcription password.
+- Transcription now uses selected teaching segments by default; full-recording
+  transcription requires an explicit checkbox when no segments are selected.
 - Attach the central 15-minute fixture to a lesson
 - Play allow-listed lesson audio and browser-recorded lesson audio in the
   lesson screen
 - Use the compact lesson history to switch between previous lessons and inspect
   their audio, narrative transcript, and extracted candidates.
-- View saved transcript text as a bulleted list
+- View the AI lesson summary first, with raw transcript text collapsed by
+  default
 - Review fixture transcript as a single executive-summary card with timestamped
   bullets
 - Listen to the relevant clip from the small button beside each bullet
 - Create a lesson-sourced practice note from a transcript bullet
+- Keep or discard extracted candidate practice items. Kept items become
+  lesson-sourced practice tasks in `From Lessons`.
 - Real 24 April 2026 Leo lesson audio is available locally for upcoming
   transcription work
 - A central 15-minute test fixture has been cut from that recording
@@ -78,7 +86,8 @@ compiled output.
 These controls are intentionally disabled and marked `Coming soon`:
 
 - Upload audio
-- Keep / edit / discard lesson extracts
+- Edit lesson extracts
+- Split or merge teaching segments
 - Practice session accept / skip / replace / add
 - Metronome controls
 - Upload asset
@@ -150,17 +159,19 @@ posting `testAudioFixture: "leo-20260424-central-15"` to
 19. Press `Start live lesson recording` for a short 20-60 second test.
 20. Speak or play a little, then press `Stop and save lesson`.
 21. Confirm a new lesson appears with playable audio.
-22. Press `Transcribe Lesson`, enter the transcription password, and wait for
+22. Add one teaching segment around the useful part of the recording.
+23. Confirm the transcription modal shows the selected segment count and
+    selected minutes.
+24. Press `Transcribe Lesson`, enter the transcription password, and wait for
     the modal success message.
-23. Confirm the transcript appears as bullets after the page refreshes.
-24. Confirm Upload audio, Keep, Edit, and Discard remain disabled until the
-    remaining review pipeline is implemented.
+25. Confirm the lesson summary appears and raw transcript is collapsed.
+26. Keep one useful extracted candidate.
+27. Open `http://localhost:3001/from-lessons` and confirm the kept item appears.
 
 Archive is safer than delete. Delete is available in the edit dialog and asks
 for confirmation.
 
 ## What Comes Next
 
-The next sensible feature is generating the executive summary from the saved
-transcript, then adding adjustable cost-aware teaching segment markers so only
-selected teaching sections need to be sent to paid transcription.
+The next sensible feature is tightening the segment editor: split, merge, and
+better post-lesson navigation for long recordings.
