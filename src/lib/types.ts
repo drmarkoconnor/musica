@@ -122,6 +122,10 @@ export type PracticeTask = {
   endsAtSeconds?: number;
   tags: string[];
   status: PracticeStatus;
+  confidence: Confidence;
+  importance: number;
+  lastPractised: string;
+  targetFrequencyDays: number;
   resurfacingScore: number;
   createdAt: string;
 };

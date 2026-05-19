@@ -10,7 +10,9 @@ export type PracticeTaskRequestBody = {
   linkedExerciseId?: unknown;
   startsAtSeconds?: unknown;
   endsAtSeconds?: unknown;
+  confidence?: unknown;
   importance?: unknown;
+  targetFrequencyDays?: unknown;
 };
 
 function optionalText(value: unknown) {
@@ -60,7 +62,14 @@ export function parsePracticeTaskPayload(body: PracticeTaskRequestBody) {
   const linkedExerciseId = optionalText(body.linkedExerciseId);
   const startsAtSeconds = optionalNonNegativeInt(body.startsAtSeconds);
   const endsAtSeconds = optionalNonNegativeInt(body.endsAtSeconds);
+  const confidence = optionalIntInRange(body.confidence, 3, 1, 5);
   const importance = optionalIntInRange(body.importance, 3, 1, 5);
+  const targetFrequencyDays = optionalIntInRange(
+    body.targetFrequencyDays,
+    source === "lesson" ? 7 : 3,
+    1,
+    365,
+  );
 
   if (!title) {
     return { error: "Title is required." };
@@ -68,6 +77,14 @@ export function parsePracticeTaskPayload(body: PracticeTaskRequestBody) {
 
   if (typeof importance === "undefined") {
     return { error: "Importance must be between 1 and 5." };
+  }
+
+  if (typeof confidence === "undefined") {
+    return { error: "Confidence must be between 1 and 5." };
+  }
+
+  if (typeof targetFrequencyDays === "undefined") {
+    return { error: "Frequency must be between 1 and 365 days." };
   }
 
   if (linkedPieceId && !isUuid(linkedPieceId)) {
@@ -118,7 +135,9 @@ export function parsePracticeTaskPayload(body: PracticeTaskRequestBody) {
       startsAtSeconds,
       endsAtSeconds,
       status: "new" as PracticeStatus,
+      confidence,
       importance,
+      targetFrequencyDays,
       resurfacingScore: "50",
       updatedAt: new Date().toISOString(),
     },

@@ -10,7 +10,10 @@ import {
 import type { PracticeStatus } from "@/lib/types";
 
 type PracticeTaskUpdateBody = {
+  confidence?: unknown;
+  lastPractised?: unknown;
   status?: unknown;
+  targetFrequencyDays?: unknown;
 };
 
 const practiceStatuses = new Set<PracticeStatus>([
@@ -24,6 +27,36 @@ function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     value,
   );
+}
+
+function optionalIntInRange(value: unknown, min: number, max: number) {
+  if (value === "" || value === null || typeof value === "undefined") {
+    return null;
+  }
+
+  const numberValue = Number(value);
+  if (!Number.isInteger(numberValue) || numberValue < min || numberValue > max) {
+    return undefined;
+  }
+
+  return numberValue;
+}
+
+function optionalDate(value: unknown) {
+  if (value === "" || value === null || typeof value === "undefined") {
+    return null;
+  }
+
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return undefined;
+  }
+
+  const parsed = Date.parse(`${value}T00:00:00Z`);
+  if (Number.isNaN(parsed)) {
+    return undefined;
+  }
+
+  return value;
 }
 
 export async function PATCH(
@@ -44,19 +77,59 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const status = typeof body.status === "string" ? body.status : "";
+  const updates: Partial<typeof practiceTasks.$inferInsert> = {
+    updatedAt: new Date().toISOString(),
+  };
+  const status = typeof body.status === "string" ? body.status : null;
+  const confidence = optionalIntInRange(body.confidence, 1, 5);
+  const targetFrequencyDays = optionalIntInRange(body.targetFrequencyDays, 1, 365);
+  const lastPractised = optionalDate(body.lastPractised);
 
-  if (!practiceStatuses.has(status as PracticeStatus)) {
+  if (status !== null && !practiceStatuses.has(status as PracticeStatus)) {
     return NextResponse.json({ error: "Status is invalid." }, { status: 400 });
+  }
+
+  if (typeof confidence === "undefined") {
+    return NextResponse.json(
+      { error: "Confidence must be between 1 and 5." },
+      { status: 400 },
+    );
+  }
+
+  if (typeof targetFrequencyDays === "undefined") {
+    return NextResponse.json(
+      { error: "Frequency must be between 1 and 365 days." },
+      { status: 400 },
+    );
+  }
+
+  if (typeof lastPractised === "undefined") {
+    return NextResponse.json(
+      { error: "Last practised date is invalid." },
+      { status: 400 },
+    );
+  }
+
+  if (status !== null) {
+    updates.status = status as PracticeStatus;
+  }
+
+  if (confidence !== null) {
+    updates.confidence = confidence;
+  }
+
+  if (targetFrequencyDays !== null) {
+    updates.targetFrequencyDays = targetFrequencyDays;
+  }
+
+  if (lastPractised !== null || "lastPractised" in body) {
+    updates.lastPractisedOn = lastPractised;
   }
 
   const db = createDatabaseClient();
   const [task] = await db
     .update(practiceTasks)
-    .set({
-      status: status as PracticeStatus,
-      updatedAt: new Date().toISOString(),
-    })
+    .set(updates)
     .where(eq(practiceTasks.id, taskId))
     .returning({ id: practiceTasks.id });
 

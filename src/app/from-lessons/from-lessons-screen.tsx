@@ -6,6 +6,7 @@ import { type FormEvent, useState } from "react";
 import {
   Archive,
   ArrowUpRight,
+  Check,
   Edit3,
   ListPlus,
   RotateCcw,
@@ -18,23 +19,34 @@ import { Section } from "@/components/section";
 import { StatusPill } from "@/components/status-pill";
 import type { PracticeLoopReadModel } from "@/lib/data";
 import { useLanguage } from "@/lib/language";
-import type { PracticeStatus, PracticeTask } from "@/lib/types";
-import { formatDuration } from "@/lib/utils";
+import type { Confidence, PracticeStatus, PracticeTask } from "@/lib/types";
+import { cn, formatDuration } from "@/lib/utils";
 
 type PracticeItemFormValues = {
   title: string;
   body: string;
+  confidence: string;
   linkedPieceId: string;
   importance: string;
+  targetFrequencyDays: string;
 };
+
+const confidenceSteps: Confidence[] = [1, 2, 3, 4, 5];
+const frequencyOptions = [1, 2, 3, 7, 14, 30];
 
 function emptyPracticeItemForm(): PracticeItemFormValues {
   return {
     title: "",
     body: "",
+    confidence: "3",
     linkedPieceId: "",
     importance: "3",
+    targetFrequencyDays: "3",
   };
+}
+
+function todayIsoDate() {
+  return new Date().toISOString().slice(0, 10);
 }
 
 function sortPracticeTasks(left: PracticeTask, right: PracticeTask) {
@@ -82,14 +94,22 @@ export function FromLessonsScreen({ data }: { data: PracticeLoopReadModel }) {
     "idle" | "saving" | "saved" | "error"
   >("idle");
 
-  async function updateTaskStatus(taskId: string, status: PracticeStatus) {
+  async function patchTask(
+    taskId: string,
+    updates: {
+      confidence?: Confidence;
+      lastPractised?: string;
+      status?: PracticeStatus;
+      targetFrequencyDays?: number;
+    },
+  ) {
     setActionState((current) => ({ ...current, [taskId]: "saving" }));
     setActionErrors((current) => ({ ...current, [taskId]: "" }));
 
     const response = await fetch(`/api/practice-tasks/${taskId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
+      body: JSON.stringify(updates),
     });
 
     if (!response.ok) {
@@ -106,6 +126,10 @@ export function FromLessonsScreen({ data }: { data: PracticeLoopReadModel }) {
 
     setActionState((current) => ({ ...current, [taskId]: "idle" }));
     router.refresh();
+  }
+
+  async function updateTaskStatus(taskId: string, status: PracticeStatus) {
+    await patchTask(taskId, { status });
   }
 
   async function deleteTask(taskId: string) {
@@ -156,8 +180,10 @@ export function FromLessonsScreen({ data }: { data: PracticeLoopReadModel }) {
         source: "manual",
         title: formValues.title,
         body: formValues.body,
+        confidence: Number(formValues.confidence),
         linkedPieceId: formValues.linkedPieceId || undefined,
         importance: Number(formValues.importance),
+        targetFrequencyDays: Number(formValues.targetFrequencyDays),
       }),
     });
 
@@ -245,7 +271,7 @@ export function FromLessonsScreen({ data }: { data: PracticeLoopReadModel }) {
                   className={`p-2.5 ${isParked ? "bg-stone-50 text-stone-500" : ""}`}
                   key={task.id}
                 >
-                  <div className="grid gap-3 lg:grid-cols-[minmax(0,1.45fr)_9rem_8rem_8rem_auto] lg:items-center">
+                  <div className="grid gap-3 lg:grid-cols-[minmax(0,1.35fr)_9rem_8rem_11rem_auto] lg:items-center">
                     <div className="min-w-0">
                       <h2 className="truncate text-sm font-semibold text-stone-950">
                         {task.title}
@@ -279,9 +305,55 @@ export function FromLessonsScreen({ data }: { data: PracticeLoopReadModel }) {
                         {task.status}
                       </StatusPill>
                     </div>
-                    <p className="text-sm font-medium text-stone-600">
-                      {sourceLabel}
-                    </p>
+                    <div className="space-y-1">
+                      <div className="flex items-end gap-1">
+                        {confidenceSteps.map((step) => (
+                          <button
+                            aria-label={`${t("confidence")} ${step}`}
+                            aria-pressed={task.confidence === step}
+                            className={cn(
+                              "w-4 rounded-sm transition disabled:cursor-not-allowed disabled:opacity-60",
+                              step <= task.confidence
+                                ? "bg-emerald-800 hover:bg-emerald-950"
+                                : "bg-stone-200 hover:bg-stone-300",
+                              step === 1 ? "h-3" : "",
+                              step === 2 ? "h-4" : "",
+                              step === 3 ? "h-5" : "",
+                              step === 4 ? "h-6" : "",
+                              step === 5 ? "h-7" : "",
+                            )}
+                            disabled={isSaving}
+                            key={step}
+                            onClick={() =>
+                              void patchTask(task.id, { confidence: step })
+                            }
+                            type="button"
+                          />
+                        ))}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <select
+                          aria-label={t("frequency")}
+                          className="h-8 rounded-md border border-stone-300 bg-white px-2 text-xs font-semibold text-stone-700 outline-none transition focus:border-emerald-800 focus:ring-2 focus:ring-emerald-800/20 disabled:cursor-not-allowed disabled:opacity-60"
+                          disabled={isSaving}
+                          onChange={(event) =>
+                            void patchTask(task.id, {
+                              targetFrequencyDays: Number(event.target.value),
+                            })
+                          }
+                          value={task.targetFrequencyDays}
+                        >
+                          {frequencyOptions.map((days) => (
+                            <option key={days} value={days}>
+                              {days}d
+                            </option>
+                          ))}
+                        </select>
+                        <span className="truncate text-xs text-stone-500">
+                          {task.lastPractised || t("notYet")}
+                        </span>
+                      </div>
+                    </div>
                     <div className="flex flex-wrap justify-start gap-1 lg:justify-end">
                       {audioSrc ? (
                         <AudioStrip
@@ -295,6 +367,21 @@ export function FromLessonsScreen({ data }: { data: PracticeLoopReadModel }) {
                           title={task.title}
                         />
                       ) : null}
+                      <button
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-emerald-200 text-emerald-900 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
+                        disabled={isSaving}
+                        onClick={() =>
+                          void patchTask(task.id, {
+                            lastPractised: todayIsoDate(),
+                            status: task.status === "new" ? "active" : task.status,
+                          })
+                        }
+                        title={t("markPractised")}
+                        type="button"
+                      >
+                        <Check aria-hidden="true" className="h-4 w-4" />
+                        <span className="sr-only">{t("markPractised")}</span>
+                      </button>
                       <button
                         className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-stone-300 text-stone-500 opacity-70"
                         disabled
@@ -480,7 +567,7 @@ export function FromLessonsScreen({ data }: { data: PracticeLoopReadModel }) {
                 />
               </label>
 
-              <div className="grid gap-4 sm:grid-cols-[1fr_8rem]">
+              <div className="grid gap-4 sm:grid-cols-[1fr_7rem_7rem_7rem]">
                 <label className="block">
                   <span className="text-sm font-medium text-stone-800">
                     {t("piece")}
@@ -506,6 +593,28 @@ export function FromLessonsScreen({ data }: { data: PracticeLoopReadModel }) {
 
                 <label className="block">
                   <span className="text-sm font-medium text-stone-800">
+                    {t("confidence")}
+                  </span>
+                  <select
+                    className="mt-2 w-full rounded-md border border-stone-300 px-3 py-2 text-stone-950 outline-none transition focus:border-emerald-800 focus:ring-2 focus:ring-emerald-800/20"
+                    onChange={(event) =>
+                      setFormValues((current) => ({
+                        ...current,
+                        confidence: event.target.value,
+                      }))
+                    }
+                    value={formValues.confidence}
+                  >
+                    {[1, 2, 3, 4, 5].map((value) => (
+                      <option key={value} value={value}>
+                        {value}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="block">
+                  <span className="text-sm font-medium text-stone-800">
                     {t("importance")}
                   </span>
                   <select
@@ -521,6 +630,28 @@ export function FromLessonsScreen({ data }: { data: PracticeLoopReadModel }) {
                     {[1, 2, 3, 4, 5].map((value) => (
                       <option key={value} value={value}>
                         {value}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="block">
+                  <span className="text-sm font-medium text-stone-800">
+                    {t("frequency")}
+                  </span>
+                  <select
+                    className="mt-2 w-full rounded-md border border-stone-300 px-3 py-2 text-stone-950 outline-none transition focus:border-emerald-800 focus:ring-2 focus:ring-emerald-800/20"
+                    onChange={(event) =>
+                      setFormValues((current) => ({
+                        ...current,
+                        targetFrequencyDays: event.target.value,
+                      }))
+                    }
+                    value={formValues.targetFrequencyDays}
+                  >
+                    {frequencyOptions.map((days) => (
+                      <option key={days} value={days}>
+                        {days}d
                       </option>
                     ))}
                   </select>

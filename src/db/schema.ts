@@ -407,7 +407,10 @@ export const practiceTasks = pgTable(
     startsAtSeconds: integer("starts_at_seconds"),
     endsAtSeconds: integer("ends_at_seconds"),
     status: practiceStatusEnum("status").notNull().default("new"),
+    confidence: integer("confidence").notNull().default(3),
     importance: integer("importance").notNull().default(3),
+    lastPractisedOn: date("last_practised_on"),
+    targetFrequencyDays: integer("target_frequency_days").notNull().default(7),
     resurfacingScore: numeric("resurfacing_score", {
       precision: 6,
       scale: 2,
@@ -424,7 +427,13 @@ export const practiceTasks = pgTable(
   (table) => [
     index("practice_tasks_status_idx").on(table.status),
     index("practice_tasks_piece_idx").on(table.linkedPieceId),
+    index("practice_tasks_last_practised_idx").on(table.lastPractisedOn),
+    check("practice_tasks_confidence_range", sql`${table.confidence} between 1 and 5`),
     check("practice_tasks_importance_range", sql`${table.importance} between 1 and 5`),
+    check(
+      "practice_tasks_target_frequency_positive",
+      sql`${table.targetFrequencyDays} > 0`,
+    ),
     check(
       "practice_tasks_start_non_negative",
       sql`${table.startsAtSeconds} is null or ${table.startsAtSeconds} >= 0`,

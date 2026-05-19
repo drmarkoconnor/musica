@@ -202,6 +202,10 @@ function mapPracticeTask(row: dbSchema.PracticeTaskRow): PracticeTask {
     endsAtSeconds: optional(row.endsAtSeconds),
     tags: [],
     status: row.status,
+    confidence: toConfidence(row.confidence),
+    importance: row.importance,
+    lastPractised: row.lastPractisedOn ?? "",
+    targetFrequencyDays: row.targetFrequencyDays,
     resurfacingScore: Number(row.resurfacingScore),
     createdAt: row.createdAt,
   };
@@ -290,20 +294,34 @@ function buildSmartQueue(
 
   const taskCandidates = practiceTasks
     .filter((task) => task.status === "new" || task.status === "active")
-    .map<QueueCandidate>((task) => ({
-      id: `queue-task-${task.id}`,
-      title: task.title,
-      kind: "lesson_task",
-      reason:
-        task.source === "lesson" ? "New from lesson" : "Manual practice item",
-      minutes: task.source === "lesson" ? 12 : 10,
-      taskId: task.id,
-      pieceId: task.linkedPieceId,
-      score:
-        task.resurfacingScore +
-        (task.status === "new" ? 30 : 12) +
-        (task.source === "lesson" ? 5 : 0),
-    }));
+    .map<QueueCandidate>((task) => {
+      const days = daysSince(task.lastPractised);
+      const overdueDays = Math.max(0, days - task.targetFrequencyDays);
+      const confidenceDebt = (6 - task.confidence) * 10;
+
+      return {
+        id: `queue-task-${task.id}`,
+        title: task.title,
+        kind: "lesson_task",
+        reason:
+          task.source === "lesson"
+            ? "New from lesson"
+            : task.lastPractised
+              ? "Due by practice frequency"
+              : "Manual practice item",
+        minutes: task.source === "lesson" ? 12 : 10,
+        confidence: task.confidence,
+        taskId: task.id,
+        pieceId: task.linkedPieceId,
+        score:
+          task.resurfacingScore +
+          task.importance * 6 +
+          overdueDays * 4 +
+          confidenceDebt +
+          (task.status === "new" ? 30 : 12) +
+          (task.source === "lesson" ? 5 : 0),
+      };
+    });
 
   const pieceCandidates = pieces
     .filter((piece) => piece.status !== "parked")
