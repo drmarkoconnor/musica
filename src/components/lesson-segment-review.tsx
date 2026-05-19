@@ -1,7 +1,19 @@
 "use client";
 
 import { FormEvent, useRef, useState } from "react";
-import { Check, Minus, Plus, RotateCcw, Scissors, Trash2 } from "lucide-react";
+import {
+  Check,
+  Minus,
+  Pause,
+  Play,
+  Plus,
+  RotateCcw,
+  Scissors,
+  SkipBack,
+  SkipForward,
+  Square,
+  Trash2,
+} from "lucide-react";
 import { AudioStrip } from "@/components/audio-strip";
 import { useLanguage } from "@/lib/language";
 import type { LessonSegment } from "@/lib/types";
@@ -23,6 +35,361 @@ function selectedSeconds(segments: LessonSegment[]) {
         total + Math.max(segment.endsAtSeconds - segment.startsAtSeconds, 0),
       0,
     );
+}
+
+const studioBars = [
+  32, 46, 39, 63, 42, 55, 74, 38, 58, 45, 69, 52, 44, 61, 36, 49, 71, 41, 57,
+  66, 47, 53, 76, 43, 59, 48, 67, 51, 40, 62, 72, 46,
+];
+
+function percentAt(seconds: number, durationSeconds: number) {
+  if (durationSeconds <= 0) return 0;
+  return clamp((seconds / durationSeconds) * 100, 0, 100);
+}
+
+function timelineMarks(durationSeconds: number) {
+  const markCount = durationSeconds > 360 ? 7 : 5;
+
+  return Array.from({ length: markCount }, (_, index) =>
+    Math.round((durationSeconds / Math.max(markCount - 1, 1)) * index),
+  );
+}
+
+function StudioTimeline({
+  audioSrc,
+  durationSeconds,
+  endsAtSeconds,
+  onEndChange,
+  onStartChange,
+  segments,
+  startsAtSeconds,
+}: {
+  audioSrc: string;
+  durationSeconds: number;
+  endsAtSeconds: number;
+  onEndChange: (seconds: number) => void;
+  onStartChange: (seconds: number) => void;
+  segments: LessonSegment[];
+  startsAtSeconds: number;
+}) {
+  const { t } = useLanguage();
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const clipEndRef = useRef<number | null>(null);
+  const lastScrubSecondRef = useRef<number | null>(null);
+  const wasPlayingBeforeScrubRef = useRef(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [playheadSeconds, setPlayheadSeconds] = useState(startsAtSeconds);
+  const [playbackError, setPlaybackError] = useState("");
+  const maxSeconds = Math.max(durationSeconds, 1);
+
+  function seekTo(seconds: number) {
+    const nextSeconds = clamp(Math.round(seconds), 0, maxSeconds);
+    const player = audioRef.current;
+
+    setPlayheadSeconds(nextSeconds);
+
+    if (player && player.readyState >= HTMLMediaElement.HAVE_METADATA) {
+      player.currentTime = nextSeconds;
+    }
+
+    return nextSeconds;
+  }
+
+  function secondFromPointer(clientX: number, element: HTMLElement) {
+    const rect = element.getBoundingClientRect();
+    const ratio = clamp((clientX - rect.left) / rect.width, 0, 1);
+
+    return Math.round(ratio * maxSeconds);
+  }
+
+  async function playFrom(seconds: number, endAt?: number) {
+    const player = audioRef.current;
+    if (!player) return;
+
+    setPlaybackError("");
+    clipEndRef.current = typeof endAt === "number" ? endAt : null;
+    player.playbackRate = 1;
+    player.currentTime = clamp(seconds, 0, maxSeconds);
+
+    try {
+      await player.play();
+    } catch {
+      setPlaybackError(t("playbackFailed"));
+    }
+  }
+
+  function stopPlayback() {
+    const player = audioRef.current;
+    if (!player) return;
+
+    player.pause();
+    player.playbackRate = 1;
+    clipEndRef.current = null;
+    setIsPlaying(false);
+  }
+
+  async function scrubTo(seconds: number) {
+    const player = audioRef.current;
+    const previousSecond = lastScrubSecondRef.current;
+    const nextSeconds = seekTo(seconds);
+
+    if (!player) return;
+
+    if (previousSecond !== null && nextSeconds !== previousSecond) {
+      player.playbackRate = nextSeconds > previousSecond ? 1.75 : 1.25;
+    }
+
+    lastScrubSecondRef.current = nextSeconds;
+
+    try {
+      await player.play();
+    } catch {
+      // Scrubbing still moves the playhead even if a browser blocks audio.
+    }
+  }
+
+  function finishScrub() {
+    const player = audioRef.current;
+    lastScrubSecondRef.current = null;
+
+    if (!player) return;
+
+    player.playbackRate = 1;
+
+    if (!wasPlayingBeforeScrubRef.current) {
+      player.pause();
+      setIsPlaying(false);
+    }
+  }
+
+  function setTwentySecondClip() {
+    const nextStart = clamp(playheadSeconds, 0, Math.max(maxSeconds - 1, 0));
+    const nextEnd = clamp(nextStart + 20, nextStart + 1, maxSeconds);
+
+    onStartChange(nextStart);
+    onEndChange(nextEnd);
+  }
+
+  function handleTimeUpdate() {
+    const player = audioRef.current;
+    if (!player) return;
+
+    setPlayheadSeconds(Math.round(player.currentTime));
+
+    if (
+      typeof clipEndRef.current === "number" &&
+      player.currentTime >= clipEndRef.current
+    ) {
+      stopPlayback();
+    }
+  }
+
+  const selectedLeft = percentAt(startsAtSeconds, maxSeconds);
+  const selectedRight = percentAt(endsAtSeconds, maxSeconds);
+  const playheadLeft = percentAt(playheadSeconds, maxSeconds);
+
+  return (
+    <div className="rounded-md border border-stone-200 bg-stone-950 p-3 text-white">
+      <audio
+        onEnded={() => setIsPlaying(false)}
+        onPause={() => setIsPlaying(false)}
+        onPlay={() => setIsPlaying(true)}
+        onTimeUpdate={handleTimeUpdate}
+        preload="auto"
+        ref={audioRef}
+        src={audioSrc}
+      />
+
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-emerald-200">
+            {t("audioStudio")}
+          </p>
+          <p className="mt-1 text-2xl font-semibold tabular-nums">
+            {formatDuration(playheadSeconds)}
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <button
+            className="inline-flex items-center justify-center gap-2 rounded-md border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
+            onClick={() => void playFrom(playheadSeconds)}
+            title={t("playFromPlayhead")}
+            type="button"
+          >
+            {isPlaying ? (
+              <Pause aria-hidden="true" className="h-4 w-4" />
+            ) : (
+              <Play aria-hidden="true" className="h-4 w-4" />
+            )}
+            {t("play")}
+          </button>
+          <button
+            className="inline-flex items-center justify-center gap-2 rounded-md border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
+            onClick={() => void playFrom(startsAtSeconds, endsAtSeconds)}
+            title={t("playSelection")}
+            type="button"
+          >
+            <SkipForward aria-hidden="true" className="h-4 w-4" />
+            {t("selection")}
+          </button>
+          <button
+            className="inline-flex items-center justify-center gap-2 rounded-md border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
+            onClick={stopPlayback}
+            type="button"
+          >
+            <Square aria-hidden="true" className="h-4 w-4" />
+            {t("stopClip")}
+          </button>
+          <button
+            className="inline-flex items-center justify-center gap-2 rounded-md border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
+            onClick={setTwentySecondClip}
+            title={t("makeTwentySecondClip")}
+            type="button"
+          >
+            <Scissors aria-hidden="true" className="h-4 w-4" />
+            20s
+          </button>
+        </div>
+      </div>
+
+      <div
+        className="relative mt-4 h-28 touch-none select-none overflow-hidden rounded-md border border-white/15 bg-stone-900"
+        onKeyDown={(event) => {
+          if (event.key === "ArrowLeft") {
+            seekTo(playheadSeconds - (event.shiftKey ? 5 : 1));
+          }
+          if (event.key === "ArrowRight") {
+            seekTo(playheadSeconds + (event.shiftKey ? 5 : 1));
+          }
+        }}
+        onPointerCancel={finishScrub}
+        onPointerDown={(event) => {
+          wasPlayingBeforeScrubRef.current = isPlaying;
+          event.currentTarget.setPointerCapture(event.pointerId);
+          void scrubTo(secondFromPointer(event.clientX, event.currentTarget));
+        }}
+        onPointerMove={(event) => {
+          if (event.buttons !== 1) return;
+          void scrubTo(secondFromPointer(event.clientX, event.currentTarget));
+        }}
+        onPointerUp={finishScrub}
+        role="slider"
+        tabIndex={0}
+        title={t("scrubTimeline")}
+      >
+        <div className="absolute inset-x-3 bottom-4 top-8 flex items-end gap-1">
+          {studioBars.map((height, index) => (
+            <span
+              aria-hidden="true"
+              className="flex-1 rounded-t bg-emerald-200/45"
+              key={`${height}-${index}`}
+              style={{ height: `${height}%` }}
+            />
+          ))}
+        </div>
+
+        {segments.map((segment) => (
+          <span
+            aria-hidden="true"
+            className="absolute top-2 h-4 rounded-sm bg-sky-300/60 ring-1 ring-sky-100/50"
+            key={segment.id}
+            style={{
+              left: `${percentAt(segment.startsAtSeconds, maxSeconds)}%`,
+              width: `${Math.max(
+                percentAt(segment.endsAtSeconds, maxSeconds) -
+                  percentAt(segment.startsAtSeconds, maxSeconds),
+                0.8,
+              )}%`,
+            }}
+          />
+        ))}
+
+        <span
+          aria-hidden="true"
+          className="absolute bottom-0 top-0 bg-emerald-400/25 ring-1 ring-emerald-200/80"
+          style={{
+            left: `${selectedLeft}%`,
+            width: `${Math.max(selectedRight - selectedLeft, 0.8)}%`,
+          }}
+        />
+
+        <span
+          aria-hidden="true"
+          className="absolute bottom-0 top-0 w-0.5 bg-white shadow-[0_0_0_1px_rgba(15,23,42,0.35)]"
+          style={{ left: `${playheadLeft}%` }}
+        />
+      </div>
+
+      <div className="mt-3 flex justify-between gap-2 text-xs font-semibold text-stone-300">
+        {timelineMarks(maxSeconds).map((mark, index) => (
+          <span className="tabular-nums" key={`${mark}-${index}`}>
+            {formatDuration(mark)}
+          </span>
+        ))}
+      </div>
+
+      <div className="mt-3 grid gap-2 md:grid-cols-[1fr_auto_auto_auto] md:items-center">
+        <div className="grid grid-cols-2 gap-2 rounded-md bg-white/10 p-2">
+          <div>
+            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-stone-300">
+              {t("selectedRange")}
+            </p>
+            <p className="mt-1 text-lg font-semibold tabular-nums">
+              {formatDuration(startsAtSeconds)} - {formatDuration(endsAtSeconds)}
+            </p>
+          </div>
+          <div>
+            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-stone-300">
+              {t("existingClips")}
+            </p>
+            <p className="mt-1 text-lg font-semibold tabular-nums">
+              {segments.length}
+            </p>
+          </div>
+        </div>
+        <button
+          className="inline-flex items-center justify-center gap-2 rounded-md border border-white/15 bg-white px-3 py-2 text-sm font-semibold text-stone-900 transition hover:bg-stone-100"
+          onClick={() => onStartChange(playheadSeconds)}
+          title={t("setStartAtPlayhead")}
+          type="button"
+        >
+          <SkipBack aria-hidden="true" className="h-4 w-4" />
+          {t("setStart")}
+        </button>
+        <button
+          className="inline-flex items-center justify-center gap-2 rounded-md border border-white/15 bg-white px-3 py-2 text-sm font-semibold text-stone-900 transition hover:bg-stone-100"
+          onClick={() => onEndChange(playheadSeconds)}
+          title={t("setEndAtPlayhead")}
+          type="button"
+        >
+          <SkipForward aria-hidden="true" className="h-4 w-4" />
+          {t("setEnd")}
+        </button>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            aria-label={t("backFiveSeconds")}
+            className="inline-flex items-center justify-center rounded-md border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
+            onClick={() => seekTo(playheadSeconds - 5)}
+            type="button"
+          >
+            -5s
+          </button>
+          <button
+            aria-label={t("forwardFiveSeconds")}
+            className="inline-flex items-center justify-center rounded-md border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
+            onClick={() => seekTo(playheadSeconds + 5)}
+            type="button"
+          >
+            +5s
+          </button>
+        </div>
+      </div>
+
+      {playbackError ? (
+        <p className="mt-2 text-xs leading-5 text-rose-200">{playbackError}</p>
+      ) : null}
+    </div>
+  );
 }
 
 function FineTrimControl({
@@ -380,6 +747,24 @@ export function LessonSegmentReview({
           </div>
         </div>
 
+        <div className="mt-4">
+          <StudioTimeline
+            audioSrc={audioSrc}
+            durationSeconds={maxSeconds}
+            endsAtSeconds={endsAtSeconds}
+            onEndChange={(seconds) => {
+              setActiveEdge("end");
+              setEnd(seconds);
+            }}
+            onStartChange={(seconds) => {
+              setActiveEdge("start");
+              setStart(seconds);
+            }}
+            segments={segments}
+            startsAtSeconds={startsAtSeconds}
+          />
+        </div>
+
         <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_17rem]">
           <div className="grid gap-3 md:grid-cols-2">
             <label className="block rounded-md border border-stone-200 bg-stone-50 p-3">
@@ -454,15 +839,6 @@ export function LessonSegmentReview({
               value={notes}
             />
           </label>
-        </div>
-
-        <div className="mt-3">
-          <AudioStrip
-            audioSrc={audioSrc}
-            endsAtSeconds={endsAtSeconds}
-            startsAtSeconds={startsAtSeconds}
-            title={t("selectedTeachingClip")}
-          />
         </div>
 
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
