@@ -5,25 +5,21 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Archive,
-  ArrowUpRight,
   Edit3,
-  ExternalLink,
   Music2,
+  Star,
   Trash2,
   X,
 } from "lucide-react";
-import { ConfidenceMeter } from "@/components/confidence-meter";
 import { Section } from "@/components/section";
-import { StatusPill } from "@/components/status-pill";
 import type { PracticeLoopReadModel } from "@/lib/data";
 import { useLanguage } from "@/lib/language";
 import {
-  pieceCreditLine,
-  pieceStatusTone,
   pieceStatusTranslationKey,
   pieceTempoLabel,
 } from "@/lib/piece-labels";
 import type { Confidence, Piece, PieceStatus } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 type PieceFormValues = {
   title: string;
@@ -46,6 +42,19 @@ const statusOptions: PieceStatus[] = [
   "maintenance",
   "parked",
 ];
+
+const confidenceSteps: Confidence[] = [1, 2, 3, 4, 5];
+
+function sortByPracticeNeed(left: Piece, right: Piece) {
+  const leftDate = left.lastPractised || "0000-00-00";
+  const rightDate = right.lastPractised || "0000-00-00";
+
+  if (leftDate !== rightDate) {
+    return leftDate.localeCompare(rightDate);
+  }
+
+  return left.title.localeCompare(right.title);
+}
 
 function emptyForm(): PieceFormValues {
   return {
@@ -91,7 +100,9 @@ export function RepertoireScreen({
   const { t } = useLanguage();
   const router = useRouter();
   const { pieces } = data;
-  const activePieces = pieces.filter((piece) => piece.status !== "parked");
+  const activePieces = [...pieces]
+    .filter((piece) => piece.status !== "parked")
+    .sort(sortByPracticeNeed);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPiece, setEditingPiece] = useState<Piece | null>(null);
   const [formValues, setFormValues] = useState<PieceFormValues>(emptyForm);
@@ -101,6 +112,9 @@ export function RepertoireScreen({
   const [pieceActionState, setPieceActionState] = useState<
     "idle" | "archiving" | "deleting" | "archived" | "deleted" | "error"
   >("idle");
+  const [inlineActionState, setInlineActionState] = useState<
+    Record<string, "saving" | "error" | undefined>
+  >({});
   const [errorMessage, setErrorMessage] = useState("");
 
   function openAddModal() {
@@ -209,6 +223,36 @@ export function RepertoireScreen({
     setTimeout(() => closeModal(), 250);
   }
 
+  async function patchPieceInline(
+    piece: Piece,
+    updates: Partial<PieceFormValues>,
+  ) {
+    setInlineActionState((current) => ({ ...current, [piece.id]: "saving" }));
+    setErrorMessage("");
+
+    const response = await fetch(`/api/pieces/${piece.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...formFromPiece(piece),
+        ...updates,
+      }),
+    });
+
+    if (!response.ok) {
+      setInlineActionState((current) => ({ ...current, [piece.id]: "error" }));
+      setErrorMessage(t("saveFailed"));
+      return;
+    }
+
+    setInlineActionState((current) => ({ ...current, [piece.id]: undefined }));
+    router.refresh();
+  }
+
+  function openPiece(pieceId: string) {
+    router.push(`/repertoire/${pieceId}`);
+  }
+
   return (
     <div className="space-y-8">
       <Section
@@ -239,90 +283,187 @@ export function RepertoireScreen({
           </p>
         ) : null}
         <div className="overflow-hidden rounded-lg border border-stone-200 bg-white shadow-sm">
-          <div className="hidden grid-cols-[1.35fr_0.55fr_0.7fr_0.85fr_0.8fr_0.75fr_0.45fr_0.45fr] gap-4 border-b border-stone-200 bg-stone-50 px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-stone-500 lg:grid">
+          <div className="hidden grid-cols-[minmax(12rem,1.45fr)_4rem_5.5rem_9rem_9rem_7.5rem_6.5rem_5.5rem] gap-3 border-b border-stone-200 bg-stone-100 px-3 py-2.5 text-xs font-semibold uppercase tracking-[0.12em] text-stone-600 lg:grid">
             <span>{t("piece")}</span>
             <span>{t("musicalKey")}</span>
+            <span>{t("spineTune")}</span>
             <span>{t("status")}</span>
             <span>{t("confidence")}</span>
             <span>{t("lastPractised")}</span>
             <span>{t("currentTempo")}</span>
-            <span>{t("spotify")}</span>
             <span>{t("edit")}</span>
           </div>
-          <div className="divide-y divide-stone-200">
+          <div className="divide-y divide-stone-200 bg-stone-100">
             {activePieces.length > 0 ? (
-              activePieces.map((piece) => {
-                const creditLine = pieceCreditLine(piece, {
-                  composer: t("composer"),
-                  lyricist: t("lyricist"),
-                });
+              activePieces.map((piece, index) => {
+                const isSaving = inlineActionState[piece.id] === "saving";
+                const hasInlineError = inlineActionState[piece.id] === "error";
 
                 return (
-              <div
-                className="grid gap-3 px-4 py-4 transition hover:bg-stone-50 lg:grid-cols-[1.35fr_0.55fr_0.7fr_0.85fr_0.8fr_0.75fr_0.45fr_0.45fr] lg:items-center lg:gap-4"
-                key={piece.id}
-              >
-                <div>
-                  <div className="flex items-center gap-2">
-                    <Link
-                      className="font-semibold text-stone-950 hover:text-emerald-800"
-                      href={`/repertoire/${piece.id}`}
+                  <div
+                    aria-label={`${t("piece")}: ${piece.title}`}
+                    className={cn(
+                      "grid cursor-pointer gap-2 px-3 py-2.5 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-800/30 lg:grid-cols-[minmax(12rem,1.45fr)_4rem_5.5rem_9rem_9rem_7.5rem_6.5rem_5.5rem] lg:items-center lg:gap-3",
+                      index % 2 === 0 ? "bg-white" : "bg-stone-50",
+                      "hover:bg-emerald-50/70",
+                    )}
+                    key={piece.id}
+                    onClick={() => openPiece(piece.id)}
+                    onKeyDown={(event) => {
+                      if (event.target !== event.currentTarget) {
+                        return;
+                      }
+
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        openPiece(piece.id);
+                      }
+                    }}
+                    role="link"
+                    tabIndex={0}
+                  >
+                    <div className="min-w-0">
+                      <span className="block truncate font-semibold text-stone-950">
+                        {piece.title}
+                      </span>
+                      <span className="mt-0.5 block text-xs text-stone-500 lg:hidden">
+                        {piece.key || "-"} / {pieceTempoLabel(piece, t("bpm"))}
+                      </span>
+                    </div>
+
+                    <span className="text-sm font-medium text-stone-700">
+                      <span className="mr-2 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-stone-500 lg:hidden">
+                        {t("musicalKey")}
+                      </span>
+                      {piece.key || "-"}
+                    </span>
+
+                    <button
+                      aria-label={`${t("spineTune")}: ${piece.title}`}
+                      aria-pressed={piece.isSpineTune}
+                      className={cn(
+                        "inline-flex h-8 w-fit items-center gap-1.5 rounded-md border px-2 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60",
+                        piece.isSpineTune
+                          ? "border-emerald-800 bg-emerald-950 text-white"
+                          : "border-stone-300 bg-white text-stone-600 hover:bg-stone-100",
+                      )}
+                      disabled={isSaving}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void patchPieceInline(piece, {
+                          isSpineTune: !piece.isSpineTune,
+                        });
+                      }}
+                      type="button"
                     >
-                      {piece.title}
-                    </Link>
-                    {piece.isSpineTune ? (
-                      <StatusPill tone="blue">{t("spineTune")}</StatusPill>
+                      <Star
+                        aria-hidden="true"
+                        className={cn("h-4 w-4", piece.isSpineTune ? "fill-current" : "")}
+                      />
+                      <span className="hidden xl:inline">{t("spineTune")}</span>
+                    </button>
+
+                    <label className="block">
+                      <span className="mb-1 block text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-stone-500 lg:hidden">
+                        {t("status")}
+                      </span>
+                      <select
+                        className="h-8 w-full rounded-md border border-stone-300 bg-white px-2 text-sm font-semibold text-stone-800 outline-none transition focus:border-emerald-800 focus:ring-2 focus:ring-emerald-800/20 disabled:cursor-not-allowed disabled:opacity-60"
+                        disabled={isSaving}
+                        onChange={(event) => {
+                          event.stopPropagation();
+                          void patchPieceInline(piece, {
+                            status: event.target.value as PieceStatus,
+                          });
+                        }}
+                        onClick={(event) => event.stopPropagation()}
+                        onMouseDown={(event) => event.stopPropagation()}
+                        value={piece.status}
+                      >
+                        {statusOptions.map((status) => (
+                          <option key={status} value={status}>
+                            {t(pieceStatusTranslationKey(status))}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <div>
+                      <span className="mb-1 block text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-stone-500 lg:hidden">
+                        {t("confidence")}
+                      </span>
+                      <div className="flex items-end gap-1">
+                        {confidenceSteps.map((step) => (
+                          <button
+                            aria-label={`${t("confidence")} ${step}`}
+                            aria-pressed={piece.confidence === step}
+                            className={cn(
+                              "h-7 w-5 rounded-sm transition disabled:cursor-not-allowed disabled:opacity-60",
+                              step <= piece.confidence
+                                ? "bg-emerald-800 hover:bg-emerald-950"
+                                : "bg-stone-200 hover:bg-stone-300",
+                              step === 1 ? "h-3" : "",
+                              step === 2 ? "h-4" : "",
+                              step === 3 ? "h-5" : "",
+                              step === 4 ? "h-6" : "",
+                            )}
+                            disabled={isSaving}
+                            key={step}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              void patchPieceInline(piece, { confidence: step });
+                            }}
+                            type="button"
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    <span className="text-sm font-medium text-stone-700">
+                      <span className="mr-2 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-stone-500 lg:hidden">
+                        {t("lastPractised")}
+                      </span>
+                      {piece.lastPractised || t("notYet")}
+                    </span>
+
+                    <span className="text-sm text-stone-600">
+                      <span className="mr-2 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-stone-500 lg:hidden">
+                        {t("currentTempo")}
+                      </span>
+                      {pieceTempoLabel(piece, t("bpm"))}
+                    </span>
+
+                    <div className="flex gap-1.5">
+                      <button
+                        aria-label={`${t("editPiece")}: ${piece.title}`}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-stone-300 bg-white text-stone-700 transition hover:bg-stone-100"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          openEditModal(piece);
+                        }}
+                        type="button"
+                      >
+                        <Edit3 aria-hidden="true" className="h-4 w-4" />
+                      </button>
+                      <button
+                        aria-label={`${t("archivePiece")}: ${piece.title}`}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-stone-300 bg-white text-stone-700 transition hover:bg-stone-100"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void handleArchive(piece);
+                        }}
+                        type="button"
+                      >
+                        <Archive aria-hidden="true" className="h-4 w-4" />
+                      </button>
+                    </div>
+
+                    {hasInlineError ? (
+                      <p className="text-xs font-medium text-rose-700 lg:col-span-8">
+                        {errorMessage}
+                      </p>
                     ) : null}
                   </div>
-                  {creditLine ? (
-                    <p className="mt-1 text-xs lowercase text-stone-500">
-                      {creditLine}
-                    </p>
-                  ) : null}
-                  <p className="mt-1 text-sm text-stone-500 lg:hidden">
-                    {piece.key || "-"} / {pieceTempoLabel(piece, t("bpm"))}
-                  </p>
-                </div>
-                <span className="hidden text-sm text-stone-700 lg:block">
-                  {piece.key || "-"}
-                </span>
-                <span>
-                  <StatusPill tone={pieceStatusTone(piece.status)}>
-                    {t(pieceStatusTranslationKey(piece.status))}
-                  </StatusPill>
-                </span>
-                <ConfidenceMeter value={piece.confidence} />
-                <span className="text-sm text-stone-600">
-                  {piece.lastPractised}
-                </span>
-                <span className="text-sm text-stone-600">
-                  {pieceTempoLabel(piece, t("bpm"))}
-                </span>
-                <span className="flex items-center gap-2 text-sm font-medium text-emerald-800">
-                  <ExternalLink aria-hidden="true" className="h-4 w-4" />
-                  <Link href={`/repertoire/${piece.id}`}>
-                    <ArrowUpRight aria-hidden="true" className="h-4 w-4" />
-                  </Link>
-                </span>
-                <div className="flex gap-2">
-                  <button
-                    aria-label={`${t("editPiece")}: ${piece.title}`}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-stone-300 text-stone-700 transition hover:bg-stone-100"
-                    onClick={() => openEditModal(piece)}
-                    type="button"
-                  >
-                    <Edit3 aria-hidden="true" className="h-4 w-4" />
-                  </button>
-                  <button
-                    aria-label={`${t("archivePiece")}: ${piece.title}`}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-stone-300 text-stone-700 transition hover:bg-stone-100"
-                    onClick={() => void handleArchive(piece)}
-                    type="button"
-                  >
-                    <Archive aria-hidden="true" className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
                 );
               })
             ) : (

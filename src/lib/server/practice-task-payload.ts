@@ -1,12 +1,16 @@
-import type { PracticeStatus } from "@/lib/types";
+import type { PracticeSource, PracticeStatus } from "@/lib/types";
 
 export type PracticeTaskRequestBody = {
   title?: unknown;
   body?: unknown;
+  source?: unknown;
   sourceLessonId?: unknown;
   linkedRecordingId?: unknown;
+  linkedPieceId?: unknown;
+  linkedExerciseId?: unknown;
   startsAtSeconds?: unknown;
   endsAtSeconds?: unknown;
+  importance?: unknown;
 };
 
 function optionalText(value: unknown) {
@@ -28,6 +32,19 @@ function optionalNonNegativeInt(value: unknown) {
   return numberValue;
 }
 
+function optionalIntInRange(value: unknown, fallback: number, min: number, max: number) {
+  if (value === "" || value === null || typeof value === "undefined") {
+    return fallback;
+  }
+
+  const numberValue = Number(value);
+  if (!Number.isInteger(numberValue) || numberValue < min || numberValue > max) {
+    return undefined;
+  }
+
+  return numberValue;
+}
+
 function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     value,
@@ -36,20 +53,41 @@ function isUuid(value: string) {
 
 export function parsePracticeTaskPayload(body: PracticeTaskRequestBody) {
   const title = optionalText(body.title);
+  const source = body.source === "manual" ? "manual" : "lesson";
   const sourceLessonId = optionalText(body.sourceLessonId);
   const linkedRecordingId = optionalText(body.linkedRecordingId);
+  const linkedPieceId = optionalText(body.linkedPieceId);
+  const linkedExerciseId = optionalText(body.linkedExerciseId);
   const startsAtSeconds = optionalNonNegativeInt(body.startsAtSeconds);
   const endsAtSeconds = optionalNonNegativeInt(body.endsAtSeconds);
+  const importance = optionalIntInRange(body.importance, 3, 1, 5);
 
   if (!title) {
     return { error: "Title is required." };
   }
 
-  if (!sourceLessonId || !linkedRecordingId) {
+  if (typeof importance === "undefined") {
+    return { error: "Importance must be between 1 and 5." };
+  }
+
+  if (linkedPieceId && !isUuid(linkedPieceId)) {
+    return { error: "Linked piece ID must be a UUID." };
+  }
+
+  if (linkedExerciseId && !isUuid(linkedExerciseId)) {
+    return { error: "Linked exercise ID must be a UUID." };
+  }
+
+  if (source === "lesson" && (!sourceLessonId || !linkedRecordingId)) {
     return { error: "Source lesson and linked recording are required." };
   }
 
-  if (!isUuid(sourceLessonId) || !isUuid(linkedRecordingId)) {
+  if (
+    source === "lesson" &&
+    sourceLessonId &&
+    linkedRecordingId &&
+    (!isUuid(sourceLessonId) || !isUuid(linkedRecordingId))
+  ) {
     return { error: "Source lesson and linked recording IDs must be UUIDs." };
   }
 
@@ -72,13 +110,15 @@ export function parsePracticeTaskPayload(body: PracticeTaskRequestBody) {
     value: {
       title,
       body: optionalText(body.body),
-      source: "lesson" as const,
-      sourceLessonId,
-      linkedRecordingId,
+      source: source as PracticeSource,
+      sourceLessonId: source === "lesson" ? sourceLessonId : null,
+      linkedRecordingId: source === "lesson" ? linkedRecordingId : null,
+      linkedPieceId,
+      linkedExerciseId,
       startsAtSeconds,
       endsAtSeconds,
       status: "new" as PracticeStatus,
-      importance: 3,
+      importance,
       resurfacingScore: "50",
       updatedAt: new Date().toISOString(),
     },

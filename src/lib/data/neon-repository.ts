@@ -275,48 +275,82 @@ function buildSmartQueue(
   exercises: Exercise[],
   practiceTasks: PracticeTask[],
 ): SmartQueueItem[] {
-  const lessonTask = practiceTasks.find((task) => task.source === "lesson");
-  const activePieces = pieces.filter((piece) => piece.status !== "parked");
-  const spineTune = activePieces.find((piece) => piece.isSpineTune);
-  const exercise = exercises[0];
+  const dayMs = 24 * 60 * 60 * 1000;
 
-  const queue: Array<SmartQueueItem | null> = [
-    exercise
-      ? {
-          id: `queue-${exercise.id}`,
-          title: exercise.title,
-          kind: "exercise" as const,
-          reason: "Warm-up rotation",
-          minutes: 10,
-          confidence: exercise.confidence,
-          exerciseId: exercise.id,
-        }
-      : null,
-    spineTune
-      ? {
-          id: `queue-${spineTune.id}`,
-          title: spineTune.title,
-          kind: "piece" as const,
-          reason: "Spine tune review",
-          minutes: 18,
-          confidence: spineTune.confidence,
-          pieceId: spineTune.id,
-        }
-      : null,
-    lessonTask
-      ? {
-          id: `queue-${lessonTask.id}`,
-          title: lessonTask.title,
-          kind: "lesson_task" as const,
-          reason: "New from lesson",
-          minutes: 12,
-          taskId: lessonTask.id,
-          pieceId: lessonTask.linkedPieceId,
-        }
-      : null,
-  ];
+  function daysSince(value: string) {
+    if (!value) return 120;
 
-  return queue.filter((item): item is SmartQueueItem => item !== null);
+    const timestamp = Date.parse(value);
+    if (Number.isNaN(timestamp)) return 120;
+
+    return Math.max(0, Math.floor((Date.now() - timestamp) / dayMs));
+  }
+
+  type QueueCandidate = SmartQueueItem & { score: number };
+
+  const taskCandidates = practiceTasks
+    .filter((task) => task.status === "new" || task.status === "active")
+    .map<QueueCandidate>((task) => ({
+      id: `queue-task-${task.id}`,
+      title: task.title,
+      kind: "lesson_task",
+      reason:
+        task.source === "lesson" ? "New from lesson" : "Manual practice item",
+      minutes: task.source === "lesson" ? 12 : 10,
+      taskId: task.id,
+      pieceId: task.linkedPieceId,
+      score:
+        task.resurfacingScore +
+        (task.status === "new" ? 30 : 12) +
+        (task.source === "lesson" ? 5 : 0),
+    }));
+
+  const pieceCandidates = pieces
+    .filter((piece) => piece.status !== "parked")
+    .map<QueueCandidate>((piece) => {
+      const days = daysSince(piece.lastPractised);
+      const confidenceDebt = (6 - piece.confidence) * 12;
+
+      return {
+        id: `queue-piece-${piece.id}`,
+        title: piece.title,
+        kind: "piece",
+        reason: piece.isSpineTune
+          ? "Spine tune review"
+          : piece.lastPractised
+            ? "Due by last practised"
+            : "Not practised yet",
+        minutes: piece.isSpineTune ? 18 : 14,
+        confidence: piece.confidence,
+        pieceId: piece.id,
+        score:
+          Math.min(days, 180) +
+          confidenceDebt +
+          (piece.isSpineTune ? 16 : 0) +
+          (piece.status === "learning" ? 8 : 0),
+      };
+    });
+
+  const exerciseCandidates = exercises.map<QueueCandidate>((exercise) => {
+    const days = daysSince(exercise.lastPractised);
+    const confidenceDebt = (6 - exercise.confidence) * 10;
+
+    return {
+      id: `queue-exercise-${exercise.id}`,
+      title: exercise.title,
+      kind: "exercise",
+      reason: exercise.lastPractised ? "Due by last practised" : "Warm-up rotation",
+      minutes: 10,
+      confidence: exercise.confidence,
+      exerciseId: exercise.id,
+      score: Math.min(days, 120) + confidenceDebt + 6,
+    };
+  });
+
+  return [...taskCandidates, ...pieceCandidates, ...exerciseCandidates]
+    .sort((left, right) => right.score - left.score)
+    .slice(0, 8)
+    .map(({ score: _score, ...item }) => item);
 }
 
 export function createNeonPracticeLoopRepository(

@@ -1,9 +1,15 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import {
   Check,
   Clock3,
+  ExternalLink,
   ListPlus,
+  Minus,
+  Pause,
+  Play,
+  Plus,
   RotateCcw,
   SkipForward,
   Timer,
@@ -14,6 +20,17 @@ import { Section } from "@/components/section";
 import { StatusPill } from "@/components/status-pill";
 import type { PracticeLoopReadModel } from "@/lib/data";
 import { useLanguage } from "@/lib/language";
+
+function formatClock(totalSeconds: number) {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+type AudioWindow = Window &
+  typeof globalThis & {
+    webkitAudioContext?: typeof AudioContext;
+  };
 
 export function PracticeScreen({ data }: { data: PracticeLoopReadModel }) {
   const { t } = useLanguage();
@@ -29,6 +46,80 @@ export function PracticeScreen({ data }: { data: PracticeLoopReadModel }) {
     confidenceBefore: smartQueue[0]?.confidence,
     tempo: 72,
   };
+  const plannedSeconds = Math.max(60, currentItem.plannedMinutes * 60);
+  const [secondsRemaining, setSecondsRemaining] = useState(plannedSeconds);
+  const [isTimerRunning, setIsTimerRunning] = useState(false);
+  const [bpm, setBpm] = useState(currentItem.tempo ?? 72);
+  const [isMetronomeRunning, setIsMetronomeRunning] = useState(false);
+  const [beatFlash, setBeatFlash] = useState(false);
+  const audioContextRef = useRef<AudioContext | null>(null);
+
+  useEffect(() => {
+    setSecondsRemaining(plannedSeconds);
+    setIsTimerRunning(false);
+    setBpm(currentItem.tempo ?? 72);
+    setIsMetronomeRunning(false);
+  }, [currentItem.id, currentItem.tempo, plannedSeconds]);
+
+  useEffect(() => {
+    if (!isTimerRunning) return;
+
+    const timerId = window.setInterval(() => {
+      setSecondsRemaining((current) => {
+        if (current <= 1) {
+          window.clearInterval(timerId);
+          setIsTimerRunning(false);
+          return 0;
+        }
+
+        return current - 1;
+      });
+    }, 1000);
+
+    return () => window.clearInterval(timerId);
+  }, [isTimerRunning]);
+
+  function playMetronomeClick() {
+    const AudioContextClass =
+      window.AudioContext || (window as AudioWindow).webkitAudioContext;
+    if (!AudioContextClass) return;
+
+    const context =
+      audioContextRef.current ?? new AudioContextClass({ latencyHint: "interactive" });
+    audioContextRef.current = context;
+
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.frequency.value = 880;
+    oscillator.type = "square";
+    gain.gain.setValueAtTime(0.0001, context.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.18, context.currentTime + 0.005);
+    gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.045);
+    oscillator.connect(gain);
+    gain.connect(context.destination);
+    oscillator.start();
+    oscillator.stop(context.currentTime + 0.05);
+    setBeatFlash(true);
+    window.setTimeout(() => setBeatFlash(false), 80);
+  }
+
+  useEffect(() => {
+    if (!isMetronomeRunning) return;
+
+    playMetronomeClick();
+    const intervalId = window.setInterval(playMetronomeClick, 60000 / bpm);
+
+    return () => window.clearInterval(intervalId);
+  }, [bpm, isMetronomeRunning]);
+
+  function resetTimer() {
+    setIsTimerRunning(false);
+    setSecondsRemaining(plannedSeconds);
+  }
+
+  function adjustBpm(amount: number) {
+    setBpm((current) => Math.min(240, Math.max(30, current + amount)));
+  }
 
   return (
     <div className="space-y-8">
@@ -67,15 +158,37 @@ export function PracticeScreen({ data }: { data: PracticeLoopReadModel }) {
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <p className="text-5xl font-semibold tabular-nums text-stone-950">
-                    10:00
+                    {formatClock(secondsRemaining)}
                   </p>
                   <p className="mt-2 text-sm text-stone-500">
                     {currentItem.plannedMinutes} {t("minutes")}
                   </p>
                 </div>
-                <span className="inline-flex h-16 w-16 items-center justify-center rounded-md bg-emerald-50 text-emerald-900">
-                  <Timer aria-hidden="true" className="h-8 w-8" />
-                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    aria-label={isTimerRunning ? t("pause") : t("play")}
+                    className="inline-flex h-11 w-11 items-center justify-center rounded-md bg-emerald-950 text-white transition hover:bg-emerald-900"
+                    onClick={() => setIsTimerRunning((current) => !current)}
+                    type="button"
+                  >
+                    {isTimerRunning ? (
+                      <Pause aria-hidden="true" className="h-5 w-5" />
+                    ) : (
+                      <Play aria-hidden="true" className="h-5 w-5" />
+                    )}
+                  </button>
+                  <button
+                    aria-label={t("restore")}
+                    className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-stone-300 text-stone-700 transition hover:bg-stone-100"
+                    onClick={resetTimer}
+                    type="button"
+                  >
+                    <RotateCcw aria-hidden="true" className="h-5 w-5" />
+                  </button>
+                  <span className="hidden h-11 w-11 items-center justify-center rounded-md bg-emerald-50 text-emerald-900 sm:inline-flex">
+                    <Timer aria-hidden="true" className="h-6 w-6" />
+                  </span>
+                </div>
               </div>
             </div>
           </Section>
@@ -85,28 +198,44 @@ export function PracticeScreen({ data }: { data: PracticeLoopReadModel }) {
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <p className="text-5xl font-semibold tabular-nums text-stone-950">
-                    {currentItem.tempo ?? 72}
+                    {bpm}
                   </p>
                   <p className="mt-2 text-sm font-medium text-stone-500">
                     {t("bpm")}
                   </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap justify-end gap-2">
                   <button
-                    className="h-11 w-11 cursor-not-allowed rounded-md border border-stone-300 bg-stone-100 text-lg font-semibold text-stone-400"
-                    disabled
-                    title={t("comingSoon")}
+                    aria-label={isMetronomeRunning ? t("pause") : t("play")}
+                    className={`inline-flex h-11 w-11 items-center justify-center rounded-md text-white transition ${
+                      beatFlash ? "bg-emerald-700" : "bg-emerald-950"
+                    } hover:bg-emerald-900`}
+                    onClick={() =>
+                      setIsMetronomeRunning((current) => !current)
+                    }
                     type="button"
                   >
-                    -
+                    {isMetronomeRunning ? (
+                      <Pause aria-hidden="true" className="h-5 w-5" />
+                    ) : (
+                      <Play aria-hidden="true" className="h-5 w-5" />
+                    )}
                   </button>
                   <button
-                    className="h-11 w-11 cursor-not-allowed rounded-md border border-stone-300 bg-stone-100 text-lg font-semibold text-stone-400"
-                    disabled
-                    title={t("comingSoon")}
+                    aria-label="-5 BPM"
+                    className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-stone-300 text-stone-700 transition hover:bg-stone-100"
+                    onClick={() => adjustBpm(-5)}
                     type="button"
                   >
-                    +
+                    <Minus aria-hidden="true" className="h-5 w-5" />
+                  </button>
+                  <button
+                    aria-label="+5 BPM"
+                    className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-stone-300 text-stone-700 transition hover:bg-stone-100"
+                    onClick={() => adjustBpm(5)}
+                    type="button"
+                  >
+                    <Plus aria-hidden="true" className="h-5 w-5" />
                   </button>
                 </div>
               </div>
@@ -114,7 +243,16 @@ export function PracticeScreen({ data }: { data: PracticeLoopReadModel }) {
           </Section>
 
           <Section title={t("trackOverride")}>
-            <div className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
+            <div className="space-y-3 rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
+              <a
+                className="inline-flex items-center gap-2 rounded-md border border-stone-300 px-3 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-100"
+                href="https://www.quartetapp.com/"
+                rel="noreferrer"
+                target="_blank"
+              >
+                Quartet
+                <ExternalLink aria-hidden="true" className="h-4 w-4" />
+              </a>
               <textarea
                 className="min-h-28 w-full resize-none rounded-md border border-stone-300 p-3 text-sm outline-none transition focus:border-emerald-800 focus:ring-2 focus:ring-emerald-800/20"
                 placeholder={t("notes")}
