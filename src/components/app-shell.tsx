@@ -9,6 +9,7 @@ import {
   Home,
   Library,
   ListMusic,
+  LogOut,
   Mic2,
   Timer,
 } from "lucide-react";
@@ -27,6 +28,10 @@ type NavItem = {
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { t } = useLanguage();
+
+  if (pathname === "/login") {
+    return <>{children}</>;
+  }
 
   const navItems: NavItem[] = [
     { href: "/", label: t("dashboard"), icon: Home },
@@ -57,8 +62,18 @@ export function AppShell({ children }: { children: ReactNode }) {
                 </span>
               </span>
             </Link>
-            <div className="hidden sm:block">
+            <div className="flex items-center gap-2">
               <LanguageToggle compact />
+              <form action="/api/auth/logout" method="post">
+                <button
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-stone-300 text-stone-600 transition hover:bg-stone-100 hover:text-stone-950"
+                  title={t("signOut")}
+                  type="submit"
+                >
+                  <LogOut aria-hidden="true" className="h-4 w-4" />
+                  <span className="sr-only">{t("signOut")}</span>
+                </button>
+              </form>
             </div>
           </div>
           <nav className="flex gap-2 overflow-x-auto pb-1">

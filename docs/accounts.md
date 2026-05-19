@@ -4,6 +4,16 @@ You do not need any new accounts for the current local mock-data phase.
 
 ## Needed Next
 
+### Private app password
+
+Purpose: immediate privacy for the hosted app before real conversations,
+transcripts, and lead sheets accumulate.
+
+We will create:
+
+- `PRACTICE_LOOP_APP_PASSWORD` in Netlify and `.env.local`
+- optional `PRACTICE_LOOP_SESSION_SECRET` in Netlify and `.env.local`
+
 ### Neon
 
 Purpose: Postgres database for metadata such as pieces, lessons, practice tasks,
@@ -16,6 +26,12 @@ We will create:
 - one Neon account
 - one project/database
 - one `DATABASE_URL` secret in `.env.local`
+
+Neon Auth is a good later option when the app needs named users, shared access,
+or user-owned records. For the current private single-user app, the whole-app
+password gate is simpler and keeps the real lesson data private now.
+
+Official Neon Auth docs: https://neon.com/docs/auth/overview
 
 ## Needed Later
 
@@ -69,6 +85,6 @@ We only need this after the app is worth using beyond local development.
 
 - Stripe
 - paid plans
-- public user accounts
+- public signup/user accounts
 - transcription credit ledgers
 - admin/billing dashboards

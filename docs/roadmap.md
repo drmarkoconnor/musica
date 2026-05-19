@@ -28,6 +28,21 @@ Status: connected for read-only screens.
 
 No real recordings or lead sheets are needed for this phase.
 
+## Phase 2.5: Privacy Before Real Conversations
+
+Status: started.
+
+- Protect the whole hosted app with `PRACTICE_LOOP_APP_PASSWORD` before using
+  it for real lesson conversations
+- Keep the existing transcription password as a second, cost-aware authorisation
+  step before any paid AI processing
+- Keep all app passwords, database URLs, and OpenAI keys in Netlify environment
+  variables, never in git
+- Treat Neon Auth as the next account-level option when named users, Leo access,
+  or proper user ownership becomes necessary
+- If Neon Auth is adopted, map user identity into the existing Neon/Postgres
+  schema and use RLS or server-side ownership checks before sharing records
+
 ## Phase 3: Real Practice Sessions
 
 - Save practice sessions
@@ -69,6 +84,10 @@ Real data needed here:
 - Let Mark keep, discard, and edit extracted items
 - Let Mark manually turn a useful point of interest into a practice note linked
   to the exact source audio segment
+- Keep the raw transcript hidden by default, while preserving it for later
+  journal/diary-style lesson memory views
+- Manage accepted lesson-derived practice items in a compact row list that can
+  scale to hundreds of entries
 
 Real data needed here:
 

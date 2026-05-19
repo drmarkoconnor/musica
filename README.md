@@ -15,6 +15,7 @@ Private lesson-to-practice web app for Mark's jazz piano and singing practice.
   - Recordings
 - English and Italian UI labels with localStorage language persistence
 - Server-side transcription password gate at `POST /api/transcriptions`
+- Optional whole-app private password gate with `PRACTICE_LOOP_APP_PASSWORD`
 - Drizzle schema for a future Neon Postgres database
 - Neon-backed read-only routes when `PRACTICE_LOOP_DATA_SOURCE=neon`
 - Historical Supabase draft and seed data in `supabase/`
@@ -27,8 +28,9 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Set `TRANSCRIPTION_PASSWORD` in `.env.local`. Keep `OPENAI_API_KEY` server-side
-only when real transcription is wired later.
+Set `PRACTICE_LOOP_APP_PASSWORD` before using a hosted deployment for real
+lesson conversations. Set `TRANSCRIPTION_PASSWORD` in `.env.local` for paid
+transcription authorisation. Keep `OPENAI_API_KEY` server-side only.
 
 The app defaults to mock data:
 

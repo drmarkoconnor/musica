@@ -10,6 +10,11 @@ The GitHub repo is public, so private lesson audio, generated transcripts, and
 lead-sheet PDFs are intentionally gitignored. Keep those files local until the
 app has private object storage.
 
+Set `PRACTICE_LOOP_APP_PASSWORD` before using the hosted app for real
+conversations. When this value is present, every page and API route is protected
+by a private app password. `PRACTICE_LOOP_SESSION_SECRET` is optional; if set,
+it adds separate signing material to the app session cookie.
+
 On Netlify the live upload route stores audio in Netlify Blobs. Neon stores the
 lesson and recording metadata; the audio object lives in the `lesson-recordings`
 blob store.
@@ -19,9 +24,14 @@ hosted app they should move to object storage too, with Neon keeping
 `piece_assets` metadata and the object store keeping the private PDF/image.
 
 Netlify environment variables that are only needed by API routes should be
-scoped to Functions rather than Builds:
+scoped to Functions rather than Builds when the Netlify plan/UI allows it. On
+the free/default setup, where variables may be scoped everywhere, use long
+unique values and verify that they do not appear in the client bundle or build
+output.
 
 - `TRANSCRIPTION_PASSWORD`
+- `PRACTICE_LOOP_APP_PASSWORD`
+- `PRACTICE_LOOP_SESSION_SECRET`
 - `OPENAI_API_KEY`
 - `DATABASE_URL`
 - optional fallback: `NETLIFY_BLOBS_TOKEN`
@@ -38,6 +48,7 @@ compiled output.
 ## Live Now
 
 - Navigation between pages
+- Whole-app private password gate when `PRACTICE_LOOP_APP_PASSWORD` is set
 - English / Italian language toggle
 - Repertoire read from Neon
 - Add repertoire piece
@@ -77,6 +88,8 @@ compiled output.
 - Create a lesson-sourced practice note from a transcript bullet
 - Keep or discard extracted candidate practice items. Kept items become
   lesson-sourced practice tasks in `From Lessons`.
+- Manage lesson-sourced practice tasks in a dense row list, with compact clip
+  playback, archive/restore, delete, and expandable details.
 - Real 24 April 2026 Leo lesson audio is available locally for upcoming
   transcription work
 - A central 15-minute test fixture has been cut from that recording

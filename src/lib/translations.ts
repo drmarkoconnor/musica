@@ -3,6 +3,7 @@ import type { Locale } from "./types";
 export const translations = {
   en: {
     appName: "Practice Loop",
+    signOut: "Sign out",
     dashboard: "Dashboard",
     lessons: "Lessons",
     lessonHistory: "Lesson history",
@@ -125,6 +126,10 @@ export const translations = {
     discard: "Discard",
     edit: "Edit",
     sourceLesson: "Source lesson",
+    active: "Active",
+    details: "Details",
+    confirmDeletePracticeTask:
+      "Delete this lesson item permanently? Archive is usually safer.",
     duplicateWarning: "Similar item already exists",
     tags: "Tags",
     piece: "Piece",
@@ -211,6 +216,7 @@ export const translations = {
   },
   it: {
     appName: "Practice Loop",
+    signOut: "Esci",
     dashboard: "Panoramica",
     lessons: "Lezioni",
     lessonHistory: "Storico lezioni",
@@ -336,6 +342,10 @@ export const translations = {
     discard: "Scarta",
     edit: "Modifica",
     sourceLesson: "Lezione di origine",
+    active: "Attivo",
+    details: "Dettagli",
+    confirmDeletePracticeTask:
+      "Eliminare definitivamente questo elemento della lezione? Di solito e meglio archiviarlo.",
     duplicateWarning: "Spunto simile gia presente",
     tags: "Tag",
     piece: "Brano",
