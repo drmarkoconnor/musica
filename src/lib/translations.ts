@@ -10,6 +10,10 @@ export const translations = {
     clips: "clips",
     selected: "Selected",
     latestClip: "Latest clip",
+    newLessonRecording: "New lesson recording",
+    recordingWillCreateLesson:
+      "This recording will create a fresh timestamped lesson when you stop and save.",
+    recordingStartedAt: "Started",
     fromLessons: "From Lessons",
     repertoire: "Repertoire",
     practiceSession: "Practice Session",
@@ -223,6 +227,10 @@ export const translations = {
     clips: "clip",
     selected: "Selezionata",
     latestClip: "Ultima clip",
+    newLessonRecording: "Nuova registrazione lezione",
+    recordingWillCreateLesson:
+      "Questa registrazione creera una nuova lezione con timestamp quando fermi e salvi.",
+    recordingStartedAt: "Iniziata",
     fromLessons: "Dalle lezioni",
     repertoire: "Repertorio",
     practiceSession: "Sessione di studio",

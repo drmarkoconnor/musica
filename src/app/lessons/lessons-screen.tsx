@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Edit3, Plus, Trash2, Upload, X } from "lucide-react";
 import { AudioStrip } from "@/components/audio-strip";
@@ -27,8 +27,33 @@ type LessonFormValues = {
   summary: string;
 };
 
+type LiveRecordingPreview = {
+  phase: "recording" | "saving";
+  startedAt: Date;
+};
+
 function todayDate() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function localLessonDate(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function previewLessonTitle(date: Date) {
+  const label = new Intl.DateTimeFormat(undefined, {
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+
+  return `Leo lesson - ${label}`;
 }
 
 function emptyLessonForm(): LessonFormValues {
@@ -89,9 +114,14 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
   const [selectedLessonId, setSelectedLessonId] = useState(
     sortedLessons[0]?.id ?? "",
   );
+  const [liveRecordingPreview, setLiveRecordingPreview] =
+    useState<LiveRecordingPreview | null>(null);
+  const [pendingSavedLessonId, setPendingSavedLessonId] = useState("");
   const activeLesson =
-    sortedLessons.find((lesson) => lesson.id === selectedLessonId) ??
-    sortedLessons[0];
+    liveRecordingPreview === null
+      ? (sortedLessons.find((lesson) => lesson.id === selectedLessonId) ??
+        sortedLessons[0])
+      : undefined;
   const recordingsForActiveLesson = activeLesson
     ? lessonRecordings
         .filter((item) => item.lessonId === activeLesson.id)
@@ -152,6 +182,16 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
     Record<string, "idle" | "saving" | "saved" | "error">
   >({});
   const [errorMessage, setErrorMessage] = useState("");
+
+  useEffect(() => {
+    if (
+      pendingSavedLessonId &&
+      sortedLessons.some((lesson) => lesson.id === pendingSavedLessonId)
+    ) {
+      setLiveRecordingPreview(null);
+      setPendingSavedLessonId("");
+    }
+  }, [pendingSavedLessonId, sortedLessons]);
 
   function openModal() {
     setIsModalOpen(true);
@@ -297,24 +337,41 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
                 {t("lessons")}
               </p>
               <h1 className="mt-1 text-2xl font-semibold text-stone-950">
-                {activeLesson?.title ?? t("notYet")}
+                {liveRecordingPreview
+                  ? previewLessonTitle(liveRecordingPreview.startedAt)
+                  : (activeLesson?.title ?? t("notYet"))}
               </h1>
-              {activeLesson ? (
+              {liveRecordingPreview ? (
+                <p className="mt-2 text-sm text-stone-600">
+                  {localLessonDate(liveRecordingPreview.startedAt)} / Leo
+                </p>
+              ) : activeLesson ? (
                 <p className="mt-2 text-sm text-stone-600">
                   {activeLesson.lessonDate} / {activeLesson.teacher}
                 </p>
               ) : null}
             </div>
-            {activeLesson ? (
+            {liveRecordingPreview ? (
+              <StatusPill
+                tone={liveRecordingPreview.phase === "saving" ? "amber" : "rose"}
+              >
+                {liveRecordingPreview.phase === "saving"
+                  ? t("savingRecording")
+                  : t("recordingNow")}
+              </StatusPill>
+            ) : activeLesson ? (
               <StatusPill tone="green">{activeLesson.status}</StatusPill>
             ) : null}
           </div>
           <p className="mt-4 whitespace-pre-line text-sm leading-6 text-stone-600">
-            {activeLesson?.summary || t("notYet")}
+            {liveRecordingPreview
+              ? t("recordingWillCreateLesson")
+              : activeLesson?.summary || t("notYet")}
           </p>
           <div className="mt-5 flex flex-col gap-2">
             <button
-              className="w-full"
+              className="w-full disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={liveRecordingPreview !== null}
               onClick={openModal}
               type="button"
             >
@@ -324,9 +381,22 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
               </span>
             </button>
             <LessonRecorder
-              lessonId={activeLesson?.id}
+              onRecordingFailed={() => {
+                setLiveRecordingPreview(null);
+                setPendingSavedLessonId("");
+              }}
+              onRecordingSaving={() => {
+                setLiveRecordingPreview((current) =>
+                  current ? { ...current, phase: "saving" } : current,
+                );
+              }}
+              onRecordingStarted={(startedAt) => {
+                setPendingSavedLessonId("");
+                setLiveRecordingPreview({ phase: "recording", startedAt });
+              }}
               onSaved={(lessonId) => {
                 setSelectedLessonId(lessonId);
+                setPendingSavedLessonId(lessonId);
                 router.refresh();
               }}
             />
@@ -356,9 +426,10 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
 
                 return (
                   <button
-                    className={`grid w-full grid-cols-[1fr_auto] gap-3 px-3 py-2 text-left transition ${
+                    className={`grid w-full grid-cols-[1fr_auto] gap-3 px-3 py-2 text-left transition disabled:cursor-not-allowed disabled:opacity-60 ${
                       isSelected ? "bg-emerald-50" : "bg-white hover:bg-stone-50"
                     }`}
+                    disabled={liveRecordingPreview !== null}
                     key={lesson.id}
                     onClick={() => setSelectedLessonId(lesson.id)}
                     type="button"
@@ -390,52 +461,88 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="text-2xl font-semibold leading-tight text-stone-950">
-                {recording ? t("latestClip") : t("recordings")}
+                {liveRecordingPreview
+                  ? t("newLessonRecording")
+                  : recording
+                    ? t("latestClip")
+                    : t("recordings")}
               </h2>
               <p className="mt-1 text-sm text-stone-500">
-                {recording?.storagePath}
+                {liveRecordingPreview
+                  ? t("recordingWillCreateLesson")
+                  : recording?.storagePath}
               </p>
             </div>
-            <StatusPill tone="blue">{t("ready")}</StatusPill>
-          </div>
-          {recording ? (
-            <AudioStrip audioSrc={recordingAudioSrc} title={recording.title} />
-          ) : null}
-          {recordingsForActiveLesson.length > 1 ? (
-            <div className="space-y-2">
-              {recordingsForActiveLesson.map((item, index) => (
-                <div
-                  className="rounded-md border border-stone-200 p-2"
-                  key={item.id}
-                >
-                  <AudioStrip
-                    audioSrc={audioSrcForRecording(item)}
-                    title={`${t("recordings")} ${index + 1}`}
-                  />
-                </div>
-              ))}
-            </div>
-          ) : null}
-          {!recording && activeLesson ? (
-            <button
-              className="inline-flex items-center justify-center gap-2 rounded-md border border-stone-300 px-3 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={attachState === "saving"}
-              onClick={() => void handleAttachTestAudio()}
-              type="button"
+            <StatusPill
+              tone={
+                liveRecordingPreview
+                  ? liveRecordingPreview.phase === "saving"
+                    ? "amber"
+                    : "rose"
+                  : "blue"
+              }
             >
-              <Upload aria-hidden="true" className="h-4 w-4" />
-              {attachState === "saving"
-                ? t("saving")
-                : attachState === "saved"
-                  ? t("audioAttached")
-                  : t("attachTestAudio")}
-            </button>
-          ) : null}
-          {attachState === "error" ? (
-            <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
-              {t("saveFailed")}
-            </p>
-          ) : null}
+              {liveRecordingPreview
+                ? liveRecordingPreview.phase === "saving"
+                  ? t("savingRecording")
+                  : t("recordingNow")
+                : t("ready")}
+            </StatusPill>
+          </div>
+          {liveRecordingPreview ? (
+            <div className="rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-900">
+              {liveRecordingPreview.phase === "saving"
+                ? t("savingRecording")
+                : `${t("recordingStartedAt")} ${new Intl.DateTimeFormat(
+                    undefined,
+                    {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    },
+                  ).format(liveRecordingPreview.startedAt)}`}
+            </div>
+          ) : (
+            <>
+              {recording ? (
+                <AudioStrip audioSrc={recordingAudioSrc} title={recording.title} />
+              ) : null}
+              {recordingsForActiveLesson.length > 1 ? (
+                <div className="space-y-2">
+                  {recordingsForActiveLesson.map((item, index) => (
+                    <div
+                      className="rounded-md border border-stone-200 p-2"
+                      key={item.id}
+                    >
+                      <AudioStrip
+                        audioSrc={audioSrcForRecording(item)}
+                        title={`${t("recordings")} ${index + 1}`}
+                      />
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+              {!recording && activeLesson ? (
+                <button
+                  className="inline-flex items-center justify-center gap-2 rounded-md border border-stone-300 px-3 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={attachState === "saving"}
+                  onClick={() => void handleAttachTestAudio()}
+                  type="button"
+                >
+                  <Upload aria-hidden="true" className="h-4 w-4" />
+                  {attachState === "saving"
+                    ? t("saving")
+                    : attachState === "saved"
+                      ? t("audioAttached")
+                      : t("attachTestAudio")}
+                </button>
+              ) : null}
+              {attachState === "error" ? (
+                <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+                  {t("saveFailed")}
+                </p>
+              ) : null}
+            </>
+          )}
           {activeLesson && recording && recordingAudioSrc ? (
             <LessonSegmentReview
               audioSrc={recordingAudioSrc}

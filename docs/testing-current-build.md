@@ -60,7 +60,9 @@ compiled output.
 - Lead-sheet assets linked to repertoire pieces
 - Actual lead-sheet PDF viewer on piece detail pages
 - Create draft lesson
-- Record live lesson audio in the browser and save it into the selected lesson
+- Record live lesson audio in the browser
+- Starting a live lesson recording now clears the previous lesson context and
+  creates a fresh timestamped lesson when stopped and saved
 - Transcription password modal
 - Server-side rejection of failed transcription passwords
 - Real OpenAI transcription test script for the central 15-minute fixture

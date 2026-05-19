@@ -72,10 +72,16 @@ function isUuid(value: string) {
 export function LessonRecorder({
   className,
   lessonId,
+  onRecordingFailed,
+  onRecordingSaving,
+  onRecordingStarted,
   onSaved,
 }: {
   className?: string;
   lessonId?: string;
+  onRecordingFailed?: () => void;
+  onRecordingSaving?: () => void;
+  onRecordingStarted?: (startedAt: Date) => void;
   onSaved?: (lessonId: string) => void;
 }) {
   const { t } = useLanguage();
@@ -176,6 +182,7 @@ export function LessonRecorder({
     if (blob.size === 0) {
       setRecordingState("error");
       setMessage(t("recordingUploadFailed"));
+      onRecordingFailed?.();
       return;
     }
 
@@ -190,6 +197,7 @@ export function LessonRecorder({
       setMessage(
         error instanceof Error ? error.message : t("recordingUploadFailed"),
       );
+      onRecordingFailed?.();
     }
   }
 
@@ -219,7 +227,8 @@ export function LessonRecorder({
       chunksRef.current = [];
       streamRef.current = stream;
       mediaRecorderRef.current = mediaRecorder;
-      startedAtRef.current = new Date();
+      const startedAt = new Date();
+      startedAtRef.current = startedAt;
       setElapsedSeconds(0);
 
       mediaRecorder.addEventListener("dataavailable", (event) => {
@@ -231,6 +240,7 @@ export function LessonRecorder({
         void finishRecording(mediaRecorder.mimeType || mimeType);
       });
       mediaRecorder.start(1000);
+      onRecordingStarted?.(startedAt);
       setRecordingState("recording");
     } catch {
       stopStream(streamRef.current);
@@ -238,6 +248,7 @@ export function LessonRecorder({
       mediaRecorderRef.current = null;
       setRecordingState("error");
       setMessage(t("microphoneUnavailable"));
+      onRecordingFailed?.();
     }
   }
 
@@ -247,6 +258,7 @@ export function LessonRecorder({
     if (!mediaRecorder || mediaRecorder.state !== "recording") return;
 
     setRecordingState("saving");
+    onRecordingSaving?.();
     mediaRecorder.stop();
   }
 
