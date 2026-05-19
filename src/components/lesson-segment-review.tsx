@@ -262,6 +262,7 @@ export function LessonSegmentReview({
   audioSrc,
   durationSeconds,
   lessonId,
+  lessonTitle,
   onChanged,
   recordingId,
   segments,
@@ -269,6 +270,7 @@ export function LessonSegmentReview({
   audioSrc: string;
   durationSeconds: number;
   lessonId: string;
+  lessonTitle: string;
   onChanged: () => void;
   recordingId: string;
   segments: LessonSegment[];
@@ -343,7 +345,7 @@ export function LessonSegmentReview({
               <Scissors aria-hidden="true" className="h-5 w-5" />
             </span>
             <h3 className="text-2xl font-semibold leading-tight text-stone-950">
-              {t("teachingSegments")}
+              {t("usefulClipsFrom")} {lessonTitle}
             </h3>
           </div>
           <p className="mt-1 max-w-2xl text-xs leading-5 text-stone-500">

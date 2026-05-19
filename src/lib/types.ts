@@ -79,9 +79,23 @@ export type Transcript = {
   text: string;
 };
 
+export type LessonSegmentTranscript = {
+  id: string;
+  lessonId: string;
+  recordingId: string;
+  segmentId: string;
+  transcriptId?: string;
+  language: Locale;
+  status: "pending" | "complete" | "failed";
+  text: string;
+  summaryTitle: string;
+  summaryBody: string;
+};
+
 export type LessonExtract = {
   id: string;
   lessonId: string;
+  segmentId?: string;
   transcriptId: string;
   title: string;
   body: string;

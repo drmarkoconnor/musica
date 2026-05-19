@@ -6,14 +6,18 @@ import {
   lessonExtracts,
   lessonRecordings,
   lessonSegments,
+  lessonSegmentTranscripts,
   lessons,
   transcripts,
 } from "@/db/schema";
 import { serverEnv } from "@/lib/server/env";
 import {
+  analyzeLessonSegments,
   analyzeLessonTranscript,
   lessonSummaryText,
   type LessonAnalysisResult,
+  type LessonSegmentAnalysisInput,
+  type SegmentedLessonAnalysisResult,
 } from "@/lib/server/lesson-analysis";
 import { materializeLessonAudioFile } from "@/lib/server/lesson-audio-storage";
 import { transcribeAudioFile } from "@/lib/server/openai-transcription";
@@ -28,6 +32,10 @@ type TranscriptionRequest = {
   password?: unknown;
   testAudioFixture?: unknown;
   includeFullRecording?: unknown;
+};
+
+type TranscribedLessonSegment = LessonSegmentAnalysisInput & {
+  model: string;
 };
 
 function safeCompare(input: string, expected: string) {
@@ -138,6 +146,126 @@ async function saveLessonAnalysis({
     .where(eq(lessons.id, lessonId));
 }
 
+async function saveRawSegmentTranscripts({
+  completedAt,
+  lessonId,
+  recordingId,
+  requestedAt,
+  segments,
+  transcriptId,
+}: {
+  completedAt: string;
+  lessonId: string;
+  recordingId: string;
+  requestedAt: string;
+  segments: TranscribedLessonSegment[];
+  transcriptId: string;
+}) {
+  const db = createDatabaseClient();
+
+  for (const segment of segments) {
+    const [existing] = await db
+      .select({ id: lessonSegmentTranscripts.id })
+      .from(lessonSegmentTranscripts)
+      .where(eq(lessonSegmentTranscripts.segmentId, segment.segmentId));
+
+    const values = {
+      completedAt,
+      errorMessage: null,
+      language: "en" as const,
+      lessonId,
+      model: segment.model,
+      recordingId,
+      requestedAt,
+      segmentId: segment.segmentId,
+      status: "complete" as const,
+      text: segment.transcriptText,
+      transcriptId,
+      updatedAt: completedAt,
+    };
+
+    if (existing) {
+      await db
+        .update(lessonSegmentTranscripts)
+        .set(values)
+        .where(eq(lessonSegmentTranscripts.id, existing.id));
+      continue;
+    }
+
+    await db.insert(lessonSegmentTranscripts).values(values);
+  }
+}
+
+async function saveSegmentedLessonAnalysis({
+  analysis,
+  lessonId,
+  transcriptId,
+}: {
+  analysis: SegmentedLessonAnalysisResult;
+  lessonId: string;
+  transcriptId: string;
+}) {
+  const db = createDatabaseClient();
+  const summary = lessonSummaryText(analysis);
+  const updatedAt = new Date().toISOString();
+  const memoryBySegmentId = new Map(
+    analysis.segmentMemories.map((memory) => [memory.segmentId, memory]),
+  );
+
+  await db
+    .delete(lessonExtracts)
+    .where(
+      and(
+        eq(lessonExtracts.lessonId, lessonId),
+        eq(lessonExtracts.status, "candidate"),
+      ),
+    );
+
+  for (const memory of analysis.segmentMemories) {
+    await db
+      .update(lessonSegmentTranscripts)
+      .set({
+        summaryBody: memory.body,
+        summaryTitle: memory.title,
+        updatedAt,
+      })
+      .where(eq(lessonSegmentTranscripts.segmentId, memory.segmentId));
+  }
+
+  const practiceCandidateRows = analysis.practiceCandidates
+    .filter((item) => item.segmentId && memoryBySegmentId.has(item.segmentId))
+    .map((item) => {
+      const memory = memoryBySegmentId.get(item.segmentId ?? "");
+
+      return {
+        lessonId,
+        segmentId: item.segmentId,
+        transcriptId,
+        title: item.title,
+        body: `${item.body}\n\nPossible follow-up: ${item.suggestedPracticeNote}`,
+        startsAtSeconds: item.startsAtSeconds,
+        endsAtSeconds:
+          item.endsAtSeconds ??
+          memory?.endsAtSeconds ??
+          Math.max(item.startsAtSeconds + 1, item.startsAtSeconds),
+        status: "candidate" as const,
+      };
+    });
+
+  if (practiceCandidateRows.length > 0) {
+    await db.insert(lessonExtracts).values(practiceCandidateRows);
+  }
+
+  await db
+    .update(lessons)
+    .set({
+      status: practiceCandidateRows.length > 0 ? "extracted" : "transcribed",
+      summary: summary || null,
+      updatedAt,
+    })
+    .where(eq(lessons.id, lessonId));
+}
+
 export async function POST(request: Request) {
   let body: TranscriptionRequest;
 
@@ -241,6 +369,7 @@ export async function POST(request: Request) {
       .select({
         endsAtSeconds: lessonSegments.endsAtSeconds,
         id: lessonSegments.id,
+        notes: lessonSegments.notes,
         startsAtSeconds: lessonSegments.startsAtSeconds,
         title: lessonSegments.title,
       })
@@ -267,6 +396,7 @@ export async function POST(request: Request) {
     let transcriptionText = "";
     let transcriptionModel = "";
     let transcriptionDurationMs = 0;
+    const segmentTranscriptions: TranscribedLessonSegment[] = [];
 
     if (selectedSegments.length > 0) {
       const { clipAudioSegments } = await import("@/lib/server/audio-segments");
@@ -284,6 +414,15 @@ export async function POST(request: Request) {
           });
           transcriptionModel = transcription.model;
           transcriptionDurationMs += transcription.durationMs;
+          segmentTranscriptions.push({
+            endsAtSeconds: clippedSegment.segment.endsAtSeconds,
+            model: transcription.model,
+            notes: clippedSegment.segment.notes ?? "",
+            segmentId: clippedSegment.segment.id,
+            startsAtSeconds: clippedSegment.segment.startsAtSeconds,
+            title: clippedSegment.segment.title,
+            transcriptText: transcription.text,
+          });
           segmentTexts.push(
             [
               `[Teaching segment ${index + 1}: ${clippedSegment.segment.title}. Original audio ${formatTimestamp(
@@ -353,21 +492,45 @@ export async function POST(request: Request) {
       .set({ status: "transcribed", updatedAt: completedAt })
       .where(eq(lessons.id, body.lessonId));
 
+    if (segmentTranscriptions.length > 0) {
+      await saveRawSegmentTranscripts({
+        completedAt,
+        lessonId: body.lessonId,
+        recordingId: body.recordingId,
+        requestedAt,
+        segments: segmentTranscriptions,
+        transcriptId,
+      });
+    }
+
     let analysisStatus: "complete" | "failed" = "complete";
     let practiceCandidateCount = 0;
     let summaryBulletCount = 0;
 
     try {
-      const analysis = await analyzeLessonTranscript({
-        transcriptText: transcriptionText,
-      });
-      await saveLessonAnalysis({
-        analysis,
-        lessonId: body.lessonId,
-        transcriptId,
-      });
-      practiceCandidateCount = analysis.practiceCandidates.length;
-      summaryBulletCount = analysis.summaryBullets.length;
+      if (segmentTranscriptions.length > 0) {
+        const analysis = await analyzeLessonSegments({
+          segments: segmentTranscriptions,
+        });
+        await saveSegmentedLessonAnalysis({
+          analysis,
+          lessonId: body.lessonId,
+          transcriptId,
+        });
+        practiceCandidateCount = analysis.practiceCandidates.length;
+        summaryBulletCount = analysis.summaryBullets.length;
+      } else {
+        const analysis = await analyzeLessonTranscript({
+          transcriptText: transcriptionText,
+        });
+        await saveLessonAnalysis({
+          analysis,
+          lessonId: body.lessonId,
+          transcriptId,
+        });
+        practiceCandidateCount = analysis.practiceCandidates.length;
+        summaryBulletCount = analysis.summaryBullets.length;
+      }
     } catch (error) {
       analysisStatus = "failed";
       console.error("Lesson analysis failed", error);

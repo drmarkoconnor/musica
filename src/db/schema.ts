@@ -214,6 +214,56 @@ export const transcripts = pgTable(
   ],
 );
 
+export const lessonSegmentTranscripts = pgTable(
+  "lesson_segment_transcripts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    lessonId: uuid("lesson_id")
+      .notNull()
+      .references(() => lessons.id, { onDelete: "cascade" }),
+    recordingId: uuid("recording_id")
+      .notNull()
+      .references(() => lessonRecordings.id, { onDelete: "cascade" }),
+    segmentId: uuid("segment_id")
+      .notNull()
+      .references(() => lessonSegments.id, { onDelete: "cascade" }),
+    transcriptId: uuid("transcript_id").references(() => transcripts.id, {
+      onDelete: "set null",
+    }),
+    language: text("language").notNull().default("en"),
+    status: transcriptStatusEnum("status").notNull().default("pending"),
+    text: text("text"),
+    summaryTitle: text("summary_title"),
+    summaryBody: text("summary_body"),
+    model: text("model"),
+    requestedAt: timestamp("requested_at", {
+      mode: "string",
+      withTimezone: true,
+    }),
+    completedAt: timestamp("completed_at", {
+      mode: "string",
+      withTimezone: true,
+    }),
+    errorMessage: text("error_message"),
+    createdAt: timestamp("created_at", { mode: "string", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "string", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("lesson_segment_transcripts_lesson_id_idx").on(table.lessonId),
+    uniqueIndex("lesson_segment_transcripts_segment_id_unique_idx").on(
+      table.segmentId,
+    ),
+    check(
+      "lesson_segment_transcripts_language_supported",
+      sql`${table.language} in ('en', 'it')`,
+    ),
+  ],
+);
+
 export const pieces = pgTable(
   "pieces",
   {
@@ -293,6 +343,9 @@ export const lessonExtracts = pgTable(
     lessonId: uuid("lesson_id")
       .notNull()
       .references(() => lessons.id, { onDelete: "cascade" }),
+    segmentId: uuid("segment_id").references(() => lessonSegments.id, {
+      onDelete: "set null",
+    }),
     transcriptId: uuid("transcript_id").references(() => transcripts.id, {
       onDelete: "set null",
     }),
@@ -619,6 +672,10 @@ export type LessonSegmentRow = typeof lessonSegments.$inferSelect;
 export type NewLessonSegmentRow = typeof lessonSegments.$inferInsert;
 export type TranscriptRow = typeof transcripts.$inferSelect;
 export type NewTranscriptRow = typeof transcripts.$inferInsert;
+export type LessonSegmentTranscriptRow =
+  typeof lessonSegmentTranscripts.$inferSelect;
+export type NewLessonSegmentTranscriptRow =
+  typeof lessonSegmentTranscripts.$inferInsert;
 export type LessonExtractRow = typeof lessonExtracts.$inferSelect;
 export type NewLessonExtractRow = typeof lessonExtracts.$inferInsert;
 export type PieceRow = typeof pieces.$inferSelect;

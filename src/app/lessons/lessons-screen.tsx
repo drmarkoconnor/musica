@@ -17,6 +17,8 @@ import {
   TEST_LESSON_FIXTURE_ID,
   TEST_LESSON_FIXTURE_STORAGE_PATH,
 } from "@/lib/teaching-review";
+import type { LessonExtract } from "@/lib/types";
+import { formatDuration } from "@/lib/utils";
 
 type LessonFormValues = {
   title: string;
@@ -67,8 +69,14 @@ function audioSrcForRecording(recording?: { id: string; storageBucket: string })
 export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
   const { t } = useLanguage();
   const router = useRouter();
-  const { lessonExtracts, lessonRecordings, lessons, lessonSegments, transcripts } =
-    data;
+  const {
+    lessonExtracts,
+    lessonRecordings,
+    lessons,
+    lessonSegments,
+    lessonSegmentTranscripts,
+    transcripts,
+  } = data;
   const sortedLessons = [...lessons].sort((a, b) =>
     (
       lessonRecordings.find((item) => item.lessonId === b.id)?.recordedAt ??
@@ -96,6 +104,19 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
         .filter((item) => item.recordingId === recording.id)
         .sort((a, b) => a.startsAtSeconds - b.startsAtSeconds)
     : [];
+  const segmentById = new Map(segmentsForRecording.map((item) => [item.id, item]));
+  const segmentTranscriptsForRecording = recording
+    ? lessonSegmentTranscripts
+        .filter((item) => item.recordingId === recording.id)
+        .sort((a, b) => {
+          const segmentA = segmentById.get(a.segmentId);
+          const segmentB = segmentById.get(b.segmentId);
+
+          return (
+            (segmentA?.startsAtSeconds ?? 0) - (segmentB?.startsAtSeconds ?? 0)
+          );
+        })
+    : [];
   const selectedSegmentSeconds = segmentsForRecording
     .filter((item) => item.status === "selected")
     .reduce(
@@ -115,6 +136,8 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
   const extracts = activeLesson
     ? lessonExtracts.filter((item) => item.lessonId === activeLesson.id)
     : [];
+  const linkedExtracts = extracts.filter((item) => item.segmentId);
+  const unlinkedExtracts = extracts.filter((item) => !item.segmentId);
   const joinedTranscriptText = lessonTranscripts.map((item) => item.text).join("\n");
   const executiveSummaryItems = summaryBulletItems(activeLesson?.summary ?? "");
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -210,6 +233,58 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
 
     setExtractActionState((current) => ({ ...current, [extractId]: "saved" }));
     router.refresh();
+  }
+
+  function clipBoundsForExtract(extract: LessonExtract) {
+    const sourceSegment =
+      (extract.segmentId ? segmentById.get(extract.segmentId) : undefined) ??
+      segmentsForRecording.find(
+        (segment) =>
+          extract.startsAtSeconds >= segment.startsAtSeconds &&
+          extract.startsAtSeconds <= segment.endsAtSeconds,
+      );
+
+    return {
+      endsAtSeconds: extract.endsAtSeconds ?? sourceSegment?.endsAtSeconds,
+      startsAtSeconds: extract.startsAtSeconds,
+    };
+  }
+
+  function renderExtractActions(extract: LessonExtract) {
+    const actionState = extractActionState[extract.id] ?? "idle";
+
+    return (
+      <div className="mt-3 flex flex-wrap gap-2">
+        {extract.status === "candidate" ? (
+          <button
+            className="inline-flex items-center justify-center gap-2 rounded-md bg-emerald-950 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-900 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={actionState === "saving"}
+            onClick={() => void handleExtractAction(extract.id, "keep")}
+            type="button"
+          >
+            <Check aria-hidden="true" className="h-4 w-4" />
+            {actionState === "saving" ? t("saving") : t("keep")}
+          </button>
+        ) : null}
+        <ComingSoonButton icon={Edit3}>{t("edit")}</ComingSoonButton>
+        {extract.status === "candidate" ? (
+          <button
+            className="inline-flex items-center justify-center gap-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={actionState === "saving"}
+            onClick={() => void handleExtractAction(extract.id, "discard")}
+            type="button"
+          >
+            <Trash2 aria-hidden="true" className="h-4 w-4" />
+            {t("discard")}
+          </button>
+        ) : null}
+        {actionState === "error" ? (
+          <p className="w-full rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+            {t("candidateActionFailed")}
+          </p>
+        ) : null}
+      </div>
+    );
   }
 
   return (
@@ -366,6 +441,7 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
               audioSrc={recordingAudioSrc}
               durationSeconds={recording.durationSeconds}
               lessonId={activeLesson.id}
+              lessonTitle={activeLesson.title}
               onChanged={() => router.refresh()}
               recordingId={recording.id}
               segments={segmentsForRecording}
@@ -382,6 +458,130 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
           ) : null}
         </section>
       </div>
+
+      {recording && recordingAudioSrc && segmentTranscriptsForRecording.length > 0 ? (
+        <Section title={t("usefulClipMemories")}>
+          <div className="grid gap-3">
+            {segmentTranscriptsForRecording.map((memory, index) => {
+              const segment = segmentById.get(memory.segmentId);
+              if (!segment) return null;
+
+              const memoryExtracts = linkedExtracts.filter(
+                (extract) => extract.segmentId === memory.segmentId,
+              );
+              const cardTone =
+                index % 2 === 0
+                  ? "border-stone-200 bg-white"
+                  : "border-sky-100 bg-sky-50/70";
+
+              return (
+                <article
+                  className={`rounded-lg border p-4 shadow-sm ${cardTone}`}
+                  key={memory.id}
+                >
+                  <div className="grid gap-3 lg:grid-cols-[12rem_1fr_auto] lg:items-start">
+                    <div className="rounded-md bg-stone-950 px-3 py-2 text-white">
+                      <p className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-stone-300">
+                        {t("clipTime")}
+                      </p>
+                      <p className="mt-1 text-xl font-semibold tabular-nums">
+                        {formatDuration(segment.startsAtSeconds)} -{" "}
+                        {formatDuration(segment.endsAtSeconds)}
+                      </p>
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="text-lg font-semibold leading-tight text-stone-950">
+                          {memory.summaryTitle || segment.title}
+                        </h3>
+                        <StatusPill tone="blue">{memory.status}</StatusPill>
+                      </div>
+                      <p className="mt-2 text-sm leading-6 text-stone-700">
+                        {memory.summaryBody ||
+                          segment.notes ||
+                          t("clipMemoryCaptured")}
+                      </p>
+                    </div>
+                    <AudioStrip
+                      audioSrc={recordingAudioSrc}
+                      controlsMode="buttons"
+                      density="compact"
+                      endsAtSeconds={segment.endsAtSeconds}
+                      showLabel={false}
+                      showWaveform={false}
+                      startsAtSeconds={segment.startsAtSeconds}
+                      title={memory.summaryTitle || segment.title}
+                    />
+                  </div>
+
+                  <details className="mt-3 rounded-md border border-stone-200 bg-white/80">
+                    <summary className="cursor-pointer px-3 py-2 text-sm font-semibold text-stone-800">
+                      {t("clipTranscript")}
+                    </summary>
+                    <p className="border-t border-stone-200 px-3 py-3 text-sm leading-6 text-stone-700">
+                      {memory.text || t("notYet")}
+                    </p>
+                  </details>
+
+                  <div className="mt-3 rounded-md border border-stone-200 bg-white p-3">
+                    <h4 className="text-sm font-semibold text-stone-950">
+                      {t("suggestedPractice")}
+                    </h4>
+                    {memoryExtracts.length === 0 ? (
+                      <p className="mt-2 text-sm leading-6 text-stone-600">
+                        {t("noPracticeItemSuggested")}
+                      </p>
+                    ) : null}
+                    <div className="mt-3 space-y-3">
+                      {memoryExtracts.map((extract) => {
+                        const bounds = clipBoundsForExtract(extract);
+
+                        return (
+                          <div
+                            className="rounded-md border border-stone-200 p-3"
+                            key={extract.id}
+                          >
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                              <div>
+                                <h5 className="text-sm font-semibold text-stone-950">
+                                  {extract.title}
+                                </h5>
+                                <p className="mt-1 whitespace-pre-line text-sm leading-6 text-stone-600">
+                                  {extract.body}
+                                </p>
+                              </div>
+                              <StatusPill
+                                tone={
+                                  extract.status === "kept" ? "green" : "slate"
+                                }
+                              >
+                                {extract.status}
+                              </StatusPill>
+                            </div>
+                            <div className="mt-3">
+                              <AudioStrip
+                                audioSrc={recordingAudioSrc}
+                                controlsMode="buttons"
+                                density="compact"
+                                endsAtSeconds={bounds.endsAtSeconds}
+                                showLabel={false}
+                                showWaveform={false}
+                                startsAtSeconds={bounds.startsAtSeconds}
+                                title={extract.title}
+                              />
+                            </div>
+                            {renderExtractActions(extract)}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </Section>
+      ) : null}
 
       {activeLesson && recording && recordingAudioSrc && isTestAudioRecording ? (
         <TeachingTranscriptReview
@@ -435,84 +635,59 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
           </div>
         </Section>
 
-        <Section title={t("extractedCandidates")}>
-          <div className="space-y-3">
-            {extracts.length === 0 ? (
-              <div className="rounded-lg border border-stone-200 bg-white p-5 text-sm leading-6 text-stone-600 shadow-sm">
-                {t("notYet")}
-              </div>
-            ) : null}
-            {extracts.map((extract) => {
-              const actionState = extractActionState[extract.id] ?? "idle";
+        {segmentTranscriptsForRecording.length === 0 ||
+        unlinkedExtracts.length > 0 ? (
+          <Section title={t("extractedCandidates")}>
+            <div className="space-y-3">
+              {unlinkedExtracts.length === 0 ? (
+                <div className="rounded-lg border border-stone-200 bg-white p-5 text-sm leading-6 text-stone-600 shadow-sm">
+                  {t("notYet")}
+                </div>
+              ) : null}
+              {unlinkedExtracts.map((extract) => {
+                const bounds = clipBoundsForExtract(extract);
 
-              return (
-                <article
-                  className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm"
-                  key={extract.id}
-                >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="space-y-2">
-                    <h3 className="text-base font-semibold text-stone-950">
-                      {extract.title}
-                    </h3>
-                    <p className="whitespace-pre-line text-sm leading-6 text-stone-600">
-                      {extract.body}
-                    </p>
-                    {extract.similarExtractId ? (
-                      <StatusPill tone="amber">{t("duplicateWarning")}</StatusPill>
-                    ) : null}
-                  </div>
-                  <StatusPill
-                    tone={extract.status === "kept" ? "green" : "slate"}
+                return (
+                  <article
+                    className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm"
+                    key={extract.id}
                   >
-                    {extract.status}
-                  </StatusPill>
-                </div>
-                <div className="mt-4">
-                  <AudioStrip
-                    audioSrc={recordingAudioSrc}
-                    endsAtSeconds={extract.endsAtSeconds}
-                    startsAtSeconds={extract.startsAtSeconds}
-                    title={extract.title}
-                  />
-                </div>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {extract.status === "candidate" ? (
-                    <button
-                      className="inline-flex items-center justify-center gap-2 rounded-md bg-emerald-950 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-900 disabled:cursor-not-allowed disabled:opacity-60"
-                      disabled={actionState === "saving"}
-                      onClick={() => void handleExtractAction(extract.id, "keep")}
-                      type="button"
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="space-y-2">
+                      <h3 className="text-base font-semibold text-stone-950">
+                        {extract.title}
+                      </h3>
+                      <p className="whitespace-pre-line text-sm leading-6 text-stone-600">
+                        {extract.body}
+                      </p>
+                      {extract.similarExtractId ? (
+                        <StatusPill tone="amber">
+                          {t("duplicateWarning")}
+                        </StatusPill>
+                      ) : null}
+                    </div>
+                    <StatusPill
+                      tone={extract.status === "kept" ? "green" : "slate"}
                     >
-                      <Check aria-hidden="true" className="h-4 w-4" />
-                      {actionState === "saving" ? t("saving") : t("keep")}
-                    </button>
-                  ) : null}
-                  <ComingSoonButton icon={Edit3}>
-                    {t("edit")}
-                  </ComingSoonButton>
-                  {extract.status === "candidate" ? (
-                    <button
-                      className="inline-flex items-center justify-center gap-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
-                      disabled={actionState === "saving"}
-                      onClick={() => void handleExtractAction(extract.id, "discard")}
-                      type="button"
-                    >
-                      <Trash2 aria-hidden="true" className="h-4 w-4" />
-                      {t("discard")}
-                    </button>
-                  ) : null}
-                </div>
-                {actionState === "error" ? (
-                  <p className="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
-                    {t("candidateActionFailed")}
-                  </p>
-                ) : null}
-              </article>
-              );
-            })}
-          </div>
-        </Section>
+                      {extract.status}
+                    </StatusPill>
+                  </div>
+                  <div className="mt-4">
+                    <AudioStrip
+                      audioSrc={recordingAudioSrc}
+                      controlsMode="buttons"
+                      endsAtSeconds={bounds.endsAtSeconds}
+                      startsAtSeconds={bounds.startsAtSeconds}
+                      title={extract.title}
+                    />
+                  </div>
+                  {renderExtractActions(extract)}
+                </article>
+                );
+              })}
+            </div>
+          </Section>
+        ) : null}
       </div>
 
       {isModalOpen ? (

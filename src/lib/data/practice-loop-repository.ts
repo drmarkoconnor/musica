@@ -4,6 +4,7 @@ import type {
   LessonExtract,
   LessonRecording,
   LessonSegment,
+  LessonSegmentTranscript,
   Piece,
   PieceAsset,
   PracticeSession,
@@ -22,6 +23,7 @@ export type PracticeLoopReadModel = {
   lessons: Lesson[];
   lessonRecordings: LessonRecording[];
   lessonSegments: LessonSegment[];
+  lessonSegmentTranscripts: LessonSegmentTranscript[];
   transcripts: Transcript[];
   lessonExtracts: LessonExtract[];
   practiceTasks: PracticeTask[];

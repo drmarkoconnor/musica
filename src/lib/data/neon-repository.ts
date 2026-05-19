@@ -7,6 +7,7 @@ import type {
   LessonExtract,
   LessonRecording,
   LessonSegment,
+  LessonSegmentTranscript,
   Piece,
   PieceAsset,
   PracticeSession,
@@ -151,10 +152,28 @@ function mapTranscript(row: dbSchema.TranscriptRow): Transcript {
   };
 }
 
+function mapLessonSegmentTranscript(
+  row: dbSchema.LessonSegmentTranscriptRow,
+): LessonSegmentTranscript {
+  return {
+    id: row.id,
+    lessonId: row.lessonId,
+    recordingId: row.recordingId,
+    segmentId: row.segmentId,
+    transcriptId: optional(row.transcriptId),
+    language: toLocale(row.language),
+    status: row.status,
+    text: row.text ?? "",
+    summaryTitle: row.summaryTitle ?? "",
+    summaryBody: row.summaryBody ?? "",
+  };
+}
+
 function mapLessonExtract(row: dbSchema.LessonExtractRow): LessonExtract {
   return {
     id: row.id,
     lessonId: row.lessonId,
+    segmentId: optional(row.segmentId),
     transcriptId: row.transcriptId ?? "",
     title: row.title,
     body: row.body ?? "",
@@ -340,6 +359,7 @@ export function createNeonPracticeLoopRepository(
       lessons,
       lessonRecordingRows,
       lessonSegmentRows,
+      lessonSegmentTranscriptRows,
       transcriptRows,
       lessonExtractRows,
       practiceTasks,
@@ -361,6 +381,10 @@ export function createNeonPracticeLoopRepository(
         .select()
         .from(dbSchema.lessonSegments)
         .orderBy(asc(dbSchema.lessonSegments.startsAtSeconds)),
+      db
+        .select()
+        .from(dbSchema.lessonSegmentTranscripts)
+        .orderBy(asc(dbSchema.lessonSegmentTranscripts.completedAt)),
       db.select().from(dbSchema.transcripts),
       db.select().from(dbSchema.lessonExtracts),
       listPracticeTasks(),
@@ -380,6 +404,9 @@ export function createNeonPracticeLoopRepository(
       lessons,
       lessonRecordings: lessonRecordingRows.map(mapLessonRecording),
       lessonSegments: lessonSegmentRows.map(mapLessonSegment),
+      lessonSegmentTranscripts: lessonSegmentTranscriptRows.map(
+        mapLessonSegmentTranscript,
+      ),
       transcripts: transcriptRows.map(mapTranscript),
       lessonExtracts: lessonExtractRows.map(mapLessonExtract),
       practiceTasks,

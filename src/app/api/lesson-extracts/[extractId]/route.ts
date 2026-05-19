@@ -1,9 +1,10 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, gte, lte } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { createDatabaseClient } from "@/db/client";
 import {
   lessonExtracts,
   lessonRecordings,
+  lessonSegments,
   practiceTasks,
   transcripts,
 } from "@/db/schema";
@@ -99,11 +100,32 @@ export async function PATCH(
     .select({ id: practiceTasks.id })
     .from(practiceTasks)
     .where(eq(practiceTasks.sourceExtractId, extractId));
+  const [sourceSegment] = extract.segmentId
+    ? await db
+        .select()
+        .from(lessonSegments)
+        .where(eq(lessonSegments.id, extract.segmentId))
+        .limit(1)
+    : await db
+        .select()
+        .from(lessonSegments)
+        .where(
+          and(
+            eq(lessonSegments.lessonId, extract.lessonId),
+            lte(lessonSegments.startsAtSeconds, extract.startsAtSeconds),
+            gte(lessonSegments.endsAtSeconds, extract.startsAtSeconds),
+          ),
+        )
+        .orderBy(desc(lessonSegments.startsAtSeconds))
+        .limit(1);
 
-  const recordingId = await recordingIdForExtract({
-    lessonId: extract.lessonId,
-    transcriptId: extract.transcriptId,
-  });
+  const recordingId =
+    sourceSegment?.recordingId ??
+    (await recordingIdForExtract({
+      lessonId: extract.lessonId,
+      transcriptId: extract.transcriptId,
+    }));
+  const endsAtSeconds = extract.endsAtSeconds ?? sourceSegment?.endsAtSeconds;
 
   const taskId =
     existingTask?.id ??
@@ -112,7 +134,7 @@ export async function PATCH(
         .insert(practiceTasks)
         .values({
           body: extract.body,
-          endsAtSeconds: extract.endsAtSeconds,
+          endsAtSeconds,
           importance: 3,
           linkedExerciseId: extract.linkedExerciseId,
           linkedPieceId: extract.linkedPieceId,

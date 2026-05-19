@@ -4,6 +4,7 @@ import { createDatabaseClient } from "@/db/client";
 import {
   lessonExtracts,
   lessonRecordings,
+  lessonSegments,
   lessons,
   transcripts,
 } from "@/db/schema";
@@ -13,6 +14,7 @@ type LessonExtractRequestBody = {
   endsAtSeconds?: unknown;
   lessonId?: unknown;
   recordingId?: unknown;
+  segmentId?: unknown;
   startsAtSeconds?: unknown;
   title?: unknown;
   transcriptId?: unknown;
@@ -51,6 +53,7 @@ export async function POST(request: Request) {
 
   const lessonId = text(body.lessonId);
   const recordingId = text(body.recordingId);
+  const segmentId = text(body.segmentId);
   const transcriptId = text(body.transcriptId);
   const title = text(body.title);
   const extractBody = text(body.body);
@@ -67,6 +70,13 @@ export async function POST(request: Request) {
   if (transcriptId && !isUuid(transcriptId)) {
     return NextResponse.json(
       { error: "Transcript ID is invalid." },
+      { status: 400 },
+    );
+  }
+
+  if (segmentId && !isUuid(segmentId)) {
+    return NextResponse.json(
+      { error: "Segment ID is invalid." },
       { status: 400 },
     );
   }
@@ -133,6 +143,26 @@ export async function POST(request: Request) {
     }
   }
 
+  if (segmentId) {
+    const [segment] = await db
+      .select({ id: lessonSegments.id })
+      .from(lessonSegments)
+      .where(
+        and(
+          eq(lessonSegments.id, segmentId),
+          eq(lessonSegments.lessonId, lessonId),
+          eq(lessonSegments.recordingId, recordingId),
+        ),
+      );
+
+    if (!segment) {
+      return NextResponse.json(
+        { error: "Segment not found." },
+        { status: 404 },
+      );
+    }
+  }
+
   const now = new Date().toISOString();
   const [extract] = await db
     .insert(lessonExtracts)
@@ -140,6 +170,7 @@ export async function POST(request: Request) {
       body: extractBody || null,
       endsAtSeconds,
       lessonId,
+      segmentId: segmentId || null,
       startsAtSeconds,
       status: "candidate",
       title,

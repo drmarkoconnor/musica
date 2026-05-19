@@ -78,6 +78,12 @@ export const translations = {
     markTeachingClipNote:
       "Choose the part of the recording that contains useful teaching, preview it, then save it as a review candidate.",
     teachingSegments: "Teaching segments",
+    usefulClipsFrom: "Useful clips from",
+    usefulClipMemories: "Useful clip memories",
+    clipTranscript: "Clip transcript",
+    clipMemoryCaptured: "Transcript captured for this useful clip.",
+    noPracticeItemSuggested: "No practice item suggested.",
+    suggestedPractice: "Suggested practice",
     teachingSegmentsNote:
       "Mark only the parts that contain useful teaching. These selected minutes are what the passworded transcription will send by default.",
     teachingSegment: "Teaching segment",
@@ -269,6 +275,12 @@ export const translations = {
     markTeachingClipNote:
       "Scegli la parte della registrazione che contiene insegnamento utile, ascoltala, poi salvala come proposta da rivedere.",
     teachingSegments: "Segmenti didattici",
+    usefulClipsFrom: "Clip utili da",
+    usefulClipMemories: "Memorie delle clip utili",
+    clipTranscript: "Trascrizione della clip",
+    clipMemoryCaptured: "Trascrizione salvata per questa clip utile.",
+    noPracticeItemSuggested: "Nessun elemento di studio suggerito.",
+    suggestedPractice: "Studio suggerito",
     teachingSegmentsNote:
       "Segna solo le parti con insegnamento utile. Per impostazione predefinita la trascrizione con password inviera questi minuti selezionati.",
     teachingSegment: "Segmento didattico",

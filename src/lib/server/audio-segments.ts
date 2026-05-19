@@ -11,6 +11,7 @@ export type AudioSegmentRange = {
   id: string;
   startsAtSeconds: number;
   endsAtSeconds: number;
+  notes?: string | null;
   title: string;
 };
 

@@ -4,6 +4,7 @@ import type {
   LessonExtract,
   LessonRecording,
   LessonSegment,
+  LessonSegmentTranscript,
   Piece,
   PieceAsset,
   PracticeSession,
@@ -144,6 +145,8 @@ export const lessons: Lesson[] = [];
 export const lessonRecordings: LessonRecording[] = [];
 
 export const lessonSegments: LessonSegment[] = [];
+
+export const lessonSegmentTranscripts: LessonSegmentTranscript[] = [];
 
 export const transcripts: Transcript[] = [];
 
