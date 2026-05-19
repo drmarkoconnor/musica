@@ -188,9 +188,11 @@ export type SessionItem = {
   pieceId?: string;
   exerciseId?: string;
   plannedMinutes: number;
+  actualSeconds: number;
   confidenceBefore?: Confidence;
   confidenceAfter?: Confidence;
   tempo?: number;
+  notes: string;
 };
 
 export type Recording = {

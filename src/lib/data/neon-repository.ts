@@ -247,6 +247,7 @@ function mapSessionItem(row: dbSchema.SessionItemRow): SessionItem {
     pieceId: optional(row.pieceId),
     exerciseId: optional(row.exerciseId),
     plannedMinutes: row.plannedMinutes ?? 0,
+    actualSeconds: row.actualSeconds ?? 0,
     confidenceBefore: row.confidenceBefore
       ? toConfidence(row.confidenceBefore)
       : undefined,
@@ -254,6 +255,7 @@ function mapSessionItem(row: dbSchema.SessionItemRow): SessionItem {
       ? toConfidence(row.confidenceAfter)
       : undefined,
     tempo: optional(row.tempo),
+    notes: row.notes ?? "",
   };
 }
 

@@ -211,8 +211,10 @@ export const sessionItems: SessionItem[] = [
     status: "accepted",
     exerciseId: "ex-root-five-rh-three-seven",
     plannedMinutes: 10,
+    actualSeconds: 0,
     confidenceBefore: 3,
     tempo: 72,
+    notes: "",
   },
   {
     id: "session-item-2",
@@ -223,8 +225,10 @@ export const sessionItems: SessionItem[] = [
     status: "queued",
     pieceId: "autumn-leaves",
     plannedMinutes: 18,
+    actualSeconds: 0,
     confidenceBefore: 3,
     tempo: 58,
+    notes: "",
   },
 ];
 
