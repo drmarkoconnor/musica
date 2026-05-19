@@ -34,14 +34,21 @@ to repertoire pieces.
 
 ## Storage Choice
 
-For local development, we can temporarily read from `docs/leadsheets`.
+For local development, we can temporarily read from `docs/leadsheets`, or use
+the app upload route and store files under the gitignored `docs/piece-assets`
+folder.
 
-For the real app, the files should move to object storage rather than staying in
-the repo:
+For the hosted app, the files move to object storage rather than staying in the
+repo:
 
-- Cloudflare R2 is the current recommendation.
-- Keep the bucket private.
-- Generate signed URLs from the server when viewing a lead sheet.
+- Netlify Blobs is the v1 storage bridge because it is already working for
+  lesson audio.
+- The blob store is `piece-assets`.
+- Neon stores only `piece_assets` metadata.
+- The protected server route `/api/piece-assets/[assetId]/file` streams the PDF
+  or image back to the app.
+- Cloudflare R2 remains a later option if we need cheaper/larger long-term
+  object storage.
 
 ## Matching Notes
 
@@ -68,5 +75,13 @@ Do this first:
 - let Mark choose `create piece` or `attach to existing piece`
 - upload/copy file to storage
 - create the `piece_assets` row
+
+Current v1 implementation:
+
+- `/assets/leadsheets` accepts multiple PDF, PNG, or JPG lead sheets
+- upload matches known filenames from the catalogue where possible
+- existing pieces are reused by normalized title
+- missing pieces are created automatically
+- existing matching asset rows are updated to point at the newly uploaded object
 
 Do not build full annotation in v1. Uploading a new annotated version is enough.

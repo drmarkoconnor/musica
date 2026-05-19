@@ -7,7 +7,9 @@ The app shows this list at `/assets/leadsheets`.
 Import result:
 
 - 22 approved lead-sheet pieces in Neon
-- 22 lead-sheet asset rows linked to local `docs/leadsheets` PDFs
+- Initial 22 lead-sheet asset rows linked to local `docs/leadsheets` PDFs
+- Current hosted flow uploads selected PDFs/images from `/assets/leadsheets` to
+  the private `piece-assets` Netlify Blobs store and updates matching asset rows
 - Existing lead-sheet pieces preserved: Autumn Leaves, My Funny Valentine, Summertime
 - Old seed-only dummy pieces deleted: Blue in Green, Stella by Starlight, All the Things You Are, There Will Never Be Another You, Body and Soul, In a Sentimental Mood, On Green Dolphin Street, I Remember You
 

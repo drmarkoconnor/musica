@@ -15,13 +15,15 @@ conversations. When this value is present, every page and API route is protected
 by a private app password. `PRACTICE_LOOP_SESSION_SECRET` is optional; if set,
 it adds separate signing material to the app session cookie.
 
-On Netlify the live upload route stores audio in Netlify Blobs. Neon stores the
-lesson and recording metadata; the audio object lives in the `lesson-recordings`
-blob store.
+On Netlify the live upload routes store audio and lead sheets in Netlify Blobs.
+Neon stores the lesson, recording, piece, and asset metadata. Audio objects live
+in the `lesson-recordings` blob store; lead sheet PDFs/images live in the
+`piece-assets` blob store.
 
-Lead-sheet PDFs are still local-only fixtures in the repo workspace. For the
-hosted app they should move to object storage too, with Neon keeping
-`piece_assets` metadata and the object store keeping the private PDF/image.
+Lead-sheet PDFs in `docs/leadsheets` are still local-only fixtures in the repo
+workspace. For the hosted app, upload them through `/assets/leadsheets` so the
+PDF/image bytes go to object storage and Neon keeps only `piece_assets`
+metadata.
 
 Netlify environment variables that are only needed by API routes should be
 scoped to Functions rather than Builds when the Netlify plan/UI allows it. On
@@ -35,6 +37,7 @@ output.
 - `OPENAI_API_KEY`
 - `DATABASE_URL`
 - optional fallback: `NETLIFY_BLOBS_TOKEN`
+- optional local override: `PRACTICE_LOOP_ASSET_STORAGE=netlify-blobs`
 
 Netlify normally supplies Blobs context automatically to Functions. If upload
 still reports `MissingBlobsEnvironmentError`, create a Netlify Personal Access
@@ -57,6 +60,9 @@ compiled output.
 - Restore repertoire piece from Archive
 - Delete repertoire piece after confirmation
 - Lead sheet review/import from `docs/leadsheets`
+- Multi-file lead sheet upload/import from `/assets/leadsheets`
+- Uploaded lead sheets are saved as private piece assets in Netlify Blobs on the
+  hosted app, with local fallback storage in `docs/piece-assets`
 - Lead-sheet assets linked to repertoire pieces
 - Actual lead-sheet PDF viewer on piece detail pages
 - Create draft lesson
@@ -159,9 +165,10 @@ posting `testAudioFixture: "leo-20260424-central-15"` to
 7. Try the language toggle and confirm labels change.
 8. Archive the tune and confirm it moves out of Repertoire into `Archive`.
 9. Restore it from `Archive` and confirm it comes back as `Maintenance`.
-10. Open `http://localhost:3001/assets/leadsheets` and confirm the approved
-    lead sheets are all linked to repertoire pieces.
-11. Open a repertoire piece and confirm its lead-sheet PDF is visible.
+10. Open `http://localhost:3001/assets/leadsheets`.
+11. Upload one or more PDF lead sheets.
+12. Confirm the uploaded lead sheets are linked to repertoire pieces.
+13. Open a repertoire piece and confirm its lead-sheet PDF is visible.
 12. Open `http://localhost:3001/lessons`, create a draft lesson, refresh, and
     confirm it remains.
 13. Confirm the new draft lesson shows no transcript or extracts yet.

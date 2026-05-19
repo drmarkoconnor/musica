@@ -2,13 +2,16 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   ArrowUpRight,
   Check,
   FileText,
+  Loader2,
   Plus,
   Rows3,
+  Upload,
 } from "lucide-react";
 import { Section } from "@/components/section";
 import { StatusPill } from "@/components/status-pill";
@@ -33,6 +36,7 @@ export function LeadSheetsReviewScreen({
   suggestions: LeadSheetSuggestion[];
 }) {
   const { t } = useLanguage();
+  const router = useRouter();
   const initialChoices = useMemo(
     () =>
       Object.fromEntries(
@@ -44,11 +48,55 @@ export function LeadSheetsReviewScreen({
     [suggestions],
   );
   const [choices, setChoices] = useState(initialChoices);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [uploadState, setUploadState] = useState<
+    "idle" | "uploading" | "done" | "error"
+  >("idle");
+  const [uploadMessage, setUploadMessage] = useState("");
+  const [uploadInputKey, setUploadInputKey] = useState(0);
   const attachCount = Object.values(choices).filter((choice) => choice === "attach")
     .length;
   const createCount = Object.values(choices).filter((choice) => choice === "create")
     .length;
-  const allMatched = suggestions.every((suggestion) => suggestion.matchedPieceId);
+  const hasLocalSuggestions = suggestions.length > 0;
+  const allMatched =
+    hasLocalSuggestions &&
+    suggestions.every((suggestion) => suggestion.matchedPieceId);
+
+  async function uploadSelectedFiles() {
+    if (selectedFiles.length === 0) return;
+
+    setUploadState("uploading");
+    setUploadMessage("");
+
+    const formData = new FormData();
+    selectedFiles.forEach((file) => formData.append("assets", file));
+
+    const response = await fetch("/api/piece-assets/upload", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const body = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+      setUploadState("error");
+      setUploadMessage(body?.error ?? t("leadSheetsUploadFailed"));
+      return;
+    }
+
+    const body = (await response.json().catch(() => null)) as {
+      imported?: { pieceTitle: string }[];
+    } | null;
+    const importedCount = body?.imported?.length ?? selectedFiles.length;
+
+    setUploadState("done");
+    setUploadMessage(`${importedCount} ${t("leadSheetsUploadComplete")}`);
+    setSelectedFiles([]);
+    setUploadInputKey((current) => current + 1);
+    router.refresh();
+  }
 
   return (
     <div className="space-y-8">
@@ -68,11 +116,79 @@ export function LeadSheetsReviewScreen({
             type="button"
           >
             <Check aria-hidden="true" className="h-4 w-4" />
-            {allMatched ? t("leadSheetsImported") : t("importComesNext")}
+            {!hasLocalSuggestions
+              ? t("uploadLeadSheets")
+              : allMatched
+                ? t("leadSheetsImported")
+                : t("importComesNext")}
           </button>
         }
         title={t("leadSheetReview")}
       >
+        <div className="mb-4 rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <label className="min-w-0 flex-1">
+              <span className="block text-sm font-semibold text-stone-950">
+                {t("uploadLeadSheets")}
+              </span>
+              <input
+                accept="application/pdf,image/png,image/jpeg"
+                className="mt-2 block w-full rounded-md border border-stone-300 px-3 py-2 text-sm text-stone-700 file:mr-3 file:rounded-md file:border-0 file:bg-stone-100 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-stone-700"
+                key={uploadInputKey}
+                multiple
+                onChange={(event) => {
+                  setSelectedFiles(Array.from(event.target.files ?? []));
+                  setUploadState("idle");
+                  setUploadMessage("");
+                }}
+                type="file"
+              />
+            </label>
+            <button
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-emerald-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-900 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={
+                selectedFiles.length === 0 || uploadState === "uploading"
+              }
+              onClick={() => void uploadSelectedFiles()}
+              type="button"
+            >
+              {uploadState === "uploading" ? (
+                <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
+              ) : (
+                <Upload aria-hidden="true" className="h-4 w-4" />
+              )}
+              {t("importLeadSheets")}
+            </button>
+          </div>
+          {selectedFiles.length > 0 ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              <StatusPill tone="blue">
+                {selectedFiles.length} {t("selectedFiles")}
+              </StatusPill>
+              {selectedFiles.slice(0, 4).map((file) => (
+                <span
+                  className="rounded border border-stone-200 bg-stone-50 px-2 py-1 text-xs font-medium text-stone-600"
+                  key={`${file.name}-${file.size}`}
+                >
+                  {file.name}
+                </span>
+              ))}
+            </div>
+          ) : null}
+          {uploadMessage ? (
+            <p
+              className={cn(
+                "mt-3 rounded-md border px-3 py-2 text-sm",
+                uploadState === "error"
+                  ? "border-rose-200 bg-rose-50 text-rose-800"
+                  : "border-emerald-200 bg-emerald-50 text-emerald-900",
+              )}
+            >
+              {uploadMessage}
+            </p>
+          ) : null}
+        </div>
+
         <div className="mb-4 flex flex-wrap gap-2">
           <StatusPill tone="blue">
             {attachCount} {t("attachToExisting")}

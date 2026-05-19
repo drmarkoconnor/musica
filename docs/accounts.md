@@ -40,6 +40,11 @@ Official Neon Auth docs: https://neon.com/docs/auth/overview
 Purpose: object storage for files such as lesson recordings, practice
 recordings, lead sheet PDFs/images, and annotated versions.
 
+Current v1 bridge: Netlify Blobs is already used for lesson recordings and lead
+sheet uploads on the hosted app. R2 remains the likely longer-term storage move
+if the app outgrows Netlify's blob storage or needs provider-independent signed
+URLs.
+
 Official R2 docs:
 
 - Get started: https://developers.cloudflare.com/r2/get-started/
