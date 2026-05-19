@@ -24,6 +24,8 @@ Lead-sheet PDFs in `docs/leadsheets` are still local-only fixtures in the repo
 workspace. For the hosted app, upload them through `/assets/leadsheets` so the
 PDF/image bytes go to object storage and Neon keeps only `piece_assets`
 metadata.
+Hosted builds hide old `local-docs` asset rows until the matching PDFs/images
+have been uploaded to Netlify Blobs.
 
 Netlify environment variables that are only needed by API routes should be
 scoped to Functions rather than Builds when the Netlify plan/UI allows it. On

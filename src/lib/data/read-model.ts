@@ -102,6 +102,10 @@ function createNeonCompatibleMockReadModel(): PracticeLoopReadModel {
 
 function mergeWithFallback(model: PracticeLoopReadModel): PracticeLoopReadModel {
   const fallback = createNeonCompatibleMockReadModel();
+  const isHostedApp = process.env.NETLIFY === "true";
+  const visiblePieceAssets = isHostedApp
+    ? model.pieceAssets.filter((asset) => asset.storageBucket !== "local-docs")
+    : model.pieceAssets;
 
   return {
     tags: model.tags.length > 0 ? model.tags : fallback.tags,
@@ -114,7 +118,10 @@ function mergeWithFallback(model: PracticeLoopReadModel): PracticeLoopReadModel 
     transcripts: model.transcripts,
     lessonExtracts: model.lessonExtracts,
     practiceTasks: model.practiceTasks,
-    pieceAssets: model.pieceAssets.length > 0 ? model.pieceAssets : fallback.pieceAssets,
+    pieceAssets:
+      visiblePieceAssets.length > 0 || isHostedApp
+        ? visiblePieceAssets
+        : fallback.pieceAssets,
     practiceSessions:
       model.practiceSessions.length > 0
         ? model.practiceSessions

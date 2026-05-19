@@ -32,6 +32,11 @@ export function AssetsScreen({ data }: { data: PracticeLoopReadModel }) {
         title={t("assets")}
       >
         <div className="grid gap-4 md:grid-cols-2">
+          {pieceAssets.length === 0 ? (
+            <div className="rounded-lg border border-stone-200 bg-white p-5 text-sm leading-6 text-stone-600 shadow-sm">
+              {t("notYet")}
+            </div>
+          ) : null}
           {pieceAssets.map((asset) => {
             const piece = pieces.find((item) => item.id === asset.pieceId);
             const Icon = asset.type === "lead_sheet_image" ? FileImage : FileText;
