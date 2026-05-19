@@ -1,7 +1,12 @@
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { createDatabaseClient } from "@/db/client";
-import { practiceTasks } from "@/db/schema";
+import {
+  practiceTaskTags,
+  practiceTasks,
+  recordings,
+  sessionItems,
+} from "@/db/schema";
 import type { PracticeStatus } from "@/lib/types";
 
 type PracticeTaskUpdateBody = {
@@ -73,14 +78,38 @@ export async function DELETE(
   }
 
   const db = createDatabaseClient();
-  const [task] = await db
-    .delete(practiceTasks)
-    .where(eq(practiceTasks.id, taskId))
-    .returning({ id: practiceTasks.id });
+  try {
+    const task = await db.transaction(async (tx) => {
+      await tx
+        .delete(practiceTaskTags)
+        .where(eq(practiceTaskTags.practiceTaskId, taskId));
+      await tx
+        .update(recordings)
+        .set({ practiceTaskId: null })
+        .where(eq(recordings.practiceTaskId, taskId));
+      await tx
+        .update(sessionItems)
+        .set({ practiceTaskId: null })
+        .where(eq(sessionItems.practiceTaskId, taskId));
 
-  if (!task) {
-    return NextResponse.json({ error: "Task not found." }, { status: 404 });
+      const [deletedTask] = await tx
+        .delete(practiceTasks)
+        .where(eq(practiceTasks.id, taskId))
+        .returning({ id: practiceTasks.id });
+
+      return deletedTask;
+    });
+
+    if (!task) {
+      return NextResponse.json({ error: "Task not found." }, { status: 404 });
+    }
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error("Practice task delete failed", error);
+    return NextResponse.json(
+      { error: "Task could not be deleted." },
+      { status: 500 },
+    );
   }
-
-  return NextResponse.json({ ok: true });
 }

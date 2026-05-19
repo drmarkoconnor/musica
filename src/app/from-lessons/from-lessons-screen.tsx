@@ -72,6 +72,8 @@ export function FromLessonsScreen({ data }: { data: PracticeLoopReadModel }) {
   const [actionState, setActionState] = useState<
     Record<string, "idle" | "saving" | "error">
   >({});
+  const [actionErrors, setActionErrors] = useState<Record<string, string>>({});
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [formValues, setFormValues] = useState<PracticeItemFormValues>(
     emptyPracticeItemForm,
@@ -82,6 +84,7 @@ export function FromLessonsScreen({ data }: { data: PracticeLoopReadModel }) {
 
   async function updateTaskStatus(taskId: string, status: PracticeStatus) {
     setActionState((current) => ({ ...current, [taskId]: "saving" }));
+    setActionErrors((current) => ({ ...current, [taskId]: "" }));
 
     const response = await fetch(`/api/practice-tasks/${taskId}`, {
       method: "PATCH",
@@ -90,7 +93,14 @@ export function FromLessonsScreen({ data }: { data: PracticeLoopReadModel }) {
     });
 
     if (!response.ok) {
+      const body = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
       setActionState((current) => ({ ...current, [taskId]: "error" }));
+      setActionErrors((current) => ({
+        ...current,
+        [taskId]: body?.error ?? t("saveFailed"),
+      }));
       return;
     }
 
@@ -99,20 +109,27 @@ export function FromLessonsScreen({ data }: { data: PracticeLoopReadModel }) {
   }
 
   async function deleteTask(taskId: string) {
-    if (!window.confirm(t("confirmDeletePracticeTask"))) return;
-
     setActionState((current) => ({ ...current, [taskId]: "saving" }));
+    setActionErrors((current) => ({ ...current, [taskId]: "" }));
 
     const response = await fetch(`/api/practice-tasks/${taskId}`, {
       method: "DELETE",
     });
 
     if (!response.ok) {
+      const body = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
       setActionState((current) => ({ ...current, [taskId]: "error" }));
+      setActionErrors((current) => ({
+        ...current,
+        [taskId]: body?.error ?? t("saveFailed"),
+      }));
       return;
     }
 
     setActionState((current) => ({ ...current, [taskId]: "idle" }));
+    setPendingDeleteId(null);
     router.refresh();
   }
 
@@ -209,6 +226,7 @@ export function FromLessonsScreen({ data }: { data: PracticeLoopReadModel }) {
               const isParked = task.status === "parked";
               const isSaving = actionState[task.id] === "saving";
               const hasError = actionState[task.id] === "error";
+              const isConfirmingDelete = pendingDeleteId === task.id;
               const sourceLabel =
                 task.source === "lesson"
                   ? t("sourceLesson")
@@ -312,7 +330,7 @@ export function FromLessonsScreen({ data }: { data: PracticeLoopReadModel }) {
                       <button
                         className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-rose-200 text-rose-800 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
                         disabled={isSaving}
-                        onClick={() => void deleteTask(task.id)}
+                        onClick={() => setPendingDeleteId(task.id)}
                         title={t("delete")}
                         type="button"
                       >
@@ -321,6 +339,37 @@ export function FromLessonsScreen({ data }: { data: PracticeLoopReadModel }) {
                       </button>
                     </div>
                   </div>
+
+                  {isConfirmingDelete ? (
+                    <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-900">
+                      <span className="font-medium">
+                        {t("confirmDeletePracticeTask")}
+                      </span>
+                      <div className="flex gap-2">
+                        <button
+                          className="rounded-md border border-rose-200 bg-white px-3 py-1.5 text-sm font-semibold text-rose-800 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                          disabled={isSaving}
+                          onClick={() => void deleteTask(task.id)}
+                          type="button"
+                        >
+                          {isSaving ? t("saving") : t("delete")}
+                        </button>
+                        <button
+                          className="rounded-md border border-stone-300 bg-white px-3 py-1.5 text-sm font-semibold text-stone-700 transition hover:bg-stone-100"
+                          onClick={() => setPendingDeleteId(null)}
+                          type="button"
+                        >
+                          {t("cancel")}
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {hasError ? (
+                    <p className="mt-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+                      {actionErrors[task.id] || t("saveFailed")}
+                    </p>
+                  ) : null}
 
                   <details className="mt-3 rounded-md border border-stone-200 bg-white">
                     <summary className="cursor-pointer px-3 py-2 text-sm font-semibold text-stone-800">
@@ -382,11 +431,6 @@ export function FromLessonsScreen({ data }: { data: PracticeLoopReadModel }) {
                           </Link>
                         ) : null}
                       </div>
-                      {hasError ? (
-                        <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
-                          {t("saveFailed")}
-                        </p>
-                      ) : null}
                     </div>
                   </details>
                 </li>
