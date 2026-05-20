@@ -24,7 +24,7 @@ implementation truth in `current-state.md`, and priority sequencing in
 
 Branch: `practice-session-repertoire-roadmap`
 
-Commit: `17ade57 Tighten practice sessions and recording management`
+Commit: `1574052 Tighten practice sessions and recording management`
 
 Work done:
 
