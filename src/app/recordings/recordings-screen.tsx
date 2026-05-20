@@ -7,6 +7,17 @@ import { StatusPill } from "@/components/status-pill";
 import type { PracticeLoopReadModel } from "@/lib/data";
 import { useLanguage } from "@/lib/language";
 
+function practiceRecordingAudioSrc(recording: { id: string; storageBucket: string }) {
+  if (
+    recording.storageBucket === "local-practice-audio" ||
+    recording.storageBucket === "netlify-blobs"
+  ) {
+    return `/api/practice-recordings/${recording.id}/file`;
+  }
+
+  return undefined;
+}
+
 export function RecordingsScreen({ data }: { data: PracticeLoopReadModel }) {
   const { t } = useLanguage();
   const { exercises, lessons, pieces, recordings } = data;
@@ -82,7 +93,10 @@ export function RecordingsScreen({ data }: { data: PracticeLoopReadModel }) {
                     {recording.kind}
                   </StatusPill>
                 </div>
-                <AudioStrip title={recording.title} />
+                <AudioStrip
+                  audioSrc={practiceRecordingAudioSrc(recording)}
+                  title={recording.title}
+                />
                 {recording.spokenNote ? (
                   <div className="mt-4 flex items-start gap-3 rounded-lg bg-stone-50 p-3">
                     <MessageSquareText

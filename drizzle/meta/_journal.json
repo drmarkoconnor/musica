@@ -36,6 +36,13 @@
       "when": 1779209561293,
       "tag": "0004_short_mercury",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1779295079131,
+      "tag": "0005_sturdy_sabra",
+      "breakpoints": true
     }
   ]
 }

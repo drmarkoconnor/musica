@@ -9,6 +9,7 @@ docs/leadsheets/*.pdf
 docs/leadsheets/*.m4a
 docs/test-audio/
 docs/lesson-recordings/
+docs/practice-recordings/
 docs/piece-assets/
 
 .env

@@ -21,6 +21,17 @@ import {
   tempoValueLabel,
 } from "@/lib/piece-labels";
 
+function practiceRecordingAudioSrc(recording: { id: string; storageBucket: string }) {
+  if (
+    recording.storageBucket === "local-practice-audio" ||
+    recording.storageBucket === "netlify-blobs"
+  ) {
+    return `/api/practice-recordings/${recording.id}/file`;
+  }
+
+  return undefined;
+}
+
 export function PieceDetailScreen({
   data,
   pieceId,
@@ -221,7 +232,11 @@ export function PieceDetailScreen({
             <div className="space-y-3">
               {pieceRecordings.length > 0 ? (
                 pieceRecordings.map((recording) => (
-                  <AudioStrip key={recording.id} title={recording.title} />
+                  <AudioStrip
+                    audioSrc={practiceRecordingAudioSrc(recording)}
+                    key={recording.id}
+                    title={recording.title}
+                  />
                 ))
               ) : (
                 <div className="rounded-lg border border-stone-200 bg-white p-4 text-sm text-stone-600 shadow-sm">

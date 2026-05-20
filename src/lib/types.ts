@@ -201,9 +201,11 @@ export type Recording = {
   title: string;
   durationSeconds: number;
   recordedAt: string;
+  storageBucket: string;
   storagePath: string;
   lessonId?: string;
   practiceSessionId?: string;
+  sessionItemId?: string;
   pieceId?: string;
   exerciseId?: string;
   practiceTaskId?: string;

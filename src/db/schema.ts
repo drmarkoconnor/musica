@@ -550,6 +550,9 @@ export const recordings = pgTable(
       () => practiceSessions.id,
       { onDelete: "set null" },
     ),
+    sessionItemId: uuid("session_item_id").references(() => sessionItems.id, {
+      onDelete: "set null",
+    }),
     pieceId: uuid("piece_id").references(() => pieces.id, {
       onDelete: "set null",
     }),
@@ -565,6 +568,7 @@ export const recordings = pgTable(
       .defaultNow(),
   },
   (table) => [
+    index("recordings_session_item_idx").on(table.sessionItemId),
     index("recordings_piece_idx").on(table.pieceId),
     index("recordings_practice_task_idx").on(table.practiceTaskId),
     check(

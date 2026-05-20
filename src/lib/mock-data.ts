@@ -239,9 +239,11 @@ export const recordings: Recording[] = [
     title: "Autumn Leaves slow chorus",
     durationSeconds: 420,
     recordedAt: "2026-05-03T09:20:00Z",
+    storageBucket: "local-practice-audio",
     storagePath: "practice-recordings/autumn-leaves-slow.m4a",
     pieceId: "autumn-leaves",
     practiceSessionId: "session-2026-05-17",
+    sessionItemId: "session-item-2",
     spokenNote: "Still rushing the resolution into the second A.",
   },
   {
@@ -250,6 +252,7 @@ export const recordings: Recording[] = [
     title: "Future note about My Funny Valentine",
     durationSeconds: 58,
     recordedAt: "2026-05-13T20:10:00Z",
+    storageBucket: "local-practice-audio",
     storagePath: "practice-recordings/my-funny-valentine-note.m4a",
     pieceId: "my-funny-valentine",
     spokenNote:
