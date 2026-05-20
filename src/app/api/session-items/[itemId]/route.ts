@@ -72,8 +72,8 @@ export async function PATCH(
     return NextResponse.json({ error: "Session item not found." }, { status: 404 });
   }
 
-  await db.transaction(async (tx) => {
-    await tx
+  try {
+    await db
       .update(sessionItems)
       .set({
         actualSeconds: actualSeconds ?? existingItem.actualSeconds,
@@ -84,14 +84,14 @@ export async function PATCH(
       .where(eq(sessionItems.id, itemId));
 
     if (status !== "done") {
-      return;
+      return NextResponse.json({ ok: true });
     }
 
     const practisedOn = todayIsoDate();
     const updatedAt = new Date().toISOString();
 
     if (existingItem.practiceTaskId) {
-      await tx
+      await db
         .update(practiceTasks)
         .set({
           ...(confidenceAfter !== null ? { confidence: confidenceAfter } : {}),
@@ -103,7 +103,7 @@ export async function PATCH(
     }
 
     if (existingItem.pieceId) {
-      await tx
+      await db
         .update(pieces)
         .set({
           ...(confidenceAfter !== null ? { confidence: confidenceAfter } : {}),
@@ -114,7 +114,7 @@ export async function PATCH(
     }
 
     if (existingItem.exerciseId) {
-      await tx
+      await db
         .update(exercises)
         .set({
           ...(confidenceAfter !== null ? { confidence: confidenceAfter } : {}),
@@ -123,7 +123,7 @@ export async function PATCH(
         })
         .where(eq(exercises.id, existingItem.exerciseId));
 
-      await tx.insert(exerciseLogs).values({
+      await db.insert(exerciseLogs).values({
         confidence: confidenceAfter ?? existingItem.confidenceBefore ?? 3,
         exerciseId: existingItem.exerciseId,
         notes: optionalText(body.notes),
@@ -131,9 +131,15 @@ export async function PATCH(
         tempo: existingItem.tempo,
       });
     }
-  });
 
-  return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error("Session item update failed", error);
+    return NextResponse.json(
+      { error: "Session item could not be saved." },
+      { status: 500 },
+    );
+  }
 }
 
 export async function DELETE(

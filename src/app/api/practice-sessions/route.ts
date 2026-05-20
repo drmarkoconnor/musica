@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { eq } from "drizzle-orm";
 import { createDatabaseClient } from "@/db/client";
 import { practiceSessions, sessionItems } from "@/db/schema";
 import {
@@ -36,13 +37,17 @@ export async function POST(request: Request) {
   }
 
   const db = createDatabaseClient();
-  const result = await db.transaction(async (tx) => {
-    const [session] = await tx
+  let sessionId: string | null = null;
+
+  try {
+    const [session] = await db
       .insert(practiceSessions)
       .values({ startedAt: new Date().toISOString() })
       .returning({ id: practiceSessions.id });
 
-    const insertedItems = await tx
+    sessionId = session.id;
+
+    const insertedItems = await db
       .insert(sessionItems)
       .values(
         parsedItems.map((item) => {
@@ -61,8 +66,25 @@ export async function POST(request: Request) {
         position: sessionItems.position,
       });
 
-    return { id: session.id, items: insertedItems };
-  });
+    return NextResponse.json(
+      { id: session.id, items: insertedItems },
+      { status: 201 },
+    );
+  } catch (error) {
+    console.error("Practice session create failed", error);
 
-  return NextResponse.json(result, { status: 201 });
+    if (sessionId) {
+      await db
+        .delete(practiceSessions)
+        .where(eq(practiceSessions.id, sessionId))
+        .catch((cleanupError) => {
+          console.error("Practice session cleanup failed", cleanupError);
+        });
+    }
+
+    return NextResponse.json(
+      { error: "Session could not be started." },
+      { status: 500 },
+    );
+  }
 }

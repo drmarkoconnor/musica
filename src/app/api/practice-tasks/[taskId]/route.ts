@@ -152,26 +152,22 @@ export async function DELETE(
 
   const db = createDatabaseClient();
   try {
-    const task = await db.transaction(async (tx) => {
-      await tx
-        .delete(practiceTaskTags)
-        .where(eq(practiceTaskTags.practiceTaskId, taskId));
-      await tx
-        .update(recordings)
-        .set({ practiceTaskId: null })
-        .where(eq(recordings.practiceTaskId, taskId));
-      await tx
-        .update(sessionItems)
-        .set({ practiceTaskId: null })
-        .where(eq(sessionItems.practiceTaskId, taskId));
+    await db
+      .delete(practiceTaskTags)
+      .where(eq(practiceTaskTags.practiceTaskId, taskId));
+    await db
+      .update(recordings)
+      .set({ practiceTaskId: null })
+      .where(eq(recordings.practiceTaskId, taskId));
+    await db
+      .update(sessionItems)
+      .set({ practiceTaskId: null })
+      .where(eq(sessionItems.practiceTaskId, taskId));
 
-      const [deletedTask] = await tx
-        .delete(practiceTasks)
-        .where(eq(practiceTasks.id, taskId))
-        .returning({ id: practiceTasks.id });
-
-      return deletedTask;
-    });
+    const [task] = await db
+      .delete(practiceTasks)
+      .where(eq(practiceTasks.id, taskId))
+      .returning({ id: practiceTasks.id });
 
     if (!task) {
       return NextResponse.json({ error: "Task not found." }, { status: 404 });
