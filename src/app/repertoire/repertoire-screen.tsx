@@ -283,7 +283,7 @@ export function RepertoireScreen({
           </p>
         ) : null}
         <div className="overflow-hidden rounded-lg border border-stone-200 bg-white shadow-sm">
-          <div className="hidden grid-cols-[minmax(12rem,1.45fr)_4rem_5.5rem_9rem_9rem_7.5rem_6.5rem_5.5rem] gap-3 border-b border-stone-200 bg-stone-100 px-3 py-2.5 text-xs font-semibold uppercase tracking-[0.12em] text-stone-600 lg:grid">
+          <div className="hidden grid-cols-[minmax(12rem,1.45fr)_4rem_7.5rem_8.5rem_9rem_7.5rem_6.5rem_5.5rem] gap-3 border-b border-stone-200 bg-stone-100 px-3 py-2.5 text-xs font-semibold uppercase tracking-[0.12em] text-stone-600 lg:grid">
             <span>{t("piece")}</span>
             <span>{t("musicalKey")}</span>
             <span>{t("spineTune")}</span>
@@ -303,7 +303,7 @@ export function RepertoireScreen({
                   <div
                     aria-label={`${t("piece")}: ${piece.title}`}
                     className={cn(
-                      "grid cursor-pointer gap-2 px-3 py-2.5 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-800/30 lg:grid-cols-[minmax(12rem,1.45fr)_4rem_5.5rem_9rem_9rem_7.5rem_6.5rem_5.5rem] lg:items-center lg:gap-3",
+                      "grid cursor-pointer gap-2 px-3 py-2.5 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-800/30 lg:grid-cols-[minmax(12rem,1.45fr)_4rem_7.5rem_8.5rem_9rem_7.5rem_6.5rem_5.5rem] lg:items-center lg:gap-3",
                       index % 2 === 0 ? "bg-white" : "bg-stone-50",
                       "hover:bg-emerald-50/70",
                     )}
@@ -342,7 +342,7 @@ export function RepertoireScreen({
                       aria-label={`${t("spineTune")}: ${piece.title}`}
                       aria-pressed={piece.isSpineTune}
                       className={cn(
-                        "inline-flex h-8 w-fit items-center gap-1.5 rounded-md border px-2 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60",
+                        "inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-md border px-2 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60",
                         piece.isSpineTune
                           ? "border-emerald-800 bg-emerald-950 text-white"
                           : "border-stone-300 bg-white text-stone-600 hover:bg-stone-100",
@@ -354,13 +354,14 @@ export function RepertoireScreen({
                           isSpineTune: !piece.isSpineTune,
                         });
                       }}
+                      title={t("spineTuneHelp")}
                       type="button"
                     >
                       <Star
                         aria-hidden="true"
                         className={cn("h-4 w-4", piece.isSpineTune ? "fill-current" : "")}
                       />
-                      <span className="hidden xl:inline">{t("spineTune")}</span>
+                      <span>{t("spine")}</span>
                     </button>
 
                     <label className="block">

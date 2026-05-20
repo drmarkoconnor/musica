@@ -20,6 +20,104 @@ Keep entries concise. Put stable product truth in `project-brief.md`, current
 implementation truth in `current-state.md`, and priority sequencing in
 `roadmap.md`.
 
+## 2026-05-20 - Practice Session, Recording, And Activity Fixes
+
+Branch: `practice-session-repertoire-roadmap`
+
+Commit: `17ade57 Tighten practice sessions and recording management`
+
+Work done:
+
+- Enabled editing for practice-list items in `/from-lessons`.
+- Expanded the practice-task PATCH route so title, notes, linked piece,
+  confidence, importance, frequency, and status can be saved.
+- Reworked `/practice` so sessions can be built from existing practice-list
+  items plus clearly labelled one-off session items.
+- Removed visible planned-duration controls from practice sessions and smart
+  suggestions.
+- Renamed the live action to `Done and log time`, added `Not today`, and added
+  inline copy explaining that skipped items do not count as practised.
+- Made session rows clickable/selectable and fixed ordered advancement after a
+  completed item.
+- Removed the Quartet accompaniment panel.
+- Added delete routes for lesson recordings and practice recordings.
+- Added piece-linking and delete controls to `/recordings`.
+- Added a first-pass dashboard activity log from completed `session_items`.
+- Widened the repertoire spine-tune/star control and clarified that it is a
+  persistent spine-tune flag.
+- Deferred the 12-keys reference card because Mark will prepare the graphic
+  separately.
+
+Commands run:
+
+```bash
+npm run typecheck
+npm run build
+git diff --check
+```
+
+Migration status: no database migration.
+
+What to test:
+
+1. Edit a practice-list item and refresh.
+2. Build a practice session from an existing practice-list item and a one-off
+   item.
+3. Start a session, switch rows, mark one item done, and confirm ordered
+   advancement.
+4. Use `Not today` and confirm the item is not marked practised.
+5. Delete/link recordings from `/recordings`.
+6. Complete a timed item and check the dashboard activity log.
+
+## 2026-05-20 - Practice Session And Repertoire Testing Triage
+
+Branch: `practice-session-repertoire-roadmap`
+
+Commit: not committed yet.
+
+Work done:
+
+- Reviewed current practice session, practice-list, repertoire, recordings, and
+  session-item API implementation against Mark's testing notes.
+- Confirmed `/from-lessons` edit is currently disabled.
+- Confirmed live session `Done` writes elapsed seconds to `session_items` and
+  updates linked task/piece/exercise metadata only for `done`, while `skipped`
+  saves the item state without marking it practised.
+- Confirmed the practice session next-item helper needs list-order sequencing.
+- Confirmed planned minutes are exposed throughout the practice session UI even
+  though actual elapsed time is the useful practice log.
+- Confirmed repertoire already has current/target tempo fields in the modal, but
+  row affordances need clearer spacing and copy.
+- Confirmed recordings list has playback but not delete/link/edit management.
+- Updated `docs/current-state.md` and `docs/roadmap.md` with the stratified
+  roadmap.
+
+Commands run:
+
+```bash
+git status -sb
+git log --oneline -5
+sed -n ... docs/current-state.md docs/roadmap.md docs/agent-log.md
+sed -n ... src/app/practice/practice-screen.tsx
+sed -n ... src/app/from-lessons/from-lessons-screen.tsx
+sed -n ... src/app/repertoire/repertoire-screen.tsx
+sed -n ... src/app/recordings/recordings-screen.tsx
+sed -n ... src/app/api/session-items/[itemId]/route.ts
+sed -n ... src/app/api/practice-tasks/[taskId]/route.ts
+sed -n ... src/app/api/practice-sessions/route.ts
+```
+
+Migration status: no database migration.
+
+Recommended next implementation:
+
+1. Practice-list edit and session builder picker.
+2. Live-session sequencing and active-row selection.
+3. Remove planned-duration UI and Quartet area.
+4. Add 12-keys reference cards.
+5. Repertoire and recordings management polish.
+6. Activity log/dashboard.
+
 ## 2026-05-20 - Audio-First Clip Rail And Review Queue
 
 Branch: `uiscrubber`

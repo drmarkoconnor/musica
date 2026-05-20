@@ -17,10 +17,19 @@ import { StatusPill } from "@/components/status-pill";
 import type { PracticeLoopReadModel } from "@/lib/data";
 import { useLanguage } from "@/lib/language";
 import { pieceTempoLabel } from "@/lib/piece-labels";
+import { formatDuration } from "@/lib/utils";
 
 export function DashboardScreen({ data }: { data: PracticeLoopReadModel }) {
   const { t } = useLanguage();
-  const { pieces, practiceTasks, smartQueue } = data;
+  const {
+    exercises,
+    pieces,
+    practiceSessions,
+    practiceTasks,
+    recordings,
+    sessionItems,
+    smartQueue,
+  } = data;
   const activePieces = pieces.filter((piece) => piece.status !== "parked");
   const neglectedPieces = activePieces.filter((piece) =>
     ["blue-in-green", "stella-by-starlight", "on-green-dolphin-street"].includes(
@@ -38,6 +47,39 @@ export function DashboardScreen({ data }: { data: PracticeLoopReadModel }) {
         .slice(0, 3);
   const activeSpineTuneCount = activePieces.filter((piece) => piece.isSpineTune)
     .length;
+  const completedSessionItems = sessionItems
+    .filter((item) => item.status === "done" && item.actualSeconds > 0)
+    .map((item) => {
+      const session = practiceSessions.find(
+        (practiceSession) => practiceSession.id === item.sessionId,
+      );
+      const piece = item.pieceId
+        ? pieces.find((pieceItem) => pieceItem.id === item.pieceId)
+        : null;
+      const task = item.practiceTaskId
+        ? practiceTasks.find((practiceTask) => practiceTask.id === item.practiceTaskId)
+        : null;
+      const exercise = item.exerciseId
+        ? exercises.find((exerciseItem) => exerciseItem.id === item.exerciseId)
+        : null;
+
+      return {
+        ...item,
+        label: piece?.title ?? task?.title ?? exercise?.title ?? item.title,
+        recordedAt: session?.startedAt ?? "",
+      };
+    })
+    .sort((left, right) => right.recordedAt.localeCompare(left.recordedAt));
+  const totalPracticeSeconds = completedSessionItems.reduce(
+    (total, item) => total + item.actualSeconds,
+    0,
+  );
+  const completedSessionIds = new Set(
+    completedSessionItems.map((item) => item.sessionId),
+  );
+  const linkedPracticeRecordings = recordings.filter(
+    (recording) => recording.kind !== "lesson" && recording.sessionItemId,
+  );
 
   return (
     <div className="space-y-8">
@@ -120,9 +162,6 @@ export function DashboardScreen({ data }: { data: PracticeLoopReadModel }) {
                             ? t("warmUp")
                             : t("spineTune")}
                       </StatusPill>
-                      <span className="text-sm text-stone-500">
-                        {item.minutes} {t("minutes")}
-                      </span>
                     </div>
                     <h3 className="text-lg font-semibold text-stone-950">
                       {item.title}
@@ -164,6 +203,73 @@ export function DashboardScreen({ data }: { data: PracticeLoopReadModel }) {
           </div>
         </Section>
       </div>
+
+      <Section title={t("activityLog")}>
+        <div className="grid gap-3 md:grid-cols-4">
+          <div className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+              {t("totalPracticeTime")}
+            </p>
+            <p className="mt-2 text-2xl font-semibold tabular-nums text-stone-950">
+              {formatDuration(totalPracticeSeconds)}
+            </p>
+          </div>
+          <div className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+              {t("loggedItems")}
+            </p>
+            <p className="mt-2 text-2xl font-semibold tabular-nums text-stone-950">
+              {completedSessionItems.length}
+            </p>
+          </div>
+          <div className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+              {t("practiceSessions")}
+            </p>
+            <p className="mt-2 text-2xl font-semibold tabular-nums text-stone-950">
+              {completedSessionIds.size}
+            </p>
+          </div>
+          <div className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+              {t("practiceRecordings")}
+            </p>
+            <p className="mt-2 text-2xl font-semibold tabular-nums text-stone-950">
+              {linkedPracticeRecordings.length}
+            </p>
+          </div>
+        </div>
+        <div className="mt-3 overflow-hidden rounded-lg border border-stone-200 bg-white shadow-sm">
+          {completedSessionItems.slice(0, 8).map((item) => (
+            <div
+              className="grid gap-2 border-b border-stone-200 px-3 py-2.5 text-sm last:border-b-0 sm:grid-cols-[minmax(0,1fr)_7rem_7rem]"
+              key={item.id}
+            >
+              <div className="min-w-0">
+                <p className="truncate font-semibold text-stone-950">
+                  {item.label}
+                </p>
+                <p className="text-xs text-stone-500">
+                  {item.recordedAt
+                    ? new Date(item.recordedAt).toLocaleDateString()
+                    : t("notYet")}
+                </p>
+              </div>
+              <span className="font-semibold tabular-nums text-stone-800">
+                {formatDuration(item.actualSeconds)}
+              </span>
+              <span className="text-stone-600">
+                {item.confidenceAfter
+                  ? `${t("confidence")} ${item.confidenceAfter}`
+                  : t("notYet")}
+              </span>
+            </div>
+          ))}
+          {completedSessionItems.length === 0 ? (
+            <p className="px-3 py-4 text-sm text-stone-600">{t("notYet")}</p>
+          ) : null}
+        </div>
+      </Section>
 
       <Section
         action={

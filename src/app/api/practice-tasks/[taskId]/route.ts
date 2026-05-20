@@ -10,10 +10,15 @@ import {
 import type { PracticeStatus } from "@/lib/types";
 
 type PracticeTaskUpdateBody = {
+  body?: unknown;
   confidence?: unknown;
+  importance?: unknown;
   lastPractised?: unknown;
+  linkedExerciseId?: unknown;
+  linkedPieceId?: unknown;
   status?: unknown;
   targetFrequencyDays?: unknown;
+  title?: unknown;
 };
 
 const practiceStatuses = new Set<PracticeStatus>([
@@ -59,6 +64,20 @@ function optionalDate(value: unknown) {
   return value;
 }
 
+function optionalText(value: unknown) {
+  return typeof value === "string" && value.trim().length > 0
+    ? value.trim()
+    : null;
+}
+
+function optionalUuid(value: unknown) {
+  if (value === "" || value === null || typeof value === "undefined") {
+    return null;
+  }
+
+  return typeof value === "string" && isUuid(value) ? value : undefined;
+}
+
 export async function PATCH(
   request: Request,
   context: { params: Promise<{ taskId: string }> },
@@ -82,6 +101,7 @@ export async function PATCH(
   };
   const status = typeof body.status === "string" ? body.status : null;
   const confidence = optionalIntInRange(body.confidence, 1, 5);
+  const importance = optionalIntInRange(body.importance, 1, 5);
   const targetFrequencyDays = optionalIntInRange(body.targetFrequencyDays, 1, 365);
   const lastPractised = optionalDate(body.lastPractised);
 
@@ -103,6 +123,13 @@ export async function PATCH(
     );
   }
 
+  if (typeof importance === "undefined") {
+    return NextResponse.json(
+      { error: "Importance must be between 1 and 5." },
+      { status: 400 },
+    );
+  }
+
   if (typeof lastPractised === "undefined") {
     return NextResponse.json(
       { error: "Last practised date is invalid." },
@@ -114,8 +141,52 @@ export async function PATCH(
     updates.status = status as PracticeStatus;
   }
 
+  if ("title" in body) {
+    const title = optionalText(body.title);
+
+    if (!title) {
+      return NextResponse.json({ error: "Title is required." }, { status: 400 });
+    }
+
+    updates.title = title;
+  }
+
+  if ("body" in body) {
+    updates.body = optionalText(body.body);
+  }
+
+  if ("linkedPieceId" in body) {
+    const linkedPieceId = optionalUuid(body.linkedPieceId);
+
+    if (typeof linkedPieceId === "undefined") {
+      return NextResponse.json(
+        { error: "Linked piece ID must be a UUID." },
+        { status: 400 },
+      );
+    }
+
+    updates.linkedPieceId = linkedPieceId;
+  }
+
+  if ("linkedExerciseId" in body) {
+    const linkedExerciseId = optionalUuid(body.linkedExerciseId);
+
+    if (typeof linkedExerciseId === "undefined") {
+      return NextResponse.json(
+        { error: "Linked exercise ID must be a UUID." },
+        { status: 400 },
+      );
+    }
+
+    updates.linkedExerciseId = linkedExerciseId;
+  }
+
   if (confidence !== null) {
     updates.confidence = confidence;
+  }
+
+  if (importance !== null) {
+    updates.importance = importance;
   }
 
   if (targetFrequencyDays !== null) {

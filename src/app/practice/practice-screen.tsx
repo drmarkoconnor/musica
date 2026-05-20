@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import {
   Check,
   Clock3,
-  ExternalLink,
   ListPlus,
   Loader2,
   Minus,
@@ -25,6 +24,7 @@ import type { PracticeLoopReadModel } from "@/lib/data";
 import { useLanguage } from "@/lib/language";
 import type {
   Confidence,
+  PracticeTask,
   Recording,
   SessionItemStatus,
   SmartQueueItem,
@@ -83,11 +83,6 @@ function formatClock(totalSeconds: number) {
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
-function clampMinutes(value: number) {
-  if (!Number.isFinite(value)) return 10;
-  return Math.min(180, Math.max(1, Math.round(value)));
-}
-
 function apiItem(item: SessionPlanItem) {
   return {
     confidence: item.confidence,
@@ -142,12 +137,11 @@ export function PracticeScreen({ data }: { data: PracticeLoopReadModel }) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [customTitle, setCustomTitle] = useState("");
-  const [customMinutes, setCustomMinutes] = useState("10");
+  const [selectedPracticeTaskId, setSelectedPracticeTaskId] = useState("");
   const [notesByItem, setNotesByItem] = useState<Record<string, string>>({});
   const [confidenceByItem, setConfidenceByItem] = useState<
     Record<string, Confidence | undefined>
   >({});
-  const [sessionNotes, setSessionNotes] = useState("");
   const [saveError, setSaveError] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
   const [pingMessage, setPingMessage] = useState("");
@@ -173,7 +167,6 @@ export function PracticeScreen({ data }: { data: PracticeLoopReadModel }) {
   const activePlanItem =
     planItems.find((item) => item.id === activePlanItemId) ?? planItems[0] ?? null;
   const activeElapsed = activePlanItem?.actualSeconds ?? 0;
-  const totalMinutes = planItems.reduce((total, item) => total + item.minutes, 0);
   const isLive = Boolean(sessionId);
   const isPracticeRecording = practiceRecordingState === "recording";
   const isPracticeRecorderBusy =
@@ -195,6 +188,9 @@ export function PracticeScreen({ data }: { data: PracticeLoopReadModel }) {
         ).values(),
       ).sort((left, right) => right.recordedAt.localeCompare(left.recordedAt))
     : [];
+  const selectablePracticeTasks = data.practiceTasks
+    .filter((task) => task.status !== "parked" && task.status !== "mastered")
+    .sort((left, right) => left.title.localeCompare(right.title));
 
   function sourceLabelFor(item: SmartQueueItem) {
     if (item.kind === "lesson_task") return t("sourceLesson");
@@ -214,6 +210,23 @@ export function PracticeScreen({ data }: { data: PracticeLoopReadModel }) {
       taskId: item.taskId,
       pieceId: item.pieceId,
       exerciseId: item.exerciseId,
+      status: "planned",
+      actualSeconds: 0,
+    };
+  }
+
+  function planItemFromPracticeTask(task: PracticeTask): SessionPlanItem {
+    return {
+      id: `task-${task.id}`,
+      title: task.title,
+      reason: task.body || t("manualPracticeItem"),
+      minutes: 10,
+      confidence: task.confidence,
+      sourceLabel:
+        task.source === "lesson" ? t("sourceLesson") : t("manualPracticeItem"),
+      taskId: task.id,
+      pieceId: task.linkedPieceId,
+      exerciseId: task.linkedExerciseId,
       status: "planned",
       actualSeconds: 0,
     };
@@ -275,13 +288,23 @@ export function PracticeScreen({ data }: { data: PracticeLoopReadModel }) {
   }
 
   function nextActiveItem(afterItemId?: string) {
-    return planItems.find(
-      (item) =>
-        item.id !== afterItemId &&
-        item.status !== "done" &&
-        item.status !== "skipped" &&
-        item.persistedId,
-    );
+    const isAvailable = (item: SessionPlanItem) =>
+      item.id !== afterItemId &&
+      item.status !== "done" &&
+      item.status !== "skipped" &&
+      item.persistedId;
+    const currentIndex = afterItemId
+      ? planItems.findIndex((item) => item.id === afterItemId)
+      : -1;
+
+    if (currentIndex >= 0) {
+      return (
+        planItems.slice(currentIndex + 1).find(isAvailable) ??
+        planItems.slice(0, currentIndex).find(isAvailable)
+      );
+    }
+
+    return planItems.find(isAvailable);
   }
 
   async function addItemToLiveSession(item: SessionPlanItem) {
@@ -328,6 +351,32 @@ export function PracticeScreen({ data }: { data: PracticeLoopReadModel }) {
     setActivePlanItemId(planItem.id);
   }
 
+  function addPracticeTask(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const task = selectablePracticeTasks.find(
+      (item) => item.id === selectedPracticeTaskId,
+    );
+
+    if (!task) return;
+
+    const existing = planItems.find((item) => item.taskId === task.id);
+    if (existing) {
+      setActivePlanItemId(existing.id);
+      return;
+    }
+
+    const planItem = planItemFromPracticeTask(task);
+    if (sessionId) {
+      void addItemToLiveSession(planItem);
+    } else {
+      setPlanItems((current) => [...current, planItem]);
+      setActivePlanItemId(planItem.id);
+    }
+
+    setSelectedPracticeTaskId("");
+  }
+
   function addCustomItem(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const title = customTitle.trim();
@@ -337,7 +386,7 @@ export function PracticeScreen({ data }: { data: PracticeLoopReadModel }) {
       id: `custom-${Date.now()}`,
       title,
       reason: t("manualPracticeItem"),
-      minutes: clampMinutes(Number(customMinutes)),
+      minutes: 10,
       sourceLabel: t("manualPracticeItem"),
       status: "planned",
       actualSeconds: 0,
@@ -351,7 +400,6 @@ export function PracticeScreen({ data }: { data: PracticeLoopReadModel }) {
     }
 
     setCustomTitle("");
-    setCustomMinutes("10");
   }
 
   async function removePlanItem(itemId: string) {
@@ -480,7 +528,7 @@ export function PracticeScreen({ data }: { data: PracticeLoopReadModel }) {
     const response = await fetch(`/api/practice-sessions/${sessionId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ended: true, notes: sessionNotes }),
+      body: JSON.stringify({ ended: true, notes: "" }),
     });
 
     if (!response.ok) {
@@ -498,7 +546,6 @@ export function PracticeScreen({ data }: { data: PracticeLoopReadModel }) {
     setPlanItems([]);
     setNotesByItem({});
     setConfidenceByItem({});
-    setSessionNotes("");
     setStatusMessage(t("sessionSaved"));
     setIsSaving(false);
   }
@@ -755,9 +802,6 @@ export function PracticeScreen({ data }: { data: PracticeLoopReadModel }) {
             <StatusPill tone="blue">
               {planItems.length} {t("addItem")}
             </StatusPill>
-            <StatusPill tone="green">
-              {totalMinutes} {t("minutes")}
-            </StatusPill>
           </div>
         </div>
       </section>
@@ -807,6 +851,8 @@ export function PracticeScreen({ data }: { data: PracticeLoopReadModel }) {
                     disabled={
                       !activePlanItem ||
                       !isLive ||
+                      activePlanItem.status === "done" ||
+                      activePlanItem.status === "skipped" ||
                       isSaving ||
                       isPracticeRecording ||
                       isPracticeRecorderBusy
@@ -815,13 +861,15 @@ export function PracticeScreen({ data }: { data: PracticeLoopReadModel }) {
                     type="button"
                   >
                     <Check aria-hidden="true" className="h-4 w-4" />
-                    {t("done")}
+                    {t("doneAndLogTime")}
                   </button>
                   <button
                     className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-stone-300 px-3 text-sm font-semibold text-stone-700 transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-50"
                     disabled={
                       !activePlanItem ||
                       !isLive ||
+                      activePlanItem.status === "done" ||
+                      activePlanItem.status === "skipped" ||
                       isSaving ||
                       isPracticeRecording ||
                       isPracticeRecorderBusy
@@ -830,10 +878,16 @@ export function PracticeScreen({ data }: { data: PracticeLoopReadModel }) {
                     type="button"
                   >
                     <Square aria-hidden="true" className="h-4 w-4" />
-                    {t("skipToday")}
+                    {t("notToday")}
                   </button>
                 </div>
               </div>
+
+              {isLive && activePlanItem ? (
+                <p className="mt-4 rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-600">
+                  {t("practiceLogHint")}
+                </p>
+              ) : null}
 
               {pingMessage ? (
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
@@ -1040,25 +1094,6 @@ export function PracticeScreen({ data }: { data: PracticeLoopReadModel }) {
             </div>
           </Section>
 
-          <Section title={t("trackOverride")}>
-            <div className="space-y-3 rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
-              <a
-                className="inline-flex items-center gap-2 rounded-md border border-stone-300 px-3 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-100"
-                href="https://www.quartetapp.com/"
-                rel="noreferrer"
-                target="_blank"
-              >
-                Quartet
-                <ExternalLink aria-hidden="true" className="h-4 w-4" />
-              </a>
-              <textarea
-                className="min-h-20 w-full resize-none rounded-md border border-stone-300 p-3 text-sm outline-none transition focus:border-emerald-800 focus:ring-2 focus:ring-emerald-800/20"
-                onChange={(event) => setSessionNotes(event.target.value)}
-                placeholder={t("notes")}
-                value={sessionNotes}
-              />
-            </div>
-          </Section>
         </div>
 
         <div className="space-y-6">
@@ -1103,10 +1138,34 @@ export function PracticeScreen({ data }: { data: PracticeLoopReadModel }) {
                   return (
                     <li
                       className={cn(
-                        "grid gap-3 p-3 sm:grid-cols-[2rem_minmax(0,1fr)_6rem_auto] sm:items-center",
+                        "grid cursor-pointer gap-3 p-3 transition hover:bg-emerald-50/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-800/30 sm:grid-cols-[2rem_minmax(0,1fr)_6rem_auto] sm:items-center",
                         isActive ? "bg-emerald-50" : "bg-white",
                       )}
                       key={item.id}
+                      onClick={() => {
+                        if (isPracticeRecording || isPracticeRecorderBusy) return;
+                        setActivePlanItemId(item.id);
+                        setIsRunning(
+                          isLive &&
+                            item.status !== "done" &&
+                            item.status !== "skipped",
+                        );
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.target !== event.currentTarget) return;
+
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          setActivePlanItemId(item.id);
+                          setIsRunning(
+                            isLive &&
+                              item.status !== "done" &&
+                              item.status !== "skipped",
+                          );
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
                     >
                       <span className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-stone-100 text-sm font-semibold text-stone-700">
                         {index + 1}
@@ -1119,7 +1178,7 @@ export function PracticeScreen({ data }: { data: PracticeLoopReadModel }) {
                           {item.status === "done"
                             ? t("done")
                             : item.status === "skipped"
-                              ? t("skipToday")
+                              ? t("notToday")
                               : item.reason}
                         </p>
                       </div>
@@ -1132,10 +1191,12 @@ export function PracticeScreen({ data }: { data: PracticeLoopReadModel }) {
                           disabled={
                             !isLive ||
                             item.status === "done" ||
+                            item.status === "skipped" ||
                             isPracticeRecording ||
                             isPracticeRecorderBusy
                           }
-                          onClick={() => {
+                          onClick={(event) => {
+                            event.stopPropagation();
                             setActivePlanItemId(item.id);
                             setIsRunning(isLive);
                           }}
@@ -1152,7 +1213,10 @@ export function PracticeScreen({ data }: { data: PracticeLoopReadModel }) {
                             isPracticeRecording ||
                             isPracticeRecorderBusy
                           }
-                          onClick={() => void removePlanItem(item.id)}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void removePlanItem(item.id);
+                          }}
                           title={t("remove")}
                           type="button"
                         >
@@ -1164,33 +1228,55 @@ export function PracticeScreen({ data }: { data: PracticeLoopReadModel }) {
                   );
                 })}
               </ul>
-              <form
-                className="grid gap-2 border-t border-stone-200 p-3 sm:grid-cols-[minmax(0,1fr)_6rem_auto]"
-                onSubmit={addCustomItem}
-              >
-                <input
-                  className="rounded-md border border-stone-300 px-3 py-2 text-sm outline-none transition focus:border-emerald-800 focus:ring-2 focus:ring-emerald-800/20"
-                  onChange={(event) => setCustomTitle(event.target.value)}
-                  placeholder={t("customItem")}
-                  value={customTitle}
-                />
-                <input
-                  className="rounded-md border border-stone-300 px-3 py-2 text-sm outline-none transition focus:border-emerald-800 focus:ring-2 focus:ring-emerald-800/20"
-                  min="1"
-                  max="180"
-                  onChange={(event) => setCustomMinutes(event.target.value)}
-                  type="number"
-                  value={customMinutes}
-                />
-                <button
-                  className="inline-flex items-center justify-center gap-2 rounded-md bg-emerald-950 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-900 disabled:cursor-not-allowed disabled:opacity-60"
-                  disabled={isSaving}
-                  type="submit"
+              <div className="space-y-2 border-t border-stone-200 p-3">
+                <form
+                  className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]"
+                  onSubmit={addPracticeTask}
                 >
-                  <ListPlus aria-hidden="true" className="h-4 w-4" />
-                  {t("addItem")}
-                </button>
-              </form>
+                  <select
+                    className="rounded-md border border-stone-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-emerald-800 focus:ring-2 focus:ring-emerald-800/20"
+                    onChange={(event) =>
+                      setSelectedPracticeTaskId(event.target.value)
+                    }
+                    value={selectedPracticeTaskId}
+                  >
+                    <option value="">{t("choosePracticeListItem")}</option>
+                    {selectablePracticeTasks.map((task) => (
+                      <option key={task.id} value={task.id}>
+                        {task.title}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    className="inline-flex items-center justify-center gap-2 rounded-md bg-emerald-950 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-900 disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={isSaving || !selectedPracticeTaskId}
+                    type="submit"
+                  >
+                    <ListPlus aria-hidden="true" className="h-4 w-4" />
+                    {t("addItem")}
+                  </button>
+                </form>
+
+                <form
+                  className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]"
+                  onSubmit={addCustomItem}
+                >
+                  <input
+                    className="rounded-md border border-stone-300 px-3 py-2 text-sm outline-none transition focus:border-emerald-800 focus:ring-2 focus:ring-emerald-800/20"
+                    onChange={(event) => setCustomTitle(event.target.value)}
+                    placeholder={t("sessionOnlyItem")}
+                    value={customTitle}
+                  />
+                  <button
+                    className="inline-flex items-center justify-center gap-2 rounded-md border border-stone-300 px-3 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={isSaving || customTitle.trim().length === 0}
+                    type="submit"
+                  >
+                    <ListPlus aria-hidden="true" className="h-4 w-4" />
+                    {t("addSessionOnlyItem")}
+                  </button>
+                </form>
+              </div>
             </div>
           </Section>
 
@@ -1206,7 +1292,7 @@ export function PracticeScreen({ data }: { data: PracticeLoopReadModel }) {
                     className="rounded-lg border border-stone-200 bg-white p-3 shadow-sm"
                     key={item.id}
                   >
-                    <div className="grid gap-3 sm:grid-cols-[2rem_minmax(0,1fr)_6rem_auto] sm:items-center">
+                    <div className="grid gap-3 sm:grid-cols-[2rem_minmax(0,1fr)_auto] sm:items-center">
                       <span className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-stone-100 text-sm font-semibold text-stone-700">
                         {index + 1}
                       </span>
@@ -1218,17 +1304,6 @@ export function PracticeScreen({ data }: { data: PracticeLoopReadModel }) {
                           {item.reason}
                         </p>
                       </div>
-                      <StatusPill
-                        tone={
-                          item.kind === "lesson_task"
-                            ? "amber"
-                            : item.kind === "exercise"
-                              ? "green"
-                              : "blue"
-                        }
-                      >
-                        {item.minutes} {t("minutes")}
-                      </StatusPill>
                       <button
                         className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-stone-300 px-3 text-sm font-semibold text-stone-700 transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-60"
                         disabled={isInPlan || isSaving}

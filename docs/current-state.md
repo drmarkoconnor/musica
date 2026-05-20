@@ -2,7 +2,7 @@
 
 Last updated: 2026-05-20
 
-Current commit: `d789206 Add lesson clip review queue and project memory docs`
+Current commit: `17ade57 Tighten practice sessions and recording management`
 
 ## Working Environment
 
@@ -54,16 +54,22 @@ Important hosted env vars:
 - `/from-lessons` is the active practice-list area.
 - Practice tasks support manual creation, compact management, archive/restore,
   delete, confidence, frequency, and last-practised metadata.
-- Practice session can be built from smart suggestions plus manual items.
+- Practice session can be built from smart suggestions, existing practice-list
+  items, or clearly labelled session-only items.
 - A live session presents one active item, logs active elapsed time, supports
-  pause, skip today, done, optional confidence, and notes.
+  pause, `Done and log time`, `Not today`, optional confidence, and notes.
+- Live practice rows are clickable/selectable, and completion advances by the
+  user's list order.
 - Session item updates no longer use unsupported Neon HTTP transactions.
 - Practice passages can be recorded during a live practice session and are saved
   against the active `session_item`.
 - Practice passage audio can be replayed from the practice item, Recordings, and
   linked repertoire page.
 - Basic metronome and 5-minute continue ping exist.
-- Quartet app is linked as an external accompaniment resource.
+- The Quartet accompaniment panel has been removed from the live practice UI.
+- Recordings can be deleted; practice recordings can be linked to repertoire
+  pieces from `/recordings`.
+- The dashboard has a first-pass activity log from completed `session_items`.
 
 ## Latest Database Shape
 
@@ -88,6 +94,10 @@ to the exact item being practised, not only the overall session or piece.
 - Practice session APIs: `src/app/api/practice-sessions/*`
 - Session item API: `src/app/api/session-items/[itemId]/route.ts`
 - Practice recording upload/file APIs: `src/app/api/practice-recordings/*`
+- Practice recording edit/delete API:
+  `src/app/api/practice-recordings/[recordingId]/route.ts`
+- Lesson recording delete API:
+  `src/app/api/lesson-recordings/[recordingId]/route.ts`
 - Practice audio storage: `src/lib/server/practice-audio-storage.ts`
 - Lead sheet upload: `src/app/api/piece-assets/upload/route.ts`
 - Lead sheet file route: `src/app/api/piece-assets/[assetId]/file/route.ts`
@@ -110,10 +120,16 @@ git diff --check
   still needs split, merge, true waveform data, and deeper zoom/focus editing.
 - AI-generated practice candidates may still need manual narrowing inside a
   clip.
-- Practice sessions now run and log active time, but the post-session history
-  and review view is still thin.
-- Practice passage recordings can be saved and replayed, but not yet edited,
-  renamed, deleted, or transcribed.
+- Practice sessions now run and log active time to `session_items`, and the
+  dashboard shows first-pass totals. A richer session review/history view is
+  still needed.
+- Practice passage recordings can be saved, replayed, deleted, and linked to a
+  piece, but not yet renamed inline or transcribed.
+- Repertoire add/edit supports current and target tempo in the modal. Row
+  affordances have been widened, but the repertoire list still needs broader
+  density and metadata polish.
+- The 12-keys reference card is intentionally deferred while Mark prepares a
+  separate graphic.
 - Smart queue is useful but still simple; later it should weight frequency,
   confidence, recency, source, and user refusal/skips more carefully.
 - Whole-app password is appropriate for private v1. Named users and sharing
@@ -121,17 +137,22 @@ git diff --check
 
 ## Current Testing Priorities
 
-After the next Netlify deploy:
+Current feedback to test next:
 
-1. Start a practice session.
-2. Select an active item.
-3. Record a short practice passage.
-4. Stop/save and confirm it appears under the current item.
-5. Play it back under the item.
-6. Confirm it appears in `/recordings`.
-7. If linked to a repertoire piece, confirm it appears on that piece page.
-8. Mark the item done and confirm time/confidence/last-practised metadata save.
-9. Delete/archive a manual practice task and confirm no Neon transaction error.
+1. Edit a practice-list item and confirm title, notes, confidence, importance,
+   piece link, and frequency persist.
+2. Build a practice session from an existing practice-list item.
+3. Add a one-off session item and confirm it is clearly session-only.
+4. Start a live session, click rows to switch active items, mark one item `Done
+   and log time`, and confirm the next item advances in order.
+5. Use `Not today` and confirm it does not update last-practised metadata.
+6. Confirm no planned-duration labels are visible in the session builder.
+7. Confirm the Quartet area is gone.
+8. Delete a lesson/practice recording from `/recordings`.
+9. Link a practice recording to a repertoire piece and confirm it appears on the
+   piece page.
+10. Check the dashboard activity log after completing timed practice items.
+11. Later, add Mark's 12-keys graphic/reference card.
 
 ## Current Git Notes
 

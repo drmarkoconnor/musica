@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import {
@@ -150,4 +150,29 @@ export async function materializeLessonAudioFile({
     },
     filePath: tempPath,
   };
+}
+
+export async function deleteLessonAudio({
+  storageBucket,
+  storagePath,
+}: {
+  storageBucket: string;
+  storagePath: string;
+}) {
+  const filePath =
+    storageBucket === LOCAL_LESSON_AUDIO_BUCKET
+      ? localLessonAudioPath(storageBucket, storagePath)
+      : null;
+
+  if (filePath) {
+    await rm(filePath, { force: true });
+    return;
+  }
+
+  const key = netlifyLessonAudioKey(storageBucket, storagePath);
+
+  if (!key) return;
+
+  const store = await netlifyBlobStore();
+  await store.delete(key);
 }

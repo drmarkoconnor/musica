@@ -45,6 +45,17 @@ function emptyPracticeItemForm(): PracticeItemFormValues {
   };
 }
 
+function formFromPracticeTask(task: PracticeTask): PracticeItemFormValues {
+  return {
+    title: task.title,
+    body: task.body,
+    confidence: String(task.confidence),
+    linkedPieceId: task.linkedPieceId ?? "",
+    importance: String(task.importance),
+    targetFrequencyDays: String(task.targetFrequencyDays),
+  };
+}
+
 function todayIsoDate() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -87,6 +98,7 @@ export function FromLessonsScreen({ data }: { data: PracticeLoopReadModel }) {
   const [actionErrors, setActionErrors] = useState<Record<string, string>>({});
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<PracticeTask | null>(null);
   const [formValues, setFormValues] = useState<PracticeItemFormValues>(
     emptyPracticeItemForm,
   );
@@ -158,34 +170,46 @@ export function FromLessonsScreen({ data }: { data: PracticeLoopReadModel }) {
   }
 
   function openCreateModal() {
+    setEditingTask(null);
     setFormValues(emptyPracticeItemForm());
+    setCreateState("idle");
+    setIsCreateOpen(true);
+  }
+
+  function openEditModal(task: PracticeTask) {
+    setEditingTask(task);
+    setFormValues(formFromPracticeTask(task));
     setCreateState("idle");
     setIsCreateOpen(true);
   }
 
   function closeCreateModal() {
     setIsCreateOpen(false);
+    setEditingTask(null);
     setFormValues(emptyPracticeItemForm());
     setCreateState("idle");
   }
 
-  async function createManualTask(event: FormEvent<HTMLFormElement>) {
+  async function savePracticeTask(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setCreateState("saving");
 
-    const response = await fetch("/api/practice-tasks", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        source: "manual",
-        title: formValues.title,
-        body: formValues.body,
-        confidence: Number(formValues.confidence),
-        linkedPieceId: formValues.linkedPieceId || undefined,
-        importance: Number(formValues.importance),
-        targetFrequencyDays: Number(formValues.targetFrequencyDays),
-      }),
-    });
+    const response = await fetch(
+      editingTask ? `/api/practice-tasks/${editingTask.id}` : "/api/practice-tasks",
+      {
+        method: editingTask ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source: "manual",
+          title: formValues.title,
+          body: formValues.body,
+          confidence: Number(formValues.confidence),
+          linkedPieceId: formValues.linkedPieceId,
+          importance: Number(formValues.importance),
+          targetFrequencyDays: Number(formValues.targetFrequencyDays),
+        }),
+      },
+    );
 
     if (!response.ok) {
       setCreateState("error");
@@ -383,8 +407,9 @@ export function FromLessonsScreen({ data }: { data: PracticeLoopReadModel }) {
                         <span className="sr-only">{t("markPractised")}</span>
                       </button>
                       <button
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-stone-300 text-stone-500 opacity-70"
-                        disabled
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-stone-300 text-stone-700 transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-60"
+                        disabled={isSaving}
+                        onClick={() => openEditModal(task)}
                         title={t("edit")}
                         type="button"
                       >
@@ -533,7 +558,7 @@ export function FromLessonsScreen({ data }: { data: PracticeLoopReadModel }) {
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-xl font-semibold text-stone-950">
-                  {t("addItem")}
+                  {editingTask ? t("edit") : t("addItem")}
                 </h2>
                 <p className="mt-1 text-sm text-stone-600">
                   {t("manualPracticeItem")}
@@ -549,7 +574,7 @@ export function FromLessonsScreen({ data }: { data: PracticeLoopReadModel }) {
               </button>
             </div>
 
-            <form className="space-y-4" onSubmit={createManualTask}>
+            <form className="space-y-4" onSubmit={savePracticeTask}>
               <label className="block">
                 <span className="text-sm font-medium text-stone-800">
                   {t("title")}

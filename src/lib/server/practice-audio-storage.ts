@@ -1,6 +1,6 @@
 import "server-only";
 
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { serverEnv } from "./env";
@@ -176,4 +176,26 @@ export async function readPracticeAudioBuffer({
   if (!entry) return null;
 
   return Buffer.from(entry);
+}
+
+export async function deletePracticeAudio({
+  storageBucket,
+  storagePath,
+}: {
+  storageBucket: string;
+  storagePath: string;
+}) {
+  const filePath = localPracticeAudioPath(storageBucket, storagePath);
+
+  if (filePath) {
+    await rm(filePath, { force: true });
+    return;
+  }
+
+  const key = netlifyPracticeAudioKey(storageBucket, storagePath);
+
+  if (!key) return;
+
+  const store = await netlifyBlobStore();
+  await store.delete(key);
 }
