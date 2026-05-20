@@ -2,7 +2,7 @@
 
 Last updated: 2026-05-20
 
-Latest implementation commit: `1574052 Tighten practice sessions and recording management`
+Latest implementation commit: `d0df3ed Add practice chart aide memoir overlay`
 
 ## Working Environment
 

@@ -24,7 +24,7 @@ implementation truth in `current-state.md`, and priority sequencing in
 
 Branch: `practice-session-repertoire-roadmap`
 
-Commit: not committed yet.
+Commit: `d0df3ed Add practice chart aide memoir overlay`
 
 Work done:
 
@@ -56,7 +56,7 @@ What to test:
 
 Branch: `practice-session-repertoire-roadmap`
 
-Commit: not committed yet.
+Commit: `c9eb847 Remove duplicate spine status control`
 
 Work done:
 
