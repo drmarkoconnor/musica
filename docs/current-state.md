@@ -2,7 +2,7 @@
 
 Last updated: 2026-05-20
 
-Current commit: pending push from `uiscrubber` to `main`.
+Current commit: `d789206 Add lesson clip review queue and project memory docs`
 
 ## Working Environment
 
@@ -136,7 +136,7 @@ After the next Netlify deploy:
 ## Current Git Notes
 
 At the time of this update, `uiscrubber` contains approved lesson segment UI
-work that should be pushed back to `main`.
+work committed as `d789206` and ready to fast-forward `main`.
 
 Approved work in this branch:
 

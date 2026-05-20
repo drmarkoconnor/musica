@@ -24,7 +24,7 @@ implementation truth in `current-state.md`, and priority sequencing in
 
 Branch: `uiscrubber`
 
-Commit: pending push to `main`.
+Commit: `d789206 Add lesson clip review queue and project memory docs`
 
 Work done:
 
