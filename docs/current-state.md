@@ -70,6 +70,8 @@ Important hosted env vars:
 - Recordings can be deleted; practice recordings can be linked to repertoire
   pieces from `/recordings`.
 - The dashboard has a first-pass activity log from completed `session_items`.
+- Repertoire now treats spine/core repertoire as one concept: the star toggle.
+  The status dropdown is lifecycle-only: learning, maintenance, parked.
 
 ## Latest Database Shape
 
@@ -128,6 +130,9 @@ git diff --check
 - Repertoire add/edit supports current and target tempo in the modal. Row
   affordances have been widened, but the repertoire list still needs broader
   density and metadata polish.
+- The database enum still contains legacy `status = spine`, but the UI maps it
+  to `maintenance` and uses `is_spine_tune` as the single active spine/core
+  flag.
 - The 12-keys reference card is intentionally deferred while Mark prepares a
   separate graphic.
 - Smart queue is useful but still simple; later it should weight frequency,

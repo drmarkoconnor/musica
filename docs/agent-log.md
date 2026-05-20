@@ -20,6 +20,35 @@ Keep entries concise. Put stable product truth in `project-brief.md`, current
 implementation truth in `current-state.md`, and priority sequencing in
 `roadmap.md`.
 
+## 2026-05-20 - Remove Duplicate Spine Status UI
+
+Branch: `practice-session-repertoire-roadmap`
+
+Commit: not committed yet.
+
+Work done:
+
+- Removed `spine` from the visible repertoire status dropdown.
+- Kept the star toggle as the single visible spine/core tune flag.
+- Mapped legacy `status = spine` rows to `maintenance` in UI labels and status
+  dropdowns so old data does not preserve the duplicate affordance.
+
+Commands run:
+
+```bash
+npm run typecheck
+npm run build
+```
+
+Migration status: no database migration.
+
+What to test:
+
+- Open `/repertoire` and confirm the status dropdown only shows learning,
+  maintenance, and parked.
+- Toggle the star/spine control and confirm that is the only visible spine/core
+  tune control.
+
 ## 2026-05-20 - Practice Session, Recording, And Activity Fixes
 
 Branch: `practice-session-repertoire-roadmap`

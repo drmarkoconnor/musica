@@ -4,14 +4,14 @@ import type { TranslationKey } from "./translations";
 export type StatusTone = "green" | "blue" | "amber" | "rose" | "slate";
 
 export function pieceStatusTranslationKey(status: PieceStatus): TranslationKey {
-  if (status === "spine") return "spine";
+  if (status === "spine") return "maintenance";
   if (status === "learning") return "learning";
   if (status === "maintenance") return "maintenance";
   return "parked";
 }
 
 export function pieceStatusTone(status: PieceStatus): StatusTone {
-  if (status === "spine") return "blue";
+  if (status === "spine") return "green";
   if (status === "learning") return "amber";
   if (status === "maintenance") return "green";
   return "slate";

@@ -100,6 +100,8 @@ Done:
 - Repertoire rows link to piece pages.
 - Lead sheets attached to pieces.
 - Practice session builder can pick existing practice-list items.
+- Spine/core tune is now a single visible concept: the star toggle. The status
+  dropdown is lifecycle-only.
 
 Next:
 
@@ -204,6 +206,8 @@ Status: later.
   session cards and suggestions.
 - The star/spine-tune control needs clearer spacing and meaning. It is intended
   to persist `is_spine_tune`, not a decorative rating.
+- Addressed in current branch: `spine` has been removed from the visible status
+  dropdown to avoid duplicate spine controls.
 
 ### Music-Practice Helpers
 

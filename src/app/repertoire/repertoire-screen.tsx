@@ -36,12 +36,7 @@ type PieceFormValues = {
   notes: string;
 };
 
-const statusOptions: PieceStatus[] = [
-  "spine",
-  "learning",
-  "maintenance",
-  "parked",
-];
+const statusOptions: PieceStatus[] = ["learning", "maintenance", "parked"];
 
 const confidenceSteps: Confidence[] = [1, 2, 3, 4, 5];
 
@@ -73,13 +68,17 @@ function emptyForm(): PieceFormValues {
   };
 }
 
+function visiblePieceStatus(status: PieceStatus): PieceStatus {
+  return status === "spine" ? "maintenance" : status;
+}
+
 function formFromPiece(piece: Piece): PieceFormValues {
   return {
     title: piece.title,
     composer: piece.composer ?? "",
     lyricist: piece.lyricist ?? "",
     key: piece.key,
-    status: piece.status,
+    status: visiblePieceStatus(piece.status),
     confidence: piece.confidence,
     lastPractised: piece.lastPractised,
     targetTempo: piece.targetTempo ? String(piece.targetTempo) : "",
@@ -379,7 +378,7 @@ export function RepertoireScreen({
                         }}
                         onClick={(event) => event.stopPropagation()}
                         onMouseDown={(event) => event.stopPropagation()}
-                        value={piece.status}
+                        value={visiblePieceStatus(piece.status)}
                       >
                         {statusOptions.map((status) => (
                           <option key={status} value={status}>
