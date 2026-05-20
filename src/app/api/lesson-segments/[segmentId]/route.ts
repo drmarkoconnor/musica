@@ -115,7 +115,12 @@ export async function PATCH(
       notes:
         typeof body.notes === "undefined" ? segment.notes : optionalText(body.notes),
       startsAtSeconds,
-      status: action === "discard" ? "discarded" : "selected",
+      status:
+        action === "discard"
+          ? "discarded"
+          : action === "select"
+            ? "selected"
+            : segment.status,
       title: optionalText(body.title) ?? segment.title,
       updatedAt: now,
     })

@@ -55,6 +55,33 @@ function timelineMarks(durationSeconds: number) {
   );
 }
 
+function chapterCountForDuration(durationSeconds: number) {
+  if (durationSeconds >= 2700) return 6;
+  if (durationSeconds >= 1200) return 5;
+  if (durationSeconds >= 600) return 4;
+
+  return 3;
+}
+
+function lessonChapters(durationSeconds: number) {
+  const maxSeconds = Math.max(durationSeconds, 1);
+  const chapterCount = chapterCountForDuration(maxSeconds);
+
+  return Array.from({ length: chapterCount }, (_, index) => {
+    const startsAtSeconds = Math.round((maxSeconds / chapterCount) * index);
+    const endsAtSeconds =
+      index === chapterCount - 1
+        ? maxSeconds
+        : Math.round((maxSeconds / chapterCount) * (index + 1));
+
+    return {
+      endsAtSeconds,
+      index,
+      startsAtSeconds,
+    };
+  });
+}
+
 function StudioTimeline({
   audioSrc,
   durationSeconds,
@@ -392,6 +419,163 @@ function StudioTimeline({
   );
 }
 
+function LessonChapterRail({
+  activeSegmentId,
+  durationSeconds,
+  endsAtSeconds,
+  onSegmentSelect,
+  segments,
+  startsAtSeconds,
+}: {
+  activeSegmentId: string;
+  durationSeconds: number;
+  endsAtSeconds: number;
+  onSegmentSelect: (segment: LessonSegment) => void;
+  segments: LessonSegment[];
+  startsAtSeconds: number;
+}) {
+  const { t } = useLanguage();
+  const maxSeconds = Math.max(durationSeconds, 1);
+  const chapters = lessonChapters(maxSeconds);
+  const activeSegment = segments.find((segment) => segment.id === activeSegmentId);
+  const focusStart = activeSegment?.startsAtSeconds ?? startsAtSeconds;
+  const focusEnd = activeSegment?.endsAtSeconds ?? endsAtSeconds;
+
+  return (
+    <div className="rounded-md border border-stone-200 bg-white p-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-emerald-800">
+            {t("lessonMap")}
+          </p>
+          <h4 className="mt-1 text-base font-semibold text-stone-950">
+            {t("chapterRail")}
+          </h4>
+        </div>
+        <span className="rounded-md bg-stone-50 px-2 py-1 text-xs font-semibold text-stone-600 ring-1 ring-stone-200">
+          {segments.length} {t("existingClips")}
+        </span>
+      </div>
+
+      <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        {chapters.map((chapter) => {
+          const chapterSegments = segments.filter(
+            (segment) =>
+              segment.startsAtSeconds < chapter.endsAtSeconds &&
+              segment.endsAtSeconds > chapter.startsAtSeconds,
+          );
+          const isFocused =
+            focusStart < chapter.endsAtSeconds && focusEnd > chapter.startsAtSeconds;
+
+          return (
+            <div
+              className={cn(
+                "rounded-md border p-2",
+                isFocused
+                  ? "border-emerald-300 bg-emerald-50"
+                  : "border-stone-200 bg-stone-50",
+              )}
+              key={chapter.index}
+            >
+              <p className="text-xs font-semibold text-stone-950">
+                {t("lessonRegion")} {chapter.index + 1}
+              </p>
+              <p className="mt-1 text-xs tabular-nums text-stone-500">
+                {formatDuration(chapter.startsAtSeconds)} -{" "}
+                {formatDuration(chapter.endsAtSeconds)}
+              </p>
+              <p className="mt-2 text-xs font-semibold text-stone-600">
+                {chapterSegments.length} {t("clips")}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="relative mt-4 h-20 overflow-hidden rounded-md border border-stone-200 bg-stone-950">
+        <div className="absolute inset-x-3 bottom-3 top-6 flex items-end gap-1">
+          {studioBars.map((height, index) => (
+            <span
+              aria-hidden="true"
+              className="flex-1 rounded-t bg-emerald-200/35"
+              key={`${height}-${index}`}
+              style={{ height: `${height}%` }}
+            />
+          ))}
+        </div>
+
+        <span
+          aria-hidden="true"
+          className="absolute bottom-0 top-0 bg-emerald-300/20 ring-1 ring-emerald-200/70"
+          style={{
+            left: `${percentAt(startsAtSeconds, maxSeconds)}%`,
+            width: `${Math.max(
+              percentAt(endsAtSeconds, maxSeconds) -
+                percentAt(startsAtSeconds, maxSeconds),
+              0.8,
+            )}%`,
+          }}
+        />
+
+        {chapters.slice(1).map((chapter) => (
+          <span
+            aria-hidden="true"
+            className="absolute bottom-0 top-0 w-px bg-white/15"
+            key={chapter.index}
+            style={{ left: `${percentAt(chapter.startsAtSeconds, maxSeconds)}%` }}
+          />
+        ))}
+
+        {segments.map((segment) => {
+          const isActive = segment.id === activeSegmentId;
+          const left = percentAt(segment.startsAtSeconds, maxSeconds);
+          const width = Math.max(
+            percentAt(segment.endsAtSeconds, maxSeconds) - left,
+            1.2,
+          );
+
+          return (
+            <button
+              aria-label={`${segment.title}: ${formatDuration(
+                segment.startsAtSeconds,
+              )} - ${formatDuration(segment.endsAtSeconds)}`}
+              className={cn(
+                "absolute top-2 h-4 rounded-sm transition",
+                segment.status === "discarded"
+                  ? "bg-rose-300/70"
+                  : "bg-sky-300/80",
+                isActive
+                  ? "ring-2 ring-white"
+                  : "ring-1 ring-white/40 hover:ring-white/80",
+              )}
+              key={segment.id}
+              onClick={() => onSegmentSelect(segment)}
+              style={{
+                left: `${left}%`,
+                width: `${width}%`,
+              }}
+              title={segment.title}
+              type="button"
+            />
+          );
+        })}
+      </div>
+
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs font-semibold text-stone-500">
+        <span>
+          {t("focusRange")}: {formatDuration(focusStart)} -{" "}
+          {formatDuration(focusEnd)}
+        </span>
+        {activeSegment ? (
+          <span className="truncate text-stone-700">{activeSegment.title}</span>
+        ) : (
+          <span>{t("currentDraftClip")}</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function FineTrimControl({
   activeEdge,
   onActiveEdgeChange,
@@ -498,21 +682,23 @@ function FineTrimControl({
   );
 }
 
-function SegmentRow({
+function SegmentReviewPanel({
   audioSrc,
-  index,
   onChanged,
   segment,
+  onSelect,
 }: {
   audioSrc: string;
-  index: number;
   onChanged: () => void;
   segment: LessonSegment;
+  onSelect: (segment: LessonSegment) => void;
 }) {
   const { t } = useLanguage();
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">(
     "idle",
   );
+  const [title, setTitle] = useState(segment.title);
+  const [notes, setNotes] = useState(segment.notes);
 
   async function saveSegment(action?: "discard" | "select") {
     setSaveState("saving");
@@ -522,6 +708,8 @@ function SegmentRow({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         action,
+        notes,
+        title,
       }),
     });
 
@@ -538,15 +726,8 @@ function SegmentRow({
   const isDiscarded = segment.status === "discarded";
 
   return (
-    <article
-      className={cn(
-        "rounded-md border p-3 shadow-sm",
-        index % 2 === 0
-          ? "border-stone-200 bg-white"
-          : "border-sky-100 bg-sky-50/70",
-      )}
-    >
-      <div className="grid gap-3 md:grid-cols-[minmax(9rem,0.45fr)_1fr_auto] md:items-center">
+    <article className="rounded-md border border-stone-200 bg-white p-3 shadow-sm">
+      <div className="grid gap-3 lg:grid-cols-[11rem_1fr]">
         <div className="rounded-md bg-stone-950 px-3 py-2 text-white">
           <p className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-stone-300">
             {t("clipTime")}
@@ -555,73 +736,218 @@ function SegmentRow({
             {formatDuration(segment.startsAtSeconds)} -{" "}
             {formatDuration(segment.endsAtSeconds)}
           </p>
+          <span
+            className={cn(
+              "mt-2 inline-flex rounded-md px-2 py-1 text-xs font-semibold ring-1",
+              isSelected
+                ? "bg-emerald-50 text-emerald-900 ring-emerald-200"
+                : isDiscarded
+                  ? "bg-rose-50 text-rose-800 ring-rose-200"
+                  : "bg-blue-50 text-blue-800 ring-blue-200",
+            )}
+          >
+            {segment.status}
+          </span>
         </div>
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h4 className="truncate text-sm font-semibold text-stone-950">
-              {segment.title}
-            </h4>
-            <span
-              className={cn(
-                "rounded-md px-2 py-1 text-xs font-semibold ring-1",
-                isSelected
-                  ? "bg-emerald-50 text-emerald-900 ring-emerald-200"
-                  : isDiscarded
-                    ? "bg-rose-50 text-rose-800 ring-rose-200"
-                    : "bg-blue-50 text-blue-800 ring-blue-200",
-              )}
-            >
-              {segment.status}
-            </span>
+
+        <div className="min-w-0 space-y-3">
+          <div className="grid gap-3 md:grid-cols-[1fr_1.1fr]">
+            <label className="block">
+              <span className="text-sm font-medium text-stone-800">
+                {t("title")}
+              </span>
+              <input
+                className="mt-2 w-full rounded-md border border-stone-300 px-3 py-2 text-sm text-stone-950 outline-none transition focus:border-emerald-800 focus:ring-2 focus:ring-emerald-800/20"
+                onChange={(event) => {
+                  setSaveState("idle");
+                  setTitle(event.target.value);
+                }}
+                required
+                value={title}
+              />
+            </label>
+            <label className="block">
+              <span className="text-sm font-medium text-stone-800">
+                {t("notes")}
+              </span>
+              <textarea
+                className="mt-2 min-h-20 w-full resize-none rounded-md border border-stone-300 px-3 py-2 text-sm text-stone-950 outline-none transition focus:border-emerald-800 focus:ring-2 focus:ring-emerald-800/20"
+                onChange={(event) => {
+                  setSaveState("idle");
+                  setNotes(event.target.value);
+                }}
+                placeholder={t("teachingSegmentPlaceholder")}
+                value={notes}
+              />
+            </label>
           </div>
-          {segment.notes ? (
-            <p className="mt-1 line-clamp-2 text-sm leading-5 text-stone-600">
-              {segment.notes}
-            </p>
-          ) : null}
-        </div>
-        <div className="flex flex-wrap justify-start gap-2 md:justify-end">
-          {isSelected ? (
-            <button
-              className="inline-flex items-center justify-center gap-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={saveState === "saving"}
-              onClick={() => void saveSegment("discard")}
-              type="button"
-            >
-              <Trash2 aria-hidden="true" className="h-4 w-4" />
-              {t("discard")}
-            </button>
-          ) : (
-            <button
-              className="inline-flex items-center justify-center gap-2 rounded-md border border-stone-300 bg-white px-3 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={saveState === "saving"}
-              onClick={() => void saveSegment("select")}
-              type="button"
-            >
-              <RotateCcw aria-hidden="true" className="h-4 w-4" />
-              {t("restore")}
-            </button>
-          )}
+
+          <AudioStrip
+            audioSrc={audioSrc}
+            controlsMode="buttons"
+            density="compact"
+            endsAtSeconds={segment.endsAtSeconds}
+            showLabel={false}
+            showWaveform={false}
+            startsAtSeconds={segment.startsAtSeconds}
+            title={segment.title}
+          />
+
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="text-sm">
+              {saveState === "saved" ? (
+                <span className="font-medium text-emerald-800">
+                  {t("clipDetailsSaved")}
+                </span>
+              ) : null}
+              {saveState === "error" ? (
+                <span className="font-medium text-rose-700">
+                  {t("segmentSaveFailed")}
+                </span>
+              ) : null}
+            </div>
+            <div className="flex flex-wrap justify-start gap-2 md:justify-end">
+              <button
+                className="inline-flex items-center justify-center gap-2 rounded-md bg-emerald-950 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-900 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={saveState === "saving"}
+                onClick={() => void saveSegment()}
+                type="button"
+              >
+                <Check aria-hidden="true" className="h-4 w-4" />
+                {saveState === "saving" ? t("saving") : t("saveClipDetails")}
+              </button>
+              {isSelected ? (
+                <button
+                  className="inline-flex items-center justify-center gap-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={saveState === "saving"}
+                  onClick={() => void saveSegment("discard")}
+                  type="button"
+                >
+                  <Trash2 aria-hidden="true" className="h-4 w-4" />
+                  {t("discard")}
+                </button>
+              ) : (
+                <button
+                  className="inline-flex items-center justify-center gap-2 rounded-md border border-stone-300 bg-white px-3 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={saveState === "saving"}
+                  onClick={() => {
+                    onSelect(segment);
+                    void saveSegment("select");
+                  }}
+                  type="button"
+                >
+                  <RotateCcw aria-hidden="true" className="h-4 w-4" />
+                  {t("restore")}
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
-      <div className="mt-2">
-        <AudioStrip
-          audioSrc={audioSrc}
-          controlsMode="buttons"
-          density="compact"
-          endsAtSeconds={segment.endsAtSeconds}
-          showLabel={false}
-          showWaveform={false}
-          startsAtSeconds={segment.startsAtSeconds}
-          title={segment.title}
-        />
-      </div>
-      {saveState === "error" ? (
-        <p className="mt-2 text-sm font-medium text-rose-700">
-          {t("segmentSaveFailed")}
-        </p>
-      ) : null}
     </article>
+  );
+}
+
+function SegmentReviewQueue({
+  activeSegmentId,
+  audioSrc,
+  onActiveSegmentChange,
+  onChanged,
+  segments,
+}: {
+  activeSegmentId: string;
+  audioSrc: string;
+  onActiveSegmentChange: (segment: LessonSegment) => void;
+  onChanged: () => void;
+  segments: LessonSegment[];
+}) {
+  const { t } = useLanguage();
+  const activeSegment =
+    segments.find((segment) => segment.id === activeSegmentId) ?? segments[0];
+
+  if (segments.length === 0) {
+    return (
+      <p className="rounded-md border border-stone-200 bg-white p-3 text-sm leading-6 text-stone-600">
+        {t("noTeachingSegments")}
+      </p>
+    );
+  }
+
+  return (
+    <div className="rounded-md border border-stone-200 bg-white p-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-emerald-800">
+            {t("clipReviewQueue")}
+          </p>
+          <h4 className="mt-1 text-base font-semibold text-stone-950">
+            {t("reviewCreatedClips")}
+          </h4>
+        </div>
+        <span className="rounded-md bg-stone-50 px-2 py-1 text-xs font-semibold text-stone-600 ring-1 ring-stone-200">
+          {segments.length} {t("clips")}
+        </span>
+      </div>
+
+      <div className="mt-3 grid gap-3 lg:grid-cols-[17rem_1fr]">
+        <div className="max-h-96 space-y-2 overflow-y-auto pr-1">
+          {segments.map((segment) => {
+            const isActive = segment.id === activeSegment?.id;
+            const isDiscarded = segment.status === "discarded";
+
+            return (
+              <button
+                aria-pressed={isActive}
+                className={cn(
+                  "w-full rounded-md border p-3 text-left transition",
+                  isActive
+                    ? "border-emerald-300 bg-emerald-50 shadow-sm"
+                    : "border-stone-200 bg-white hover:border-stone-300 hover:bg-stone-50",
+                )}
+                key={segment.id}
+                onClick={() => onActiveSegmentChange(segment)}
+                type="button"
+              >
+                <span className="flex items-center justify-between gap-2">
+                  <span className="truncate text-sm font-semibold text-stone-950">
+                    {segment.title}
+                  </span>
+                  <span
+                    className={cn(
+                      "rounded-md px-2 py-1 text-xs font-semibold ring-1",
+                      isDiscarded
+                        ? "bg-rose-50 text-rose-800 ring-rose-200"
+                        : "bg-emerald-50 text-emerald-900 ring-emerald-200",
+                    )}
+                  >
+                    {segment.status}
+                  </span>
+                </span>
+                <span className="mt-1 block text-xs font-semibold tabular-nums text-stone-500">
+                  {formatDuration(segment.startsAtSeconds)} -{" "}
+                  {formatDuration(segment.endsAtSeconds)}
+                </span>
+                {segment.notes ? (
+                  <span className="mt-1 block line-clamp-2 text-xs leading-5 text-stone-600">
+                    {segment.notes}
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+
+        {activeSegment ? (
+          <SegmentReviewPanel
+            audioSrc={audioSrc}
+            key={activeSegment.id}
+            onChanged={onChanged}
+            onSelect={onActiveSegmentChange}
+            segment={activeSegment}
+          />
+        ) : null}
+      </div>
+    </div>
   );
 }
 
@@ -647,6 +973,7 @@ export function LessonSegmentReview({
   const [startsAtSeconds, setStartsAtSeconds] = useState(0);
   const [endsAtSeconds, setEndsAtSeconds] = useState(defaultClipEnd(maxSeconds));
   const [activeEdge, setActiveEdge] = useState<"start" | "end">("end");
+  const [activeSegmentId, setActiveSegmentId] = useState("");
   const [title, setTitle] = useState(t("teachingSegment"));
   const [notes, setNotes] = useState("");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">(
@@ -655,6 +982,10 @@ export function LessonSegmentReview({
   const selectedTotalSeconds = selectedSeconds(segments);
   const selectedCount = segments.filter((segment) => segment.status === "selected")
     .length;
+
+  function selectSegment(segment: LessonSegment) {
+    setActiveSegmentId(segment.id);
+  }
 
   function setStart(value: number) {
     setStartsAtSeconds(
@@ -697,7 +1028,12 @@ export function LessonSegmentReview({
       return;
     }
 
+    const body = (await response.json().catch(() => null)) as { id?: string } | null;
+
     setSaveState("saved");
+    if (body?.id) {
+      setActiveSegmentId(body.id);
+    }
     setNotes("");
     setTitle(t("teachingSegment"));
     onChanged();
@@ -745,6 +1081,17 @@ export function LessonSegmentReview({
               {formatDuration(startsAtSeconds)} - {formatDuration(endsAtSeconds)}
             </p>
           </div>
+        </div>
+
+        <div className="mt-4">
+          <LessonChapterRail
+            activeSegmentId={activeSegmentId}
+            durationSeconds={maxSeconds}
+            endsAtSeconds={endsAtSeconds}
+            onSegmentSelect={selectSegment}
+            segments={segments}
+            startsAtSeconds={startsAtSeconds}
+          />
         </div>
 
         <div className="mt-4">
@@ -865,22 +1212,13 @@ export function LessonSegmentReview({
         </div>
       </form>
 
-      <div className="space-y-3">
-        {segments.length === 0 ? (
-          <p className="rounded-md border border-stone-200 bg-white p-3 text-sm leading-6 text-stone-600">
-            {t("noTeachingSegments")}
-          </p>
-        ) : null}
-        {segments.map((segment, index) => (
-          <SegmentRow
-            audioSrc={audioSrc}
-            index={index}
-            key={segment.id}
-            onChanged={onChanged}
-            segment={segment}
-          />
-        ))}
-      </div>
+      <SegmentReviewQueue
+        activeSegmentId={activeSegmentId}
+        audioSrc={audioSrc}
+        onActiveSegmentChange={selectSegment}
+        onChanged={onChanged}
+        segments={segments}
+      />
     </section>
   );
 }

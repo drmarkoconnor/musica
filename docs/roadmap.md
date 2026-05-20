@@ -1,120 +1,164 @@
 # Practice Loop Roadmap
 
-This roadmap keeps the app progressive and private. The app should become useful
-before it becomes clever.
+Last updated: 2026-05-20
+
+## Roadmap Rule
+
+Keep the app useful before making it clever. Prioritise real lesson/practice
+flows, persistence, privacy, and clear audio links over elaborate automation.
 
 ## Phase 1: Static MVP UI
 
-Status: complete enough for now.
+Status: complete.
 
-- Core routes and navigation
-- Mocked dashboard, lessons, from-lessons, repertoire, practice, assets, recordings
-- English and Italian UI labels
-- Password-gated transcription entrypoint
-- Initial product schema thinking
+- Core routes and navigation.
+- Mock dashboard, lessons, practice list, repertoire, practice session, assets,
+  archive, and recordings.
+- English/Italian labels.
+- Initial product types and schema thinking.
 
-## Phase 2: Database Foundation
+## Phase 2: Neon Foundation
 
-Status: connected for read-only screens.
+Status: complete enough for active testing.
 
-- Use Drizzle as the TypeScript-owned schema layer
-- Target Neon Postgres first
-- Keep mock fallback data for areas that do not have real records yet
-- Add a provider-neutral repository boundary
-- Generate migrations locally
-- Seed initial tags, spine tunes, exercises, and tune-exercise links
-- Render read-only routes through the repository layer
-- Defer audio and lead-sheet storage until the file workflow phase
+- Drizzle schema and migrations.
+- Neon metadata persistence.
+- Repository boundary with mock fallback.
+- Seed/import support for repertoire, exercises, tags, and lead sheets.
+- Existing unsupported transaction usage removed from runtime routes.
 
-No real recordings or lead sheets are needed for this phase.
+## Phase 3: Privacy And Deployment
 
-## Phase 2.5: Privacy Before Real Conversations
+Status: working v1.
 
-Status: started.
+- Whole-app password via `PRACTICE_LOOP_APP_PASSWORD`.
+- Separate transcription password for paid AI actions.
+- Netlify build/deploy path.
+- Netlify Blobs for v1 object storage.
+- Keep secrets out of git and client bundles.
 
-- Protect the whole hosted app with `PRACTICE_LOOP_APP_PASSWORD` before using
-  it for real lesson conversations
-- Keep the existing transcription password as a second, cost-aware authorisation
-  step before any paid AI processing
-- Keep all app passwords, database URLs, and OpenAI keys in Netlify environment
-  variables, never in git
-- Treat Neon Auth as the next account-level option when named users, Leo access,
-  or proper user ownership becomes necessary
-- If Neon Auth is adopted, map user identity into the existing Neon/Postgres
-  schema and use RLS or server-side ownership checks before sharing records
+Later:
 
-## Phase 3: Real Practice Sessions
+- Consider Neon Auth only when named users, Leo access, or per-user ownership
+  becomes necessary.
 
-- Save practice sessions
-- Accept, skip, replace, and add queue items
-- Track tempo, notes, confidence, and overrides
-- Start with a simple smart queue before making it more intelligent
+## Phase 4: Lesson Capture And Teaching Clip Review
 
-Real data helpful later:
+Status: working, needs editor polish.
 
-- A real current spine-tune list
-- A few actual practice priorities
+Done:
 
-## Phase 4: Lesson Recording and Upload
+- Browser lesson recording.
+- Lesson creation and recording metadata.
+- Protected audio playback.
+- Teaching segment creation and adjustment.
+- Selected segment minute preview before transcription.
+- Server-side ffmpeg clipping before transcription.
+- Audio-first chapter rail for long lesson orientation.
+- Created-clip review queue with title and note editing before transcription.
 
-- Create lessons
-- Upload or record lesson audio
-- Store recording metadata
-- Play lesson recordings from object storage
-- Add cost-aware teaching segment markers with 30 second pre-roll and 10 second
-  end trim defaults
-- Let those defaults become adjustable and support post-lesson segment review,
-  trimming, splitting, and merging
-- Show selected minutes before transcription
+Next:
 
-Real data needed here:
+- Arbitrary audio upload.
+- Better long-recording studio: split, merge, chunk creation, true waveform
+  data, deeper zoom/focus editing, and clearer clip states.
+- More nuanced start/end editing beyond the original 30 second pre-roll and 10
+  second trim idea.
 
-- One short test lesson recording
-- One short practice recording
+## Phase 5: Transcription, Lesson Memory, And Extraction
 
-## Phase 5: Password-Protected Transcription and Extraction
+Status: working for selected clips.
 
-- Keep transcription behind the server-side password gate
-- Send audio to transcription only after authorisation
-- Send selected teaching segments before ever trying a full one-hour lesson
-- Save transcripts
-- Show transcripts as a concise executive summary with bullet-level clip
-  playback
-- Extract candidate practice items
-- Let Mark keep, discard, and edit extracted items
-- Let Mark manually turn a useful point of interest into a practice note linked
-  to the exact source audio segment
-- Keep the raw transcript hidden by default, while preserving it for later
-  journal/diary-style lesson memory views
-- Manage accepted lesson-derived practice items in a compact row list that can
-  scale to hundreds of entries
+Done:
 
-Real data needed here:
+- Passworded transcription through OpenAI.
+- Hidden raw transcript.
+- AI lesson summary.
+- Candidate practice extraction.
+- Keep/discard candidate items.
+- Link kept items to source lesson audio.
 
-- A short real lesson clip for transcription testing
-- Later, one full lesson recording when the cost guardrails feel solid
+Next:
 
-## Phase 6: Assets and Recording Polish
+- Per-segment returned cards for transcript, memory, and candidate items.
+- Better distinction between lesson memory, context note, practice note, and
+  actual exercise.
+- Manual editing before saving candidate practice items.
+- Journal/diary-style lesson memory view in v2.
 
-- Upload lead sheets and annotated versions
-- Attach assets to pieces
-- Attach practice recordings and spoken notes to pieces, sessions, exercises, or lesson items
+## Phase 6: Practice List And Repertoire Management
 
-Real data needed here:
+Status: active, needs density and CRUD polish.
 
-- One or two lead sheet PDFs or images
-- One annotated version if available
+Done:
 
-## Phase 7: Smart Resurfacing
+- Lesson-derived and manual practice tasks.
+- Compact practice-list rows.
+- Archive/restore/delete.
+- Confidence, frequency, and last-practised fields.
+- Repertoire rows link to piece pages.
+- Lead sheets attached to pieces.
 
-- Use last-practised date
-- Use confidence
-- Weight lesson-derived tasks
-- Rotate spine tunes
-- Resurface overdue exercises
-- Keep nudges gentle and non-judgemental
+Next:
 
-Real data helpful here:
+- Denser scalable list design for hundreds of practice items.
+- Better edit flows for manual items.
+- Category/tag filtering.
+- Inline status/confidence/frequency controls where appropriate.
+- More direct relation between practice tasks, repertoire, exercises, and logs.
 
-- A realistic practice history over a few weeks
-- Mark's sense of which tunes are currently over-practised or neglected
+## Phase 7: Live Practice Sessions
+
+Status: functional first pass.
+
+Done:
+
+- Build session from suggestions plus manual choices.
+- Start live session.
+- Active item timer with pause.
+- 5-minute continue ping.
+- Done/skip today.
+- Optional confidence and notes.
+- Add/delete items during a live session.
+- Attach short practice recordings to the active session item.
+
+Next:
+
+- Session review/history page.
+- Clear log records for what was actually practised and for how long.
+- Better support for changing plans mid-session without losing intent.
+- Recordings/note-to-self management per item.
+- Optional confidence update prompts at the right moment.
+
+## Phase 8: Smart Resurfacing
+
+Status: simple first pass.
+
+Current smart queue uses lesson tasks, repertoire, exercises, confidence, and
+recency.
+
+Next:
+
+- Weight target frequency, confidence, source, importance, skips/refusals, and
+  last practised more carefully.
+- Keep suggestions flexible and non-judgemental.
+- Treat "skip today" as a real signal without punishing the user.
+
+## Phase 9: Storage And V2 Foundations
+
+Status: later.
+
+- Decide whether Netlify Blobs remains sufficient.
+- Likely durable move: Cloudflare R2 or S3-compatible private storage.
+- Named auth and user ownership.
+- More formal transcript usage ledger if transcription becomes commercial.
+- Possible paid transcription bundles in v2, not v1.
+
+## Immediate Next Best Steps
+
+1. Let Mark test practice passage recording on phone/iPad after Netlify deploy.
+2. Fix any save/playback edge cases from that test.
+3. Improve session review/log visibility.
+4. Continue the lesson audio studio with split/merge, true waveform data, and
+   deeper zoom/focus editing.
+5. Continue tightening dense practice-list CRUD before adding more intelligence.

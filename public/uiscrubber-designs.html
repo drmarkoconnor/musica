@@ -1,0 +1,1244 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lesson Audio Scrubber UI Directions</title>
+    <style>
+      :root {
+        --bg: #f6f7f2;
+        --panel: #ffffff;
+        --ink: #18181b;
+        --muted: #646461;
+        --line: #deded6;
+        --deep: #0f1720;
+        --teal: #00796b;
+        --mint: #d9f2ea;
+        --blue: #2b6cb0;
+        --blue-soft: #dbeafe;
+        --amber: #d97706;
+        --amber-soft: #fef3c7;
+        --coral: #e11d48;
+        --coral-soft: #ffe4e6;
+        --violet: #6d5dfc;
+        --violet-soft: #ede9fe;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+      }
+
+      main {
+        width: min(1180px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 32px 0 56px;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: clamp(2rem, 5vw, 4.25rem);
+        line-height: 0.95;
+        letter-spacing: 0;
+        max-width: 780px;
+      }
+
+      h2 {
+        font-size: 1.35rem;
+        line-height: 1.2;
+      }
+
+      h3 {
+        font-size: 1rem;
+        line-height: 1.25;
+      }
+
+      p,
+      li {
+        color: var(--muted);
+        line-height: 1.55;
+      }
+
+      .eyebrow {
+        color: var(--teal);
+        font-size: 0.76rem;
+        font-weight: 800;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 24px;
+        align-items: end;
+        padding: 24px 0 30px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .hero p {
+        max-width: 640px;
+        margin-top: 14px;
+        font-size: 1.03rem;
+      }
+
+      .branch {
+        min-width: 184px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        padding: 14px;
+        box-shadow: 0 8px 24px rgb(24 24 27 / 0.06);
+      }
+
+      .branch span {
+        display: block;
+        color: var(--muted);
+        font-size: 0.74rem;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+
+      .branch strong {
+        display: block;
+        margin-top: 5px;
+        color: var(--ink);
+        font-size: 1.05rem;
+      }
+
+      .review {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+        margin: 24px 0;
+      }
+
+      .note {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        padding: 16px;
+      }
+
+      .note ul {
+        display: grid;
+        gap: 8px;
+        margin: 12px 0 0;
+        padding-left: 18px;
+      }
+
+      .decision-note {
+        margin-bottom: 18px;
+        border-color: rgb(0 121 107 / 0.35);
+        background: #f8fffc;
+      }
+
+      .decision-note h2 {
+        color: #064e45;
+      }
+
+      .designs {
+        display: grid;
+        gap: 18px;
+      }
+
+      .design {
+        display: grid;
+        grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
+        gap: 0;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        box-shadow: 0 12px 36px rgb(24 24 27 / 0.07);
+      }
+
+      .selected-design {
+        border-color: rgb(0 121 107 / 0.45);
+        box-shadow: 0 14px 44px rgb(0 121 107 / 0.16);
+      }
+
+      .visual {
+        min-height: 390px;
+        padding: 18px;
+        border-right: 1px solid var(--line);
+        background: #fbfbf8;
+      }
+
+      .analysis {
+        padding: 18px;
+      }
+
+      .analysis p {
+        margin-top: 8px;
+      }
+
+      .tag-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px;
+        margin-top: 14px;
+      }
+
+      .tag {
+        border-radius: 999px;
+        background: #f0f1ec;
+        color: #3f3f3c;
+        font-size: 0.78rem;
+        font-weight: 700;
+        padding: 5px 8px;
+      }
+
+      .score {
+        display: grid;
+        gap: 8px;
+        margin-top: 18px;
+      }
+
+      .score div {
+        display: grid;
+        grid-template-columns: 6rem 1fr;
+        gap: 10px;
+        align-items: center;
+        color: var(--muted);
+        font-size: 0.88rem;
+      }
+
+      .meter {
+        position: relative;
+        height: 7px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: #ecece7;
+      }
+
+      .meter span {
+        display: block;
+        height: 100%;
+        border-radius: inherit;
+        background: var(--teal);
+      }
+
+      .mock-shell {
+        height: 100%;
+        min-height: 354px;
+        border: 1px solid #d9d9d2;
+        border-radius: 8px;
+        background: #fff;
+        padding: 14px;
+      }
+
+      .toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .title-group strong {
+        display: block;
+        font-size: 1rem;
+      }
+
+      .title-group span {
+        display: block;
+        margin-top: 3px;
+        color: var(--muted);
+        font-size: 0.78rem;
+      }
+
+      .button-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .icon-btn,
+      .pill-btn {
+        border: 1px solid #d6d6cf;
+        border-radius: 7px;
+        background: #fff;
+        color: var(--ink);
+        font-size: 0.78rem;
+        font-weight: 800;
+        line-height: 1;
+        padding: 9px 10px;
+      }
+
+      .icon-btn {
+        width: 36px;
+        height: 36px;
+        padding: 0;
+      }
+
+      .primary-btn {
+        border-color: transparent;
+        background: var(--deep);
+        color: #fff;
+      }
+
+      .time-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+        margin-top: 14px;
+      }
+
+      .time-grid div {
+        border: 1px solid #deded6;
+        border-radius: 7px;
+        background: #f8f8f4;
+        padding: 9px;
+      }
+
+      .time-grid span {
+        display: block;
+        color: var(--muted);
+        font-size: 0.68rem;
+        font-weight: 800;
+        text-transform: uppercase;
+      }
+
+      .time-grid strong {
+        display: block;
+        margin-top: 5px;
+        font-size: 1.1rem;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .wave {
+        position: relative;
+        display: flex;
+        align-items: end;
+        gap: 4px;
+        height: 142px;
+        margin-top: 18px;
+        padding: 28px 12px 18px;
+        overflow: hidden;
+        border: 1px solid #292f35;
+        border-radius: 8px;
+        background: var(--deep);
+      }
+
+      .wave span {
+        flex: 1;
+        min-width: 3px;
+        border-radius: 6px 6px 0 0;
+        background: rgb(218 246 238 / 0.58);
+      }
+
+      .wave .range,
+      .wave .playhead,
+      .wave .clip {
+        position: absolute;
+        pointer-events: none;
+      }
+
+      .wave .range {
+        top: 0;
+        bottom: 0;
+        left: 28%;
+        width: 21%;
+        border-inline: 2px solid #c7f9e9;
+        background: rgb(0 121 107 / 0.36);
+      }
+
+      .wave .playhead {
+        top: 0;
+        bottom: 0;
+        left: 39%;
+        width: 2px;
+        background: #fff;
+        box-shadow: 0 0 0 2px rgb(0 0 0 / 0.18);
+      }
+
+      .wave .clip {
+        top: 9px;
+        height: 12px;
+        border-radius: 3px;
+        background: var(--blue);
+      }
+
+      .mini-axis {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 8px;
+        color: var(--muted);
+        font-size: 0.72rem;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .trim-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr 140px;
+        gap: 10px;
+        margin-top: 14px;
+      }
+
+      .trim-box {
+        border: 1px solid #deded6;
+        border-radius: 7px;
+        background: #f8f8f4;
+        padding: 10px;
+      }
+
+      .range-line {
+        position: relative;
+        height: 6px;
+        margin-top: 12px;
+        border-radius: 999px;
+        background: #d6d6cf;
+      }
+
+      .range-line::before {
+        position: absolute;
+        inset: 0 35% 0 24%;
+        border-radius: inherit;
+        background: var(--teal);
+        content: "";
+      }
+
+      .range-line::after {
+        position: absolute;
+        top: 50%;
+        left: 24%;
+        width: 16px;
+        height: 16px;
+        border: 3px solid #fff;
+        border-radius: 50%;
+        background: var(--teal);
+        box-shadow: 0 1px 4px rgb(0 0 0 / 0.2);
+        content: "";
+        transform: translate(-50%, -50%);
+      }
+
+      .transcript-layout {
+        display: grid;
+        grid-template-columns: 0.95fr 1.05fr;
+        gap: 12px;
+      }
+
+      .mobile-companion {
+        display: grid;
+        grid-template-columns: minmax(0, 0.86fr) minmax(280px, 0.64fr);
+        gap: 14px;
+        align-items: start;
+        margin-top: 14px;
+        padding-top: 14px;
+        border-top: 1px dashed var(--line);
+      }
+
+      .mobile-notes {
+        display: grid;
+        gap: 10px;
+        border: 1px solid #d9d9d2;
+        border-radius: 8px;
+        background: #fff;
+        padding: 12px;
+      }
+
+      .mobile-notes ul {
+        display: grid;
+        gap: 8px;
+        margin: 0;
+        padding-left: 18px;
+      }
+
+      .transcript {
+        display: grid;
+        gap: 10px;
+        height: 320px;
+        overflow: hidden;
+        border: 1px solid #d9d9d2;
+        border-radius: 8px;
+        background: #fff;
+        padding: 12px;
+      }
+
+      .quote {
+        border-left: 3px solid #d6d6cf;
+        padding-left: 10px;
+        color: #52524f;
+        font-size: 0.88rem;
+        line-height: 1.45;
+      }
+
+      .quote.active {
+        border-color: var(--violet);
+        border-radius: 0 6px 6px 0;
+        background: var(--violet-soft);
+        color: #2a254d;
+        padding: 9px 9px 9px 11px;
+      }
+
+      .quote span {
+        color: var(--muted);
+        font-size: 0.7rem;
+        font-weight: 800;
+      }
+
+      .script-panel {
+        border: 1px solid #d9d9d2;
+        border-radius: 8px;
+        background: #fafaf7;
+        padding: 12px;
+      }
+
+      .small-wave {
+        position: relative;
+        display: flex;
+        align-items: end;
+        gap: 3px;
+        height: 86px;
+        margin-top: 12px;
+        border-radius: 7px;
+        background: #26252b;
+        padding: 16px 10px 10px;
+      }
+
+      .small-wave span {
+        flex: 1;
+        border-radius: 5px 5px 0 0;
+        background: rgb(237 233 254 / 0.58);
+      }
+
+      .small-wave::before {
+        position: absolute;
+        inset: 0 42% 0 30%;
+        background: rgb(109 93 252 / 0.35);
+        border-inline: 2px solid #d8d0ff;
+        content: "";
+      }
+
+      .clip-card {
+        display: grid;
+        gap: 10px;
+        margin-top: 12px;
+        border: 1px solid #d9d9d2;
+        border-radius: 8px;
+        background: #fff;
+        padding: 12px;
+      }
+
+      .chapter-row {
+        display: grid;
+        grid-template-columns: 1.3fr 0.8fr 1fr 0.7fr;
+        gap: 8px;
+        margin-top: 14px;
+      }
+
+      .chapter {
+        min-height: 62px;
+        border-radius: 7px;
+        padding: 10px;
+        color: #17211f;
+        font-size: 0.78rem;
+        font-weight: 800;
+      }
+
+      .chapter span {
+        display: block;
+        margin-top: 4px;
+        font-size: 0.68rem;
+        font-weight: 700;
+        opacity: 0.7;
+      }
+
+      .chapter:nth-child(1) {
+        background: var(--mint);
+      }
+
+      .chapter:nth-child(2) {
+        background: var(--blue-soft);
+      }
+
+      .chapter:nth-child(3) {
+        background: var(--amber-soft);
+      }
+
+      .chapter:nth-child(4) {
+        background: var(--coral-soft);
+      }
+
+      .chapter-wave {
+        position: relative;
+        height: 128px;
+        margin-top: 14px;
+        border-radius: 8px;
+        background:
+          linear-gradient(to right, transparent 24%, rgb(0 0 0 / 0.08) 24% 25%, transparent 25%),
+          linear-gradient(to right, transparent 48%, rgb(0 0 0 / 0.08) 48% 49%, transparent 49%),
+          linear-gradient(to right, transparent 74%, rgb(0 0 0 / 0.08) 74% 75%, transparent 75%),
+          #ffffff;
+        border: 1px solid #d9d9d2;
+        padding: 12px;
+      }
+
+      .summary-wave {
+        position: absolute;
+        inset: 24px 12px 22px;
+        display: flex;
+        align-items: center;
+        gap: 3px;
+      }
+
+      .summary-wave span {
+        flex: 1;
+        height: var(--h);
+        border-radius: 999px;
+        background: var(--teal);
+        opacity: 0.72;
+      }
+
+      .chapter-wave .rail-label {
+        position: absolute;
+        bottom: 8px;
+        color: var(--muted);
+        font-size: 0.72rem;
+        font-weight: 800;
+      }
+
+      .focus-bar {
+        display: grid;
+        grid-template-columns: 54px 1fr 54px;
+        gap: 10px;
+        align-items: center;
+        margin-top: 14px;
+        border-radius: 8px;
+        background: var(--deep);
+        color: #fff;
+        padding: 12px;
+      }
+
+      .focus-bar strong {
+        display: block;
+        text-align: center;
+        font-size: 1.35rem;
+      }
+
+      .focus-range {
+        position: relative;
+        height: 10px;
+        border-radius: 999px;
+        background: rgb(255 255 255 / 0.2);
+      }
+
+      .focus-range span {
+        position: absolute;
+        inset: 0 22% 0 32%;
+        border-radius: inherit;
+        background: #fff;
+      }
+
+      .mobile-mock {
+        width: min(330px, 100%);
+        margin: 0 auto;
+        border: 1px solid #d9d9d2;
+        border-radius: 22px;
+        background: #fbfbf8;
+        padding: 14px;
+        box-shadow: inset 0 0 0 6px #fff;
+      }
+
+      .mobile-screen {
+        border: 1px solid #e3e3dd;
+        border-radius: 16px;
+        background: #fff;
+        padding: 14px;
+      }
+
+      .big-clock {
+        margin-top: 10px;
+        font-size: 2.7rem;
+        font-weight: 850;
+        line-height: 1;
+        text-align: center;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .touch-wave {
+        position: relative;
+        height: 120px;
+        margin-top: 16px;
+        border-radius: 12px;
+        background: #f1f2ed;
+        overflow: hidden;
+      }
+
+      .touch-wave::before {
+        position: absolute;
+        inset: 34px 18px;
+        border-radius: 999px;
+        background: #d8d8d1;
+        content: "";
+      }
+
+      .touch-wave::after {
+        position: absolute;
+        inset: 34px 94px 34px 76px;
+        border-radius: 999px;
+        background: var(--amber);
+        content: "";
+      }
+
+      .handle {
+        position: absolute;
+        top: 50%;
+        width: 42px;
+        height: 42px;
+        border: 4px solid #fff;
+        border-radius: 50%;
+        background: var(--amber);
+        box-shadow: 0 6px 14px rgb(0 0 0 / 0.2);
+        transform: translate(-50%, -50%);
+      }
+
+      .handle.start {
+        left: 27%;
+      }
+
+      .handle.end {
+        left: 72%;
+      }
+
+      .dock {
+        display: grid;
+        grid-template-columns: 52px 1fr 52px;
+        gap: 10px;
+        align-items: center;
+        margin-top: 16px;
+      }
+
+      .dock .icon-btn {
+        width: 52px;
+        height: 52px;
+        border-radius: 14px;
+      }
+
+      .dock .primary-btn {
+        height: 52px;
+        border-radius: 14px;
+      }
+
+      .queue-layout {
+        display: grid;
+        grid-template-columns: 0.7fr 1fr;
+        gap: 12px;
+      }
+
+      .queue {
+        display: grid;
+        gap: 10px;
+      }
+
+      .queue-item {
+        border: 1px solid #d9d9d2;
+        border-radius: 8px;
+        background: #fff;
+        padding: 10px;
+      }
+
+      .queue-item.active {
+        border-color: var(--teal);
+        background: var(--mint);
+      }
+
+      .queue-item strong {
+        display: block;
+        font-size: 0.86rem;
+      }
+
+      .queue-item span {
+        color: var(--muted);
+        font-size: 0.74rem;
+        font-weight: 700;
+      }
+
+      .status {
+        float: right;
+        border-radius: 999px;
+        background: #fff;
+        color: var(--teal);
+        font-size: 0.68rem;
+        font-weight: 850;
+        padding: 4px 6px;
+      }
+
+      .queue-main {
+        border: 1px solid #d9d9d2;
+        border-radius: 8px;
+        background: #fff;
+        padding: 12px;
+      }
+
+      .decision-row {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        margin-top: 12px;
+      }
+
+      .decision-row .pill-btn {
+        height: 42px;
+      }
+
+      .source-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 18px;
+      }
+
+      .source-list a {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: #fff;
+        color: #245c58;
+        font-size: 0.82rem;
+        font-weight: 700;
+        padding: 7px 10px;
+        text-decoration: none;
+      }
+
+      @media (max-width: 940px) {
+        .hero,
+        .review,
+        .design,
+        .transcript-layout,
+        .mobile-companion,
+        .queue-layout {
+          grid-template-columns: 1fr;
+        }
+
+        .visual {
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+        }
+
+        .trim-row {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 640px) {
+        main {
+          width: min(100vw - 20px, 1180px);
+          padding-top: 18px;
+        }
+
+        .time-grid,
+        .chapter-row,
+        .decision-row {
+          grid-template-columns: 1fr 1fr;
+        }
+
+        .toolbar {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
+        .visual {
+          padding: 12px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="hero">
+        <div>
+          <p class="eyebrow">UI exploration</p>
+          <h1>Lesson audio segment chooser</h1>
+          <p>
+            Selected direction: audio-first chapter rail for long lesson
+            navigation, wired to a created-clip review queue with editable
+            titles and notes.
+          </p>
+        </div>
+        <div class="branch">
+          <span>Branch</span>
+          <strong>uiscrubber</strong>
+        </div>
+      </section>
+
+      <section class="review" aria-label="Current implementation review">
+        <article class="note">
+          <h2>What works now</h2>
+          <ul>
+            <li>One custom timeline owns playback, playhead, clip preview, and 20 second capture.</li>
+            <li>Selected range, existing clips, and audio rows are visible in the same workflow.</li>
+            <li>Start and end can be set by playhead, slider, or fine one second nudge.</li>
+          </ul>
+        </article>
+        <article class="note">
+          <h2>Main friction</h2>
+          <ul>
+            <li>The waveform is decorative rather than derived from the recording.</li>
+            <li>Whole-lesson scale makes long recordings hard to trim precisely.</li>
+            <li>Timeline scrubbing, range handles, and saved clips are visually separate decisions.</li>
+          </ul>
+        </article>
+        <article class="note">
+          <h2>Design target</h2>
+          <ul>
+            <li>Keep dense teacher-review workflow, not a marketing-style media player.</li>
+            <li>Use larger hit areas, zoom or focus range, and stronger selected-clip contrast.</li>
+            <li>Make saved segments feel like first-class markers on the recording.</li>
+          </ul>
+        </article>
+      </section>
+
+      <section class="note decision-note" aria-label="Selected scrubber direction">
+        <h2>Chosen direction</h2>
+        <p>
+          Use Option 3 as the audio-first lesson map before transcription. Pair
+          it with Option 5 for the clips that have already been created: saved
+          clips appear in a review queue, selecting a marker in the rail selects
+          the same clip in the queue, and the queue owns title and note editing.
+          Transcript-led selection stays deferred until after authorised
+          transcription exists.
+        </p>
+      </section>
+
+      <section class="designs" aria-label="Selected scrubber direction and alternatives">
+        <article class="design">
+          <div class="visual">
+            <div class="mock-shell">
+              <div class="toolbar">
+                <div class="title-group">
+                  <strong>1. Producer Timeline</strong>
+                  <span>Waveform first, controls grouped like a compact editor</span>
+                </div>
+                <div class="button-row" aria-hidden="true">
+                  <button class="icon-btn">-5</button>
+                  <button class="icon-btn primary-btn">Play</button>
+                  <button class="icon-btn">+5</button>
+                  <button class="pill-btn">20s</button>
+                </div>
+              </div>
+              <div class="time-grid">
+                <div><span>Playhead</span><strong>12:44</strong></div>
+                <div><span>Start</span><strong>12:31</strong></div>
+                <div><span>End</span><strong>12:58</strong></div>
+                <div><span>Saved</span><strong>7</strong></div>
+              </div>
+              <div class="wave" aria-hidden="true">
+                <div class="clip" style="left: 8%; width: 10%"></div>
+                <div class="clip" style="left: 55%; width: 16%"></div>
+                <div class="range"></div>
+                <div class="playhead"></div>
+                <span style="height: 28%"></span><span style="height: 42%"></span><span style="height: 36%"></span><span style="height: 58%"></span>
+                <span style="height: 34%"></span><span style="height: 46%"></span><span style="height: 68%"></span><span style="height: 38%"></span>
+                <span style="height: 54%"></span><span style="height: 32%"></span><span style="height: 62%"></span><span style="height: 48%"></span>
+                <span style="height: 36%"></span><span style="height: 56%"></span><span style="height: 30%"></span><span style="height: 44%"></span>
+                <span style="height: 70%"></span><span style="height: 45%"></span><span style="height: 61%"></span><span style="height: 40%"></span>
+                <span style="height: 52%"></span><span style="height: 74%"></span><span style="height: 47%"></span><span style="height: 64%"></span>
+              </div>
+              <div class="mini-axis"><span>00:00</span><span>15:00</span><span>30:00</span><span>45:00</span></div>
+              <div class="trim-row">
+                <div class="trim-box">
+                  <strong>Start trim</strong>
+                  <div class="range-line"></div>
+                </div>
+                <div class="trim-box">
+                  <strong>End trim</strong>
+                  <div class="range-line"></div>
+                </div>
+                <button class="pill-btn primary-btn">Save segment</button>
+              </div>
+            </div>
+          </div>
+          <div class="analysis">
+            <p class="eyebrow">Best default candidate</p>
+            <h2>Dense but learnable desktop scrubber</h2>
+            <p>
+              This is closest to the current component, but with clearer hierarchy:
+              one waveform surface, visible saved markers, always-visible timing
+              stats, and trim controls directly under the audio surface.
+            </p>
+            <div class="tag-row">
+              <span class="tag">desktop first</span>
+              <span class="tag">minimal behavior change</span>
+              <span class="tag">precise trim</span>
+            </div>
+            <div class="score">
+              <div><span>Fit</span><span class="meter"><span style="width: 92%"></span></span></div>
+              <div><span>Effort</span><span class="meter"><span style="width: 58%"></span></span></div>
+              <div><span>Risk</span><span class="meter"><span style="width: 34%"></span></span></div>
+            </div>
+          </div>
+        </article>
+
+        <article class="design">
+          <div class="visual">
+            <div class="mock-shell">
+              <div class="toolbar">
+                <div class="title-group">
+                  <strong>2 + 4. Transcript Sync with Mobile Trim Dock</strong>
+                  <span>Script, waveform, and touch trimming use one shared selection</span>
+                </div>
+                <button class="pill-btn primary-btn">Create from text</button>
+              </div>
+              <div class="transcript-layout" style="margin-top: 14px">
+                <div class="transcript">
+                  <p class="quote"><span>11:58</span><br />Teacher: Play it again, but hold the left hand softer.</p>
+                  <p class="quote active"><span>12:31</span><br />Teacher: That second bar is the useful memory. Keep the bass quiet, then let the melody answer.</p>
+                  <p class="quote"><span>13:08</span><br />Student: I can hear the difference when I delay the phrase.</p>
+                  <p class="quote"><span>13:42</span><br />Teacher: Mark that as a practice loop for the week.</p>
+                </div>
+                <div class="script-panel">
+                  <div class="title-group">
+                    <strong>Selected phrase</strong>
+                    <span>12:31 - 12:58</span>
+                  </div>
+                  <div class="small-wave" aria-hidden="true">
+                    <span style="height: 26%"></span><span style="height: 52%"></span><span style="height: 44%"></span><span style="height: 68%"></span>
+                    <span style="height: 36%"></span><span style="height: 58%"></span><span style="height: 76%"></span><span style="height: 45%"></span>
+                    <span style="height: 61%"></span><span style="height: 38%"></span><span style="height: 66%"></span><span style="height: 50%"></span>
+                  </div>
+                  <div class="clip-card">
+                    <strong>Teaching point title</strong>
+                    <p>Left-hand balance and melody response.</p>
+                    <div class="button-row">
+                      <button class="pill-btn">Set start</button>
+                      <button class="pill-btn">Set end</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="mobile-companion">
+                <div class="mobile-notes">
+                  <div class="title-group">
+                    <strong>Mobile behavior</strong>
+                    <span>Dock appears below the transcript context</span>
+                  </div>
+                  <ul>
+                    <li>Keep the transcript as the discovery surface.</li>
+                    <li>Show the selected sentence or segment summary first.</li>
+                    <li>Place large start and end handles below for thumb trimming.</li>
+                    <li>Use the same save action and validation as the desktop flow.</li>
+                  </ul>
+                </div>
+                <div class="mobile-mock">
+                  <div class="mobile-screen">
+                    <div class="toolbar">
+                      <div class="title-group">
+                        <strong>Touch Trim Dock</strong>
+                        <span>Mobile layout below transcript</span>
+                      </div>
+                    </div>
+                    <div class="big-clock">12:44</div>
+                    <div class="touch-wave" aria-hidden="true">
+                      <span class="handle start"></span>
+                      <span class="handle end"></span>
+                    </div>
+                    <div class="mini-axis"><span>12:31</span><span>27s</span><span>12:58</span></div>
+                    <div class="dock">
+                      <button class="icon-btn">-5</button>
+                      <button class="pill-btn primary-btn">Play selection</button>
+                      <button class="icon-btn">+5</button>
+                    </div>
+                    <button class="pill-btn" style="width: 100%; height: 48px; margin-top: 10px">Save teaching clip</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="analysis">
+            <p class="eyebrow">Deferred direction</p>
+            <h2>Transcript first, touch trim underneath on mobile</h2>
+            <p>
+              The user reviews language and audio together. Highlighted transcript
+              text proposes a range, while the waveform remains the authority for
+              exact start and end times. On mobile, the touch dock sits below the
+              selected transcript context instead of becoming a separate mode.
+            </p>
+            <div class="tag-row">
+              <span class="tag">transcript linked</span>
+              <span class="tag">mobile companion</span>
+              <span class="tag">shared selection state</span>
+            </div>
+            <div class="score">
+              <div><span>Fit</span><span class="meter"><span style="width: 94%"></span></span></div>
+              <div><span>Effort</span><span class="meter"><span style="width: 76%"></span></span></div>
+              <div><span>Risk</span><span class="meter"><span style="width: 44%"></span></span></div>
+            </div>
+          </div>
+        </article>
+
+        <article class="design selected-design">
+          <div class="visual">
+            <div class="mock-shell">
+              <div class="toolbar">
+                <div class="title-group">
+                  <strong>3. Chapter Rail</strong>
+                  <span>Long lesson organized into named regions</span>
+                </div>
+                <div class="button-row">
+                  <button class="pill-btn">Zoom -</button>
+                  <button class="pill-btn">Zoom +</button>
+                </div>
+              </div>
+              <div class="chapter-row" aria-hidden="true">
+                <div class="chapter">Warmup<span>00:00 - 07:10</span></div>
+                <div class="chapter">Rhythm<span>07:10 - 13:20</span></div>
+                <div class="chapter">Tone<span>13:20 - 29:40</span></div>
+                <div class="chapter">Wrap<span>29:40 - 43:00</span></div>
+              </div>
+              <div class="chapter-wave" aria-hidden="true">
+                <div class="summary-wave">
+                  <span style="--h: 28%"></span><span style="--h: 55%"></span><span style="--h: 42%"></span><span style="--h: 64%"></span>
+                  <span style="--h: 34%"></span><span style="--h: 72%"></span><span style="--h: 48%"></span><span style="--h: 54%"></span>
+                  <span style="--h: 36%"></span><span style="--h: 68%"></span><span style="--h: 44%"></span><span style="--h: 62%"></span>
+                  <span style="--h: 52%"></span><span style="--h: 40%"></span><span style="--h: 70%"></span><span style="--h: 46%"></span>
+                  <span style="--h: 58%"></span><span style="--h: 32%"></span><span style="--h: 66%"></span><span style="--h: 50%"></span>
+                </div>
+                <span class="rail-label" style="left: 12px">00:00</span>
+                <span class="rail-label" style="left: 28%">13:20</span>
+                <span class="rail-label" style="right: 12px">43:00</span>
+              </div>
+              <div class="focus-bar">
+                <strong>-</strong>
+                <div>
+                  <div class="focus-range"><span></span></div>
+                  <div class="mini-axis"><span>12:00</span><span>12:31 - 12:58</span><span>14:00</span></div>
+                </div>
+                <strong>+</strong>
+              </div>
+            </div>
+          </div>
+          <div class="analysis">
+            <p class="eyebrow">Selected direction, part 1</p>
+            <h2>Audio-first overview plus focus range</h2>
+            <p>
+              A chapter rail gives the whole recording structure, while the focus
+              strip below handles fine trimming. This avoids forcing a 45 minute
+              recording into a single fixed-width precision surface and works
+              before any transcript exists.
+            </p>
+            <div class="tag-row">
+              <span class="tag">chapter markers</span>
+              <span class="tag">zoomable</span>
+              <span class="tag">long audio</span>
+            </div>
+            <div class="score">
+              <div><span>Fit</span><span class="meter"><span style="width: 78%"></span></span></div>
+              <div><span>Effort</span><span class="meter"><span style="width: 68%"></span></span></div>
+              <div><span>Risk</span><span class="meter"><span style="width: 46%"></span></span></div>
+            </div>
+          </div>
+        </article>
+
+        <article class="design selected-design">
+          <div class="visual">
+            <div class="mock-shell">
+              <div class="toolbar">
+                <div class="title-group">
+                  <strong>5. Review Queue</strong>
+                  <span>Segment decisions are the main surface</span>
+                </div>
+                <button class="pill-btn primary-btn">Analyze selected</button>
+              </div>
+              <div class="queue-layout" style="margin-top: 14px">
+                <div class="queue">
+                  <div class="queue-item active">
+                    <span class="status">selected</span>
+                    <strong>LH balance</strong>
+                    <span>12:31 - 12:58</span>
+                  </div>
+                  <div class="queue-item">
+                    <span class="status">new</span>
+                    <strong>Rhythm correction</strong>
+                    <span>18:05 - 18:34</span>
+                  </div>
+                  <div class="queue-item">
+                    <span class="status">maybe</span>
+                    <strong>Phrase shape</strong>
+                    <span>26:40 - 27:22</span>
+                  </div>
+                  <div class="queue-item">
+                    <strong>Discarded clip</strong>
+                    <span>31:08 - 31:29</span>
+                  </div>
+                </div>
+                <div class="queue-main">
+                  <div class="title-group">
+                    <strong>LH balance</strong>
+                    <span>Current clip preview</span>
+                  </div>
+                  <div class="wave" style="height: 116px; margin-top: 12px" aria-hidden="true">
+                    <div class="range" style="left: 16%; width: 58%"></div>
+                    <div class="playhead" style="left: 44%"></div>
+                    <span style="height: 28%"></span><span style="height: 48%"></span><span style="height: 36%"></span><span style="height: 66%"></span>
+                    <span style="height: 44%"></span><span style="height: 58%"></span><span style="height: 72%"></span><span style="height: 40%"></span>
+                    <span style="height: 54%"></span><span style="height: 32%"></span><span style="height: 64%"></span><span style="height: 46%"></span>
+                  </div>
+                  <div class="decision-row">
+                    <button class="pill-btn">Discard</button>
+                    <button class="pill-btn">Retitle</button>
+                    <button class="pill-btn primary-btn">Keep</button>
+                  </div>
+                  <div class="clip-card">
+                    <strong>Notes</strong>
+                    <p>Keep the bass quiet, then let the melody answer.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="analysis">
+            <p class="eyebrow">Selected direction, part 2</p>
+            <h2>Rename created clips, keep, discard, then move on</h2>
+            <p>
+              The saved segments become the primary navigation. This suits a
+              post-analysis workflow where the system has already proposed clips
+              and it now also suits the pre-transcription workflow because the
+              created clips can be retitled and cleaned up before transcription.
+            </p>
+            <div class="tag-row">
+              <span class="tag">triage</span>
+              <span class="tag">saved clips first</span>
+              <span class="tag">fast review</span>
+            </div>
+            <div class="score">
+              <div><span>Fit</span><span class="meter"><span style="width: 82%"></span></span></div>
+              <div><span>Effort</span><span class="meter"><span style="width: 54%"></span></span></div>
+              <div><span>Risk</span><span class="meter"><span style="width: 36%"></span></span></div>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section class="note" style="margin-top: 18px">
+        <h2>Reference patterns used</h2>
+        <p>
+          The concepts combine transcript editing, chapter markers, zoomable
+          timelines, waveform selection, bookmarks, and compact touch controls.
+        </p>
+        <div class="source-list">
+          <a href="https://help.descript.com/hc/en-us/articles/10249275208717-Timeline-overview">Descript timeline</a>
+          <a href="https://riverside.com/video-editor">Riverside editor</a>
+          <a href="https://support.riverside.com/hc/en-us/articles/12948781294109-Zoom-in-and-out-on-the-editor-s-timeline">Riverside zoom</a>
+          <a href="https://www.macrumors.com/2024/06/26/ios-18-podcasts-scrubbing-chapters/">Apple Podcasts chapters</a>
+          <a href="https://support.audacityteam.org/au4/basics/audacity-editing">Audacity waveform selection</a>
+          <a href="https://apps.apple.com/us/app/ferrite-recording-studio/id1018780185">Ferrite bookmarks</a>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
