@@ -16,6 +16,7 @@ import {
   Square,
   Timer,
   Trash2,
+  X,
 } from "lucide-react";
 import { AudioStrip } from "@/components/audio-strip";
 import { Section } from "@/components/section";
@@ -138,6 +139,8 @@ export function PracticeScreen({ data }: { data: PracticeLoopReadModel }) {
   const [isRunning, setIsRunning] = useState(false);
   const [customTitle, setCustomTitle] = useState("");
   const [selectedPracticeTaskId, setSelectedPracticeTaskId] = useState("");
+  const [chartAideMemoirEnabled, setChartAideMemoirEnabled] = useState(false);
+  const [isChartAideMemoirOpen, setIsChartAideMemoirOpen] = useState(false);
   const [notesByItem, setNotesByItem] = useState<Record<string, string>>({});
   const [confidenceByItem, setConfidenceByItem] = useState<
     Record<string, Confidence | undefined>
@@ -475,6 +478,9 @@ export function PracticeScreen({ data }: { data: PracticeLoopReadModel }) {
     setIsRunning(Boolean(liveItems[0]));
     setIsSaving(false);
     setStatusMessage(t("sessionStarted"));
+    if (chartAideMemoirEnabled) {
+      setIsChartAideMemoirOpen(true);
+    }
   }
 
   async function finishActiveItem(status: "done" | "skipped") {
@@ -546,6 +552,7 @@ export function PracticeScreen({ data }: { data: PracticeLoopReadModel }) {
     setPlanItems([]);
     setNotesByItem({});
     setConfidenceByItem({});
+    setIsChartAideMemoirOpen(false);
     setStatusMessage(t("sessionSaved"));
     setIsSaving(false);
   }
@@ -773,6 +780,20 @@ export function PracticeScreen({ data }: { data: PracticeLoopReadModel }) {
   }, [bpm, isMetronomeRunning]);
 
   useEffect(() => {
+    if (!isChartAideMemoirOpen) return;
+
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsChartAideMemoirOpen(false);
+      }
+    }
+
+    window.addEventListener("keydown", closeOnEscape);
+
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [isChartAideMemoirOpen]);
+
+  useEffect(() => {
     return () => {
       if (practiceMediaRecorderRef.current?.state === "recording") {
         practiceMediaRecorderRef.current.stop();
@@ -783,6 +804,28 @@ export function PracticeScreen({ data }: { data: PracticeLoopReadModel }) {
 
   return (
     <div className="space-y-8">
+      {isChartAideMemoirOpen ? (
+        <div
+          aria-modal="true"
+          className="fixed inset-0 z-[80] bg-stone-950 p-2 sm:p-4"
+          role="dialog"
+        >
+          <button
+            aria-label={t("closeChartAideMemoir")}
+            className="absolute right-3 top-3 z-10 inline-flex h-9 w-9 items-center justify-center rounded-md bg-white/95 text-stone-950 shadow-sm transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+            onClick={() => setIsChartAideMemoirOpen(false)}
+            type="button"
+          >
+            <X aria-hidden="true" className="h-5 w-5" />
+          </button>
+          <img
+            alt={t("chartAideMemoir")}
+            className="h-full w-full object-contain"
+            src="/reference/chart-aide-memoir.png"
+          />
+        </div>
+      ) : null}
+
       <section className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-5">
           <div>
@@ -1099,29 +1142,48 @@ export function PracticeScreen({ data }: { data: PracticeLoopReadModel }) {
         <div className="space-y-6">
           <Section
             action={
-              isLive ? (
-                <button
-                  className="inline-flex items-center gap-2 rounded-md bg-emerald-950 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-900 disabled:cursor-not-allowed disabled:opacity-60"
-                  disabled={
-                    isSaving || isPracticeRecording || isPracticeRecorderBusy
-                  }
-                  onClick={() => void finishSession()}
-                  type="button"
-                >
-                  <Timer aria-hidden="true" className="h-4 w-4" />
-                  {t("finishSession")}
-                </button>
-              ) : (
-                <button
-                  className="inline-flex items-center gap-2 rounded-md bg-emerald-950 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-900 disabled:cursor-not-allowed disabled:opacity-60"
-                  disabled={isSaving || planItems.length === 0}
-                  onClick={() => void startLiveSession()}
-                  type="button"
-                >
-                  <Play aria-hidden="true" className="h-4 w-4" />
-                  {t("startLiveSession")}
-                </button>
-              )
+              <div className="flex flex-wrap items-center justify-end gap-3">
+                <label className="inline-flex min-h-10 items-center gap-2 rounded-md border border-stone-300 bg-white px-3 py-2 text-sm font-semibold text-stone-700">
+                  <input
+                    checked={chartAideMemoirEnabled}
+                    className="h-4 w-4 accent-emerald-900"
+                    onChange={(event) => {
+                      setChartAideMemoirEnabled(event.target.checked);
+                      if (event.target.checked && isLive) {
+                        setIsChartAideMemoirOpen(true);
+                      }
+                      if (!event.target.checked) {
+                        setIsChartAideMemoirOpen(false);
+                      }
+                    }}
+                    type="checkbox"
+                  />
+                  {t("chartAideMemoir")}
+                </label>
+                {isLive ? (
+                  <button
+                    className="inline-flex items-center gap-2 rounded-md bg-emerald-950 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-900 disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={
+                      isSaving || isPracticeRecording || isPracticeRecorderBusy
+                    }
+                    onClick={() => void finishSession()}
+                    type="button"
+                  >
+                    <Timer aria-hidden="true" className="h-4 w-4" />
+                    {t("finishSession")}
+                  </button>
+                ) : (
+                  <button
+                    className="inline-flex items-center gap-2 rounded-md bg-emerald-950 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-900 disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={isSaving || planItems.length === 0}
+                    onClick={() => void startLiveSession()}
+                    type="button"
+                  >
+                    <Play aria-hidden="true" className="h-4 w-4" />
+                    {t("startLiveSession")}
+                  </button>
+                )}
+              </div>
             }
             title={t("sessionPlan")}
           >

@@ -60,6 +60,9 @@ Important hosted env vars:
   pause, `Done and log time`, `Not today`, optional confidence, and notes.
 - Live practice rows are clickable/selectable, and completion advances by the
   user's list order.
+- `/practice` has an optional `Chart aide memoir` checkbox. If active when a
+  live practice session starts, it opens the stored chart graphic as a full
+  screen overlay with a small top-right close button.
 - Session item updates no longer use unsupported Neon HTTP transactions.
 - Practice passages can be recorded during a live practice session and are saved
   against the active `session_item`.
@@ -93,6 +96,7 @@ to the exact item being practised, not only the overall session or piece.
 - Transcription API: `src/app/api/transcriptions/route.ts`
 - Lesson audio storage: `src/lib/server/lesson-audio-storage.ts`
 - Practice screen: `src/app/practice/practice-screen.tsx`
+- Chart aide memoir asset: `public/reference/chart-aide-memoir.png`
 - Practice session APIs: `src/app/api/practice-sessions/*`
 - Session item API: `src/app/api/session-items/[itemId]/route.ts`
 - Practice recording upload/file APIs: `src/app/api/practice-recordings/*`

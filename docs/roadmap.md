@@ -131,6 +131,7 @@ Done:
 - Planned-duration labels removed from the visible session UI.
 - Attach short practice recordings to the active session item.
 - Quartet accompaniment area removed.
+- Optional chart aide memoir overlay when a live practice session starts.
 
 Next:
 

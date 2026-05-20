@@ -20,6 +20,38 @@ Keep entries concise. Put stable product truth in `project-brief.md`, current
 implementation truth in `current-state.md`, and priority sequencing in
 `roadmap.md`.
 
+## 2026-05-21 - Chart Aide Memoir Overlay
+
+Branch: `practice-session-repertoire-roadmap`
+
+Commit: not committed yet.
+
+Work done:
+
+- Added `public/reference/chart-aide-memoir.png` from Mark's generated image.
+- Added a `Chart aide memoir` checkbox beside the practice session start/finish
+  controls.
+- When the checkbox is active and a live practice session starts, the chart
+  opens as a full-screen overlay.
+- Added a small top-right close button and Escape-key close handling.
+
+Commands run:
+
+```bash
+npm run typecheck
+npm run build
+git diff --check
+```
+
+Migration status: no database migration.
+
+What to test:
+
+- Add at least one practice item, tick `Chart aide memoir`, and start the
+  session.
+- Confirm the chart fills the screen and closes with the top-right X.
+- Confirm leaving the checkbox unticked starts the session without the overlay.
+
 ## 2026-05-20 - Remove Duplicate Spine Status UI
 
 Branch: `practice-session-repertoire-roadmap`
