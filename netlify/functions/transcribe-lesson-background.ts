@@ -1,4 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
+import { connectLambda } from "@netlify/blobs";
 import { serverEnv } from "../../src/lib/server/env";
 import {
   markTranscriptionJobFailed,
@@ -6,7 +7,9 @@ import {
 } from "../../src/lib/server/transcription-job";
 
 type BackgroundEvent = {
+  blobs?: string;
   body?: string | null;
+  headers?: Record<string, string>;
   httpMethod?: string;
 };
 
@@ -27,6 +30,10 @@ function safeCompare(input: string, expected: string) {
 }
 
 export const handler = async (event: BackgroundEvent) => {
+  if (event.blobs && event.headers) {
+    connectLambda({ blobs: event.blobs, headers: event.headers });
+  }
+
   if (event.httpMethod && event.httpMethod !== "POST") {
     return {
       body: JSON.stringify({ error: "Method not allowed." }),

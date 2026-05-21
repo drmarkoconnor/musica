@@ -7,6 +7,9 @@ import { LanguageProvider } from "@/lib/language";
 export const metadata: Metadata = {
   title: "Practice Loop",
   description: "Private lesson-to-practice companion for jazz practice.",
+  icons: {
+    icon: "/icon.svg",
+  },
 };
 
 export default function RootLayout({

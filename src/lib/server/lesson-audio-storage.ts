@@ -1,7 +1,11 @@
 import { randomUUID } from "node:crypto";
+import { createWriteStream } from "node:fs";
 import { access, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
+import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 import {
   LOCAL_LESSON_AUDIO_BUCKET,
   LOCAL_LESSON_AUDIO_DIRECTORY,
@@ -24,6 +28,16 @@ function bufferArrayBuffer(buffer: Buffer) {
   const arrayBuffer = new ArrayBuffer(buffer.byteLength);
   new Uint8Array(arrayBuffer).set(buffer);
   return arrayBuffer;
+}
+
+async function writeReadableStreamToFile(
+  stream: ReadableStream<Uint8Array>,
+  filePath: string,
+) {
+  await pipeline(
+    Readable.fromWeb(stream as unknown as NodeReadableStream<Uint8Array>),
+    createWriteStream(filePath),
+  );
 }
 
 function shouldUseNetlifyBlobs() {
@@ -135,17 +149,21 @@ export async function materializeLessonAudioFile({
     };
   }
 
-  const buffer = await readLessonAudioBuffer({ storageBucket, storagePath });
-
-  if (!buffer) return null;
-
   const extension = path.extname(storagePath) || ".webm";
   const tempPath = path.join(
     os.tmpdir(),
     `practice-loop-transcription-${randomUUID()}${extension}`,
   );
+  const key = netlifyLessonAudioKey(storageBucket, storagePath);
 
-  await writeFile(tempPath, buffer);
+  if (!key) return null;
+
+  const store = await netlifyBlobStore();
+  const stream = await store.get(key, { type: "stream" });
+
+  if (!stream) return null;
+
+  await writeReadableStreamToFile(stream, tempPath);
 
   return {
     cleanup: async () => {
