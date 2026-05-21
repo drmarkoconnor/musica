@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Edit3, Plus, Trash2, Upload, X } from "lucide-react";
+import { AlertTriangle, Check, Edit3, Plus, Trash2, Upload, X } from "lucide-react";
 import { AudioStrip } from "@/components/audio-strip";
 import { ComingSoonButton } from "@/components/coming-soon-button";
 import { LessonRecorder } from "@/components/lesson-recorder";
@@ -329,8 +329,8 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
 
   return (
     <div className="space-y-8">
-      <div className="grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
-        <section className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
+      <div className="grid gap-4 xl:grid-cols-[24rem_minmax(0,1fr)]">
+        <section className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm xl:sticky xl:top-36 xl:self-start">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-emerald-800">
@@ -457,7 +457,7 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
           </div>
         </section>
 
-        <section className="space-y-4 rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
+        <section className="min-w-0 space-y-4 rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="text-2xl font-semibold leading-tight text-stone-950">
@@ -544,15 +544,31 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
             </>
           )}
           {activeLesson && recording && recordingAudioSrc ? (
-            <LessonSegmentReview
-              audioSrc={recordingAudioSrc}
-              durationSeconds={recording.durationSeconds}
-              lessonId={activeLesson.id}
-              lessonTitle={activeLesson.title}
-              onChanged={() => router.refresh()}
-              recordingId={recording.id}
-              segments={segmentsForRecording}
-            />
+            <>
+              <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">
+                <div className="flex gap-2">
+                  <AlertTriangle
+                    aria-hidden="true"
+                    className="mt-0.5 h-4 w-4 flex-none text-amber-800"
+                  />
+                  <div>
+                    <p className="font-semibold">
+                      {t("transcriptionClipFirstTitle")}
+                    </p>
+                    <p>{t("transcriptionClipFirstBody")}</p>
+                  </div>
+                </div>
+              </div>
+              <LessonSegmentReview
+                audioSrc={recordingAudioSrc}
+                durationSeconds={recording.durationSeconds}
+                lessonId={activeLesson.id}
+                lessonTitle={activeLesson.title}
+                onChanged={() => router.refresh()}
+                recordingId={recording.id}
+                segments={segmentsForRecording}
+              />
+            </>
           ) : null}
           {recording ? (
             <TranscriptionGate
@@ -561,6 +577,8 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
               recordingId={recording.id}
               selectedSegmentCount={selectedSegmentCount}
               selectedSegmentSeconds={selectedSegmentSeconds}
+              transcriptErrorMessage={transcript?.errorMessage}
+              transcriptStatus={transcript?.status}
             />
           ) : null}
         </section>

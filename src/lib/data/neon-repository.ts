@@ -149,6 +149,10 @@ function mapTranscript(row: dbSchema.TranscriptRow): Transcript {
     language: toLocale(row.language),
     status: row.status,
     text: row.text ?? "",
+    model: optional(row.model),
+    requestedAt: optional(row.requestedAt),
+    completedAt: optional(row.completedAt),
+    errorMessage: optional(row.errorMessage),
   };
 }
 

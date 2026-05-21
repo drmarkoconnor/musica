@@ -77,6 +77,10 @@ export type Transcript = {
   language: Locale;
   status: "pending" | "complete" | "failed";
   text: string;
+  model?: string;
+  requestedAt?: string;
+  completedAt?: string;
+  errorMessage?: string;
 };
 
 export type LessonSegmentTranscript = {

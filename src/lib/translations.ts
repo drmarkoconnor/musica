@@ -59,6 +59,11 @@ export const translations = {
     transcribeLesson: "Transcribe Lesson",
     transcriptionNote:
       "Transcription uses paid AI processing and requires authorisation.",
+    transcriptionClipFirstTitle: "Listen first, then select short clips",
+    transcriptionClipFirstBody:
+      "Aim for the useful teaching moments: usually 30 seconds to 3 minutes. Whole-lesson transcription should be a rare fallback, not the normal route.",
+    wholeLessonRareWarning:
+      "Whole lessons are slower, cost more, and are more likely to hit model limits. Use them only when a lesson genuinely has no clear clips.",
     selectedSegmentsWillTranscribe: "Selected teaching segments will be transcribed:",
     noSegmentsWillTranscribeFull:
       "No teaching segments are selected. This would transcribe the full recording:",
@@ -70,7 +75,13 @@ export const translations = {
     cancel: "Cancel",
     passwordFailed: "Password not accepted. Transcription was not started.",
     transcriptionAccepted:
-      "Authorised. Transcription saved to the lesson.",
+      "Authorised. Transcription is running in the background.",
+    transcriptionQueued: "Queued. You can leave this open or come back later.",
+    transcriptionRunning: "Transcribing audio",
+    transcriptionComplete: "Transcript saved to the lesson.",
+    transcriptionFailed: "Transcription failed.",
+    transcriptionProgress: "Progress",
+    processingChunk: "Processing",
     recentLessonItems: "Recently extracted lesson items",
     neglectedRepertoire: "Neglected repertoire",
     createLesson: "Create lesson",
@@ -227,6 +238,12 @@ export const translations = {
     bpm: "BPM",
     minutes: "min",
     activityLog: "Activity log",
+    practiceTotals: "Practice totals",
+    byPiece: "By piece",
+    byExercise: "By exercise",
+    byPracticeItem: "By practice item",
+    lastSevenDays: "Last 7 days",
+    noLoggedTimeYet: "No logged practice time yet.",
     totalPracticeTime: "Total practice time",
     loggedItems: "Logged items",
     practiceSessions: "Practice sessions",
@@ -339,6 +356,11 @@ export const translations = {
     transcribeLesson: "Trascrivi la lezione",
     transcriptionNote:
       "La trascrizione usa elaborazione AI a pagamento e richiede autorizzazione.",
+    transcriptionClipFirstTitle: "Ascolta prima, poi scegli clip brevi",
+    transcriptionClipFirstBody:
+      "Punta ai momenti didattici utili: di solito da 30 secondi a 3 minuti. La trascrizione di tutta la lezione dovrebbe essere un'eccezione rara, non la via normale.",
+    wholeLessonRareWarning:
+      "Le lezioni intere sono piu lente, costano di piu e possono superare i limiti del modello. Usale solo quando una lezione non ha clip chiare.",
     selectedSegmentsWillTranscribe:
       "Saranno trascritti i segmenti didattici selezionati:",
     noSegmentsWillTranscribeFull:
@@ -353,7 +375,13 @@ export const translations = {
     passwordFailed:
       "Password non accettata. La trascrizione non e stata avviata.",
     transcriptionAccepted:
-      "Autorizzato. Trascrizione salvata nella lezione.",
+      "Autorizzato. La trascrizione gira in background.",
+    transcriptionQueued: "In coda. Puoi lasciare aperto o tornare piu tardi.",
+    transcriptionRunning: "Trascrizione audio",
+    transcriptionComplete: "Trascrizione salvata nella lezione.",
+    transcriptionFailed: "Trascrizione non riuscita.",
+    transcriptionProgress: "Avanzamento",
+    processingChunk: "Elaborazione",
     recentLessonItems: "Spunti recenti dalle lezioni",
     neglectedRepertoire: "Repertorio trascurato",
     createLesson: "Crea lezione",
@@ -510,6 +538,12 @@ export const translations = {
     bpm: "BPM",
     minutes: "min",
     activityLog: "Registro attivita",
+    practiceTotals: "Totali di studio",
+    byPiece: "Per brano",
+    byExercise: "Per esercizio",
+    byPracticeItem: "Per elemento",
+    lastSevenDays: "Ultimi 7 giorni",
+    noLoggedTimeYet: "Nessun tempo di studio registrato.",
     totalPracticeTime: "Tempo totale di studio",
     loggedItems: "Elementi registrati",
     practiceSessions: "Sessioni di studio",

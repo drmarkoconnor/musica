@@ -1,5 +1,3 @@
-import "server-only";
-
 import { spawn } from "node:child_process";
 import { mkdir, rm } from "node:fs/promises";
 import os from "node:os";

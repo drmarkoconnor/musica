@@ -46,8 +46,8 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen bg-[#f5f7f4] text-stone-900">
-      <header className="border-b border-stone-200 bg-white/92 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8">
+      <header className="sticky top-0 z-40 border-b border-stone-200 bg-white/92 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-3 sm:px-6 lg:px-8">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <Link className="flex items-center gap-3" href="/">
               <span className="flex h-10 w-10 items-center justify-center rounded-md bg-emerald-950 text-lg font-semibold text-white">
@@ -76,7 +76,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               </form>
             </div>
           </div>
-          <nav className="flex gap-2 overflow-x-auto pb-1">
+          <nav className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
             {navItems.map((item) => {
               const isActive =
                 item.href === "/"
@@ -86,7 +86,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               return (
                 <Link
                   className={cn(
-                    "inline-flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition",
+                    "inline-flex min-h-11 shrink-0 items-center gap-2 rounded-md px-3.5 py-2 text-sm font-medium transition",
                     isActive
                       ? "bg-emerald-950 text-white"
                       : "text-stone-600 hover:bg-stone-100 hover:text-stone-950",
@@ -102,7 +102,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </nav>
         </div>
       </header>
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      <main className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
         {children}
       </main>
     </div>

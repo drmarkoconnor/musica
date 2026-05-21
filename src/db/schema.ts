@@ -29,6 +29,23 @@ export const transcriptStatusEnum = pgEnum("transcript_status", [
   "failed",
 ]);
 
+export const transcriptionJobStatusEnum = pgEnum("transcription_job_status", [
+  "queued",
+  "running",
+  "complete",
+  "failed",
+]);
+
+export const transcriptionJobModeEnum = pgEnum("transcription_job_mode", [
+  "selected_segments",
+  "full_recording",
+]);
+
+export const transcriptionChunkStatusEnum = pgEnum(
+  "transcription_chunk_status",
+  ["pending", "running", "complete", "failed"],
+);
+
 export const extractStatusEnum = pgEnum("extract_status", [
   "candidate",
   "kept",
@@ -260,6 +277,126 @@ export const lessonSegmentTranscripts = pgTable(
     check(
       "lesson_segment_transcripts_language_supported",
       sql`${table.language} in ('en', 'it')`,
+    ),
+  ],
+);
+
+export const transcriptionJobs = pgTable(
+  "transcription_jobs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    lessonId: uuid("lesson_id")
+      .notNull()
+      .references(() => lessons.id, { onDelete: "cascade" }),
+    recordingId: uuid("recording_id")
+      .notNull()
+      .references(() => lessonRecordings.id, { onDelete: "cascade" }),
+    transcriptId: uuid("transcript_id").references(() => transcripts.id, {
+      onDelete: "set null",
+    }),
+    mode: transcriptionJobModeEnum("mode").notNull(),
+    status: transcriptionJobStatusEnum("status").notNull().default("queued"),
+    totalChunks: integer("total_chunks").notNull(),
+    completedChunks: integer("completed_chunks").notNull().default(0),
+    selectedSegmentCount: integer("selected_segment_count").notNull().default(0),
+    selectedSeconds: integer("selected_seconds").notNull().default(0),
+    fullDurationSeconds: integer("full_duration_seconds"),
+    currentLabel: text("current_label"),
+    requestedAt: timestamp("requested_at", {
+      mode: "string",
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+    startedAt: timestamp("started_at", {
+      mode: "string",
+      withTimezone: true,
+    }),
+    completedAt: timestamp("completed_at", {
+      mode: "string",
+      withTimezone: true,
+    }),
+    updatedAt: timestamp("updated_at", { mode: "string", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    errorMessage: text("error_message"),
+  },
+  (table) => [
+    index("transcription_jobs_lesson_recording_idx").on(
+      table.lessonId,
+      table.recordingId,
+      table.requestedAt,
+    ),
+    index("transcription_jobs_status_idx").on(table.status),
+    check("transcription_jobs_total_chunks_positive", sql`${table.totalChunks} > 0`),
+    check(
+      "transcription_jobs_completed_chunks_valid",
+      sql`${table.completedChunks} >= 0 and ${table.completedChunks} <= ${table.totalChunks}`,
+    ),
+    check(
+      "transcription_jobs_selected_count_non_negative",
+      sql`${table.selectedSegmentCount} >= 0`,
+    ),
+    check(
+      "transcription_jobs_selected_seconds_non_negative",
+      sql`${table.selectedSeconds} >= 0`,
+    ),
+    check(
+      "transcription_jobs_full_duration_positive",
+      sql`${table.fullDurationSeconds} is null or ${table.fullDurationSeconds} > 0`,
+    ),
+  ],
+);
+
+export const transcriptionJobChunks = pgTable(
+  "transcription_job_chunks",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    jobId: uuid("job_id")
+      .notNull()
+      .references(() => transcriptionJobs.id, { onDelete: "cascade" }),
+    segmentId: uuid("segment_id").references(() => lessonSegments.id, {
+      onDelete: "set null",
+    }),
+    position: integer("position").notNull(),
+    label: text("label").notNull(),
+    startsAtSeconds: integer("starts_at_seconds").notNull(),
+    endsAtSeconds: integer("ends_at_seconds").notNull(),
+    status: transcriptionChunkStatusEnum("status").notNull().default("pending"),
+    text: text("text"),
+    model: text("model"),
+    durationMs: integer("duration_ms"),
+    errorMessage: text("error_message"),
+    startedAt: timestamp("started_at", {
+      mode: "string",
+      withTimezone: true,
+    }),
+    completedAt: timestamp("completed_at", {
+      mode: "string",
+      withTimezone: true,
+    }),
+    updatedAt: timestamp("updated_at", { mode: "string", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("transcription_job_chunks_job_position_unique_idx").on(
+      table.jobId,
+      table.position,
+    ),
+    index("transcription_job_chunks_job_status_idx").on(table.jobId, table.status),
+    check("transcription_job_chunks_position_positive", sql`${table.position} > 0`),
+    check(
+      "transcription_job_chunks_start_non_negative",
+      sql`${table.startsAtSeconds} >= 0`,
+    ),
+    check(
+      "transcription_job_chunks_end_after_start",
+      sql`${table.endsAtSeconds} > ${table.startsAtSeconds}`,
+    ),
+    check(
+      "transcription_job_chunks_duration_ms_positive",
+      sql`${table.durationMs} is null or ${table.durationMs} > 0`,
     ),
   ],
 );
@@ -689,6 +826,12 @@ export type LessonSegmentTranscriptRow =
   typeof lessonSegmentTranscripts.$inferSelect;
 export type NewLessonSegmentTranscriptRow =
   typeof lessonSegmentTranscripts.$inferInsert;
+export type TranscriptionJobRow = typeof transcriptionJobs.$inferSelect;
+export type NewTranscriptionJobRow = typeof transcriptionJobs.$inferInsert;
+export type TranscriptionJobChunkRow =
+  typeof transcriptionJobChunks.$inferSelect;
+export type NewTranscriptionJobChunkRow =
+  typeof transcriptionJobChunks.$inferInsert;
 export type LessonExtractRow = typeof lessonExtracts.$inferSelect;
 export type NewLessonExtractRow = typeof lessonExtracts.$inferInsert;
 export type PieceRow = typeof pieces.$inferSelect;

@@ -1,5 +1,3 @@
-import "server-only";
-
 import os from "node:os";
 import path from "node:path";
 import {

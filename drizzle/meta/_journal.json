@@ -43,6 +43,13 @@
       "when": 1779295079131,
       "tag": "0005_sturdy_sabra",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1779401081580,
+      "tag": "0006_hot_starfox",
+      "breakpoints": true
     }
   ]
 }

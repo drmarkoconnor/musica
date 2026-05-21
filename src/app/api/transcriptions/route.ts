@@ -1,33 +1,17 @@
 import { timingSafeEqual } from "node:crypto";
-import { and, asc, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { createDatabaseClient } from "@/db/client";
-import {
-  lessonExtracts,
-  lessonRecordings,
-  lessonSegments,
-  lessonSegmentTranscripts,
-  lessons,
-  transcripts,
-} from "@/db/schema";
 import { serverEnv } from "@/lib/server/env";
-import {
-  analyzeLessonSegments,
-  analyzeLessonTranscript,
-  lessonSummaryText,
-  type LessonAnalysisResult,
-  type LessonSegmentAnalysisInput,
-  type SegmentedLessonAnalysisResult,
-} from "@/lib/server/lesson-analysis";
-import { materializeLessonAudioFile } from "@/lib/server/lesson-audio-storage";
 import { transcribeAudioFile } from "@/lib/server/openai-transcription";
 import { getTestAudioFixture } from "@/lib/server/test-audio-fixtures";
+import {
+  createLessonTranscriptionJob,
+  markTranscriptionJobFailed,
+  runLessonTranscriptionJob,
+  TranscriptionRequestError,
+} from "@/lib/server/transcription-job";
 
 export const runtime = "nodejs";
-export const maxDuration = 300;
-
-const MAX_FULL_RECORDING_TRANSCRIPTION_SECONDS = 60 * 60;
-const MAX_TRANSCRIPTION_CHUNK_SECONDS = 10 * 60;
+export const maxDuration = 60;
 
 type TranscriptionRequest = {
   lessonId?: unknown;
@@ -35,10 +19,6 @@ type TranscriptionRequest = {
   password?: unknown;
   testAudioFixture?: unknown;
   includeFullRecording?: unknown;
-};
-
-type TranscribedLessonSegment = LessonSegmentAnalysisInput & {
-  model: string;
 };
 
 function safeCompare(input: string, expected: string) {
@@ -52,243 +32,45 @@ function safeCompare(input: string, expected: string) {
   return timingSafeEqual(inputBuffer, expectedBuffer);
 }
 
-function formatTimestamp(totalSeconds: number) {
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+function shouldUseNetlifyBackgroundFunction() {
+  return serverEnv("NETLIFY") === "true";
 }
 
-function fullRecordingChunks(durationSeconds: number) {
-  const chunks = [];
-
-  for (
-    let startsAtSeconds = 0, index = 0;
-    startsAtSeconds < durationSeconds;
-    startsAtSeconds += MAX_TRANSCRIPTION_CHUNK_SECONDS, index += 1
-  ) {
-    chunks.push({
-      endsAtSeconds: Math.min(
-        startsAtSeconds + MAX_TRANSCRIPTION_CHUNK_SECONDS,
-        durationSeconds,
-      ),
-      id: `full-recording-${index + 1}`,
-      startsAtSeconds,
-      title: `Full recording part ${index + 1}`,
-    });
-  }
-
-  return chunks;
-}
-
-async function markTranscriptFailed({
-  errorMessage,
-  lessonId,
-  recordingId,
-  requestedAt,
+async function startTranscriptionJob({
+  expectedPassword,
+  jobId,
+  request,
 }: {
-  errorMessage: string;
-  lessonId: string;
-  recordingId: string;
-  requestedAt: string;
+  expectedPassword: string;
+  jobId: string;
+  request: Request;
 }) {
-  const db = createDatabaseClient();
-  const [existingTranscript] = await db
-    .select({ id: transcripts.id })
-    .from(transcripts)
-    .where(
-      and(
-        eq(transcripts.lessonId, lessonId),
-        eq(transcripts.recordingId, recordingId),
-      ),
-    );
+  if (shouldUseNetlifyBackgroundFunction()) {
+    const url = new URL("/.netlify/functions/transcribe-lesson-background", request.url);
+    const response = await fetch(url, {
+      body: JSON.stringify({ jobId, token: expectedPassword }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
 
-  if (existingTranscript) {
-    await db
-      .update(transcripts)
-      .set({
-        status: "failed",
-        requestedAt,
-        completedAt: null,
-        errorMessage,
-      })
-      .where(eq(transcripts.id, existingTranscript.id));
+    if (!response.ok) {
+      const body = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+      throw new Error(body?.error ?? "Background transcription did not start.");
+    }
+
     return;
   }
 
-  await db.insert(transcripts).values({
-    lessonId,
-    recordingId,
-    language: "en",
-    status: "failed",
-    requestedAt,
-    errorMessage,
-  });
-}
-
-async function saveLessonAnalysis({
-  analysis,
-  lessonId,
-  transcriptId,
-}: {
-  analysis: LessonAnalysisResult;
-  lessonId: string;
-  transcriptId: string;
-}) {
-  const db = createDatabaseClient();
-  const summary = lessonSummaryText(analysis);
-  const updatedAt = new Date().toISOString();
-
-  await db
-    .delete(lessonExtracts)
-    .where(
-      and(
-        eq(lessonExtracts.lessonId, lessonId),
-        eq(lessonExtracts.status, "candidate"),
-      ),
-    );
-
-  if (analysis.practiceCandidates.length > 0) {
-    await db.insert(lessonExtracts).values(
-      analysis.practiceCandidates.map((item) => ({
-        lessonId,
-        transcriptId,
-        title: item.title,
-        body: `${item.body}\n\nPossible follow-up: ${item.suggestedPracticeNote}`,
-        startsAtSeconds: item.startsAtSeconds,
-        endsAtSeconds: item.endsAtSeconds,
-        status: "candidate" as const,
-      })),
-    );
-  }
-
-  await db
-    .update(lessons)
-    .set({
-      status: analysis.practiceCandidates.length > 0 ? "extracted" : "transcribed",
-      summary: summary || null,
-      updatedAt,
-    })
-    .where(eq(lessons.id, lessonId));
-}
-
-async function saveRawSegmentTranscripts({
-  completedAt,
-  lessonId,
-  recordingId,
-  requestedAt,
-  segments,
-  transcriptId,
-}: {
-  completedAt: string;
-  lessonId: string;
-  recordingId: string;
-  requestedAt: string;
-  segments: TranscribedLessonSegment[];
-  transcriptId: string;
-}) {
-  const db = createDatabaseClient();
-
-  for (const segment of segments) {
-    const [existing] = await db
-      .select({ id: lessonSegmentTranscripts.id })
-      .from(lessonSegmentTranscripts)
-      .where(eq(lessonSegmentTranscripts.segmentId, segment.segmentId));
-
-    const values = {
-      completedAt,
-      errorMessage: null,
-      language: "en" as const,
-      lessonId,
-      model: segment.model,
-      recordingId,
-      requestedAt,
-      segmentId: segment.segmentId,
-      status: "complete" as const,
-      text: segment.transcriptText,
-      transcriptId,
-      updatedAt: completedAt,
-    };
-
-    if (existing) {
-      await db
-        .update(lessonSegmentTranscripts)
-        .set(values)
-        .where(eq(lessonSegmentTranscripts.id, existing.id));
-      continue;
-    }
-
-    await db.insert(lessonSegmentTranscripts).values(values);
-  }
-}
-
-async function saveSegmentedLessonAnalysis({
-  analysis,
-  lessonId,
-  transcriptId,
-}: {
-  analysis: SegmentedLessonAnalysisResult;
-  lessonId: string;
-  transcriptId: string;
-}) {
-  const db = createDatabaseClient();
-  const summary = lessonSummaryText(analysis);
-  const updatedAt = new Date().toISOString();
-  const memoryBySegmentId = new Map(
-    analysis.segmentMemories.map((memory) => [memory.segmentId, memory]),
-  );
-
-  await db
-    .delete(lessonExtracts)
-    .where(
-      and(
-        eq(lessonExtracts.lessonId, lessonId),
-        eq(lessonExtracts.status, "candidate"),
-      ),
-    );
-
-  for (const memory of analysis.segmentMemories) {
-    await db
-      .update(lessonSegmentTranscripts)
-      .set({
-        summaryBody: memory.body,
-        summaryTitle: memory.title,
-        updatedAt,
-      })
-      .where(eq(lessonSegmentTranscripts.segmentId, memory.segmentId));
-  }
-
-  const practiceCandidateRows = analysis.practiceCandidates
-    .filter((item) => item.segmentId && memoryBySegmentId.has(item.segmentId))
-    .map((item) => {
-      const memory = memoryBySegmentId.get(item.segmentId ?? "");
-
-      return {
-        lessonId,
-        segmentId: item.segmentId,
-        transcriptId,
-        title: item.title,
-        body: `${item.body}\n\nPossible follow-up: ${item.suggestedPracticeNote}`,
-        startsAtSeconds: item.startsAtSeconds,
-        endsAtSeconds:
-          item.endsAtSeconds ??
-          memory?.endsAtSeconds ??
-          Math.max(item.startsAtSeconds + 1, item.startsAtSeconds),
-        status: "candidate" as const,
-      };
+  void runLessonTranscriptionJob({ jobId }).catch((error) => {
+    const errorMessage =
+      error instanceof Error ? error.message : "Transcription failed.";
+    console.error("Background transcription failed", error);
+    void markTranscriptionJobFailed({ errorMessage, jobId }).catch((markError) => {
+      console.error("Could not mark transcription job failed", markError);
     });
-
-  if (practiceCandidateRows.length > 0) {
-    await db.insert(lessonExtracts).values(practiceCandidateRows);
-  }
-
-  await db
-    .update(lessons)
-    .set({
-      status: practiceCandidateRows.length > 0 ? "extracted" : "transcribed",
-      summary: summary || null,
-      updatedAt,
-    })
-    .where(eq(lessons.id, lessonId));
+  });
 }
 
 export async function POST(request: Request) {
@@ -360,299 +142,54 @@ export async function POST(request: Request) {
     }
   }
 
-  const db = createDatabaseClient();
-  const [recording] = await db
-    .select()
-    .from(lessonRecordings)
-    .where(
-      and(
-        eq(lessonRecordings.id, body.recordingId),
-        eq(lessonRecordings.lessonId, body.lessonId),
-      ),
-    );
-
-  if (!recording) {
-    return NextResponse.json({ error: "Recording not found." }, { status: 404 });
-  }
-
-  const audioFile = await materializeLessonAudioFile({
-    storageBucket: recording.storageBucket,
-    storagePath: recording.storagePath,
-  });
-
-  if (!audioFile) {
-    return NextResponse.json(
-      { error: "Recording audio is not available for transcription." },
-      { status: 404 },
-    );
-  }
-
-  const requestedAt = new Date().toISOString();
-
   try {
-    const selectedSegments = await db
-      .select({
-        endsAtSeconds: lessonSegments.endsAtSeconds,
-        id: lessonSegments.id,
-        notes: lessonSegments.notes,
-        startsAtSeconds: lessonSegments.startsAtSeconds,
-        title: lessonSegments.title,
-      })
-      .from(lessonSegments)
-      .where(
-        and(
-          eq(lessonSegments.lessonId, body.lessonId),
-          eq(lessonSegments.recordingId, body.recordingId),
-          eq(lessonSegments.status, "selected"),
-        ),
-      )
-      .orderBy(asc(lessonSegments.startsAtSeconds));
+    const job = await createLessonTranscriptionJob({
+      includeFullRecording: body.includeFullRecording === true,
+      lessonId: body.lessonId,
+      recordingId: body.recordingId,
+    });
 
-    if (selectedSegments.length === 0 && body.includeFullRecording !== true) {
-      return NextResponse.json(
-        {
-          error:
-            "No teaching segments selected. Confirm full-recording transcription to continue.",
-        },
-        { status: 400 },
-      );
-    }
-
-    if (
-      selectedSegments.length === 0 &&
-      body.includeFullRecording === true &&
-      (recording.durationSeconds ?? 0) > MAX_FULL_RECORDING_TRANSCRIPTION_SECONDS
-    ) {
-      return NextResponse.json(
-        {
-          error:
-            "This recording is too long for full-recording transcription. Create one or more teaching clips and transcribe the selected clips instead.",
-        },
-        { status: 400 },
-      );
-    }
-
-    let transcriptionText = "";
-    let transcriptionModel = "";
-    let transcriptionDurationMs = 0;
-    const segmentTranscriptions: TranscribedLessonSegment[] = [];
-
-    if (selectedSegments.length > 0) {
-      const { clipAudioSegments } = await import("@/lib/server/audio-segments");
-      const clipped = await clipAudioSegments({
-        segments: selectedSegments,
-        sourceFilePath: audioFile.filePath,
-      });
-
+    if (job.shouldStart) {
       try {
-        const segmentTexts: string[] = [];
-
-        for (const [index, clippedSegment] of clipped.clippedSegments.entries()) {
-          const transcription = await transcribeAudioFile({
-            filePath: clippedSegment.filePath,
-          });
-          transcriptionModel = transcription.model;
-          transcriptionDurationMs += transcription.durationMs;
-          segmentTranscriptions.push({
-            endsAtSeconds: clippedSegment.segment.endsAtSeconds,
-            model: transcription.model,
-            notes: clippedSegment.segment.notes ?? "",
-            segmentId: clippedSegment.segment.id,
-            startsAtSeconds: clippedSegment.segment.startsAtSeconds,
-            title: clippedSegment.segment.title,
-            transcriptText: transcription.text,
-          });
-          segmentTexts.push(
-            [
-              `[Teaching segment ${index + 1}: ${clippedSegment.segment.title}. Original audio ${formatTimestamp(
-                clippedSegment.segment.startsAtSeconds,
-              )}-${formatTimestamp(clippedSegment.segment.endsAtSeconds)}.]`,
-              transcription.text,
-            ].join("\n"),
-          );
-        }
-
-        transcriptionText = segmentTexts.join("\n\n");
-      } finally {
-        await clipped.cleanup();
-      }
-    } else {
-      const recordingDurationSeconds = recording.durationSeconds ?? 0;
-
-      if (recordingDurationSeconds > MAX_TRANSCRIPTION_CHUNK_SECONDS) {
-        const { clipAudioSegments } = await import("@/lib/server/audio-segments");
-        const fullRecordingSegments = fullRecordingChunks(recordingDurationSeconds);
-        const clipped = await clipAudioSegments({
-          segments: fullRecordingSegments,
-          sourceFilePath: audioFile.filePath,
+        await startTranscriptionJob({
+          expectedPassword,
+          jobId: job.jobId,
+          request,
         });
-
-        try {
-          const chunkTexts: string[] = [];
-
-          for (const [index, clippedSegment] of clipped.clippedSegments.entries()) {
-            const transcription = await transcribeAudioFile({
-              filePath: clippedSegment.filePath,
-            });
-            transcriptionModel = transcription.model;
-            transcriptionDurationMs += transcription.durationMs;
-            chunkTexts.push(
-              [
-                `[Full recording part ${index + 1}. Original audio ${formatTimestamp(
-                  clippedSegment.segment.startsAtSeconds,
-                )}-${formatTimestamp(clippedSegment.segment.endsAtSeconds)}.]`,
-                transcription.text,
-              ].join("\n"),
-            );
-          }
-
-          transcriptionText = chunkTexts.join("\n\n");
-        } finally {
-          await clipped.cleanup();
-        }
-      } else {
-        const transcription = await transcribeAudioFile({
-          filePath: audioFile.filePath,
-        });
-        transcriptionText = transcription.text;
-        transcriptionModel = transcription.model;
-        transcriptionDurationMs = transcription.durationMs;
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : "Transcription was queued but the background job did not start.";
+        await markTranscriptionJobFailed({ errorMessage, jobId: job.jobId });
+        return NextResponse.json({ error: errorMessage }, { status: 502 });
       }
     }
 
-    const completedAt = new Date().toISOString();
-    let transcriptId: string;
-    const [existingTranscript] = await db
-      .select({ id: transcripts.id })
-      .from(transcripts)
-      .where(
-        and(
-          eq(transcripts.lessonId, body.lessonId),
-          eq(transcripts.recordingId, body.recordingId),
-        ),
-      );
-
-    if (existingTranscript) {
-      await db
-        .update(transcripts)
-        .set({
-          language: "en",
-          status: "complete",
-          text: transcriptionText,
-          model: transcriptionModel,
-          requestedAt,
-          completedAt,
-          errorMessage: null,
-        })
-        .where(eq(transcripts.id, existingTranscript.id));
-      transcriptId = existingTranscript.id;
-    } else {
-      const [createdTranscript] = await db
-        .insert(transcripts)
-        .values({
-          lessonId: body.lessonId,
-          recordingId: body.recordingId,
-          language: "en",
-          status: "complete",
-          text: transcriptionText,
-          model: transcriptionModel,
-          requestedAt,
-          completedAt,
-        })
-        .returning({ id: transcripts.id });
-      transcriptId = createdTranscript.id;
-    }
-
-    await db
-      .update(lessons)
-      .set({ status: "transcribed", updatedAt: completedAt })
-      .where(eq(lessons.id, body.lessonId));
-
-    if (segmentTranscriptions.length > 0) {
-      await saveRawSegmentTranscripts({
-        completedAt,
+    return NextResponse.json(
+      {
+        ok: true,
+        status: "queued",
         lessonId: body.lessonId,
         recordingId: body.recordingId,
-        requestedAt,
-        segments: segmentTranscriptions,
-        transcriptId,
-      });
-    }
-
-    let analysisStatus: "complete" | "failed" = "complete";
-    let practiceCandidateCount = 0;
-    let summaryBulletCount = 0;
-
-    try {
-      if (segmentTranscriptions.length > 0) {
-        const analysis = await analyzeLessonSegments({
-          segments: segmentTranscriptions,
-        });
-        await saveSegmentedLessonAnalysis({
-          analysis,
-          lessonId: body.lessonId,
-          transcriptId,
-        });
-        practiceCandidateCount = analysis.practiceCandidates.length;
-        summaryBulletCount = analysis.summaryBullets.length;
-      } else {
-        const analysis = await analyzeLessonTranscript({
-          transcriptText: transcriptionText,
-        });
-        await saveLessonAnalysis({
-          analysis,
-          lessonId: body.lessonId,
-          transcriptId,
-        });
-        practiceCandidateCount = analysis.practiceCandidates.length;
-        summaryBulletCount = analysis.summaryBullets.length;
-      }
-    } catch (error) {
-      analysisStatus = "failed";
-      console.error("Lesson analysis failed", error);
-    }
-
-    if (selectedSegments.length > 0) {
-      await Promise.all(
-        selectedSegments.map((segment) =>
-          db
-            .update(lessonSegments)
-            .set({ status: "transcribed", updatedAt: completedAt })
-            .where(eq(lessonSegments.id, segment.id)),
-        ),
+        ...job,
+      },
+      { status: 202 },
+    );
+  } catch (error) {
+    if (error instanceof TranscriptionRequestError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status },
       );
     }
 
-    return NextResponse.json({
-      ok: true,
-      status:
-        analysisStatus === "complete"
-          ? "transcribed_and_extracted"
-          : "transcribed_recording",
-      analysisStatus,
-      lessonId: body.lessonId,
-      recordingId: body.recordingId,
-      model: transcriptionModel,
-      durationMs: transcriptionDurationMs,
-      characterCount: transcriptionText.length,
-      practiceCandidateCount,
-      selectedSegmentCount: selectedSegments.length,
-      summaryBulletCount,
-      text: transcriptionText,
-    });
-  } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : "Transcription failed.";
-
-    await markTranscriptFailed({
-      errorMessage,
-      lessonId: body.lessonId,
-      recordingId: body.recordingId,
-      requestedAt,
-    });
-
-    return NextResponse.json({ error: errorMessage }, { status: 502 });
-  } finally {
-    await audioFile.cleanup();
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error ? error.message : "Transcription failed.",
+      },
+      { status: 502 },
+    );
   }
 }

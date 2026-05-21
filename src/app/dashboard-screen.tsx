@@ -19,6 +19,78 @@ import { useLanguage } from "@/lib/language";
 import { pieceTempoLabel } from "@/lib/piece-labels";
 import { formatDateLabel, formatDuration } from "@/lib/utils";
 
+type PracticeTotalRow = {
+  id: string;
+  label: string;
+  seconds: number;
+};
+
+function buildPracticeTotals<T>(
+  items: T[],
+  getKey: (item: T) => string,
+  getLabel: (item: T) => string,
+  getSeconds: (item: T) => number,
+) {
+  const totals = new Map<string, PracticeTotalRow>();
+
+  for (const item of items) {
+    const id = getKey(item);
+    const label = getLabel(item);
+
+    if (!id || !label) continue;
+
+    const existing = totals.get(id) ?? { id, label, seconds: 0 };
+    existing.seconds += getSeconds(item);
+    totals.set(id, existing);
+  }
+
+  return Array.from(totals.values()).sort(
+    (left, right) => right.seconds - left.seconds || left.label.localeCompare(right.label),
+  );
+}
+
+function isWithinLastSevenDays(value: string) {
+  const timestamp = Date.parse(value);
+
+  if (Number.isNaN(timestamp)) return false;
+
+  return timestamp >= Date.now() - 7 * 24 * 60 * 60 * 1000;
+}
+
+function PracticeTotalsPanel({
+  emptyLabel,
+  rows,
+  title,
+}: {
+  emptyLabel: string;
+  rows: PracticeTotalRow[];
+  title: string;
+}) {
+  return (
+    <div className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
+      <h3 className="text-sm font-semibold text-stone-950">{title}</h3>
+      <div className="mt-3 space-y-2">
+        {rows.length === 0 ? (
+          <p className="text-sm text-stone-600">{emptyLabel}</p>
+        ) : null}
+        {rows.slice(0, 6).map((row) => (
+          <div
+            className="grid min-h-11 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-md bg-stone-50 px-3 py-2"
+            key={row.id}
+          >
+            <span className="truncate text-sm font-medium text-stone-800">
+              {row.label}
+            </span>
+            <span className="text-sm font-semibold tabular-nums text-stone-950">
+              {formatDuration(row.seconds)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function DashboardScreen({ data }: { data: PracticeLoopReadModel }) {
   const { t } = useLanguage();
   const {
@@ -66,7 +138,10 @@ export function DashboardScreen({ data }: { data: PracticeLoopReadModel }) {
       return {
         ...item,
         label: piece?.title ?? task?.title ?? exercise?.title ?? item.title,
+        exerciseLabel: exercise?.title ?? "",
+        pieceLabel: piece?.title ?? "",
         recordedAt: session?.startedAt ?? "",
+        taskLabel: task?.title ?? "",
       };
     })
     .sort((left, right) => right.recordedAt.localeCompare(left.recordedAt));
@@ -80,6 +155,30 @@ export function DashboardScreen({ data }: { data: PracticeLoopReadModel }) {
   const linkedPracticeRecordings = recordings.filter(
     (recording) => recording.kind !== "lesson" && recording.sessionItemId,
   );
+  const pieceTotals = buildPracticeTotals(
+    completedSessionItems.filter((item) => item.pieceId),
+    (item) => item.pieceId ?? "",
+    (item) => item.pieceLabel,
+    (item) => item.actualSeconds,
+  );
+  const exerciseTotals = buildPracticeTotals(
+    completedSessionItems.filter((item) => item.exerciseId),
+    (item) => item.exerciseId ?? "",
+    (item) => item.exerciseLabel,
+    (item) => item.actualSeconds,
+  );
+  const practiceItemTotals = buildPracticeTotals(
+    completedSessionItems.filter((item) => item.practiceTaskId || item.title),
+    (item) => item.practiceTaskId ?? `session-item-${item.title}`,
+    (item) => item.taskLabel || item.title,
+    (item) => item.actualSeconds,
+  );
+  const sevenDayTotals = buildPracticeTotals(
+    completedSessionItems.filter((item) => isWithinLastSevenDays(item.recordedAt)),
+    (item) => item.recordedAt.slice(0, 10),
+    (item) => formatDateLabel(item.recordedAt),
+    (item) => item.actualSeconds,
+  ).sort((left, right) => right.id.localeCompare(left.id));
 
   return (
     <div className="space-y-8">
@@ -238,6 +337,28 @@ export function DashboardScreen({ data }: { data: PracticeLoopReadModel }) {
               {linkedPracticeRecordings.length}
             </p>
           </div>
+        </div>
+        <div className="mt-4 grid gap-3 xl:grid-cols-4">
+          <PracticeTotalsPanel
+            emptyLabel={t("noLoggedTimeYet")}
+            rows={pieceTotals}
+            title={t("byPiece")}
+          />
+          <PracticeTotalsPanel
+            emptyLabel={t("noLoggedTimeYet")}
+            rows={exerciseTotals}
+            title={t("byExercise")}
+          />
+          <PracticeTotalsPanel
+            emptyLabel={t("noLoggedTimeYet")}
+            rows={practiceItemTotals}
+            title={t("byPracticeItem")}
+          />
+          <PracticeTotalsPanel
+            emptyLabel={t("noLoggedTimeYet")}
+            rows={sevenDayTotals}
+            title={t("lastSevenDays")}
+          />
         </div>
         <div className="mt-3 overflow-hidden rounded-lg border border-stone-200 bg-white shadow-sm">
           {completedSessionItems.slice(0, 8).map((item) => (
