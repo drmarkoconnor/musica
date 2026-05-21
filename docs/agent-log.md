@@ -20,6 +20,52 @@ Keep entries concise. Put stable product truth in `project-brief.md`, current
 implementation truth in `current-state.md`, and priority sequencing in
 `roadmap.md`.
 
+## 2026-05-22 - Stream Lesson Blobs For Background Transcription
+
+Branch: `main`
+
+Implementation commit: `983675a`
+
+Work done:
+
+- Investigated Mark's report after a short clip transcription test.
+- Confirmed the browser `favicon.ico` 404 was cosmetic, but the latest
+  transcription job had stalled in `running` at `Preparing recording`.
+- Manually resumed the same job locally; it completed successfully with a
+  transcript, summary, and one practice candidate.
+- Updated the Netlify background function to call `connectLambda(event)` before
+  using Netlify Blobs.
+- Updated lesson audio materialization to stream Netlify Blob audio to a temp
+  file for transcription instead of loading the whole lesson blob into memory.
+- Added an SVG app icon so the browser no longer falls back to missing
+  `/favicon.ico`.
+
+Commands run:
+
+```bash
+git status -sb
+npx tsx -e ... latest transcription job query
+npx tsx -e ... runLessonTranscriptionJob
+npm run typecheck
+npm run build
+git diff --check
+git commit -m "Stream lesson blobs for transcription jobs"
+```
+
+Migration status: no database migration.
+
+What Mark should test next:
+
+- Reload the live app after deploy, open the same lesson, and confirm the
+  completed `Misty Counting` clip transcript appears.
+- Try one more short selected clip and confirm it moves beyond `Preparing
+  recording` into chunk progress.
+
+Known caveats:
+
+- If a Netlify background function is killed hard, a job may still remain in
+  `running`; the same job can be resumed by rerunning the job runner.
+
 ## 2026-05-21 - Background Transcription Queue And Dashboard Totals
 
 Branch: `main`

@@ -2,7 +2,7 @@
 
 Last updated: 2026-05-21
 
-Latest implementation commit: `ddc633c Add transcription jobs and practice dashboard totals`
+Latest implementation commit: `983675a Stream lesson blobs for transcription jobs`
 
 ## Working Environment
 
@@ -62,6 +62,9 @@ Important hosted env vars:
   3-minute audio chunks, update chunk/job progress in Neon, save partial
   transcript text as chunks complete, and can retry failed jobs without
   redoing already completed chunks.
+- The Netlify background transcription function initializes the Blobs context
+  explicitly and materializes lesson audio by streaming the blob to temp storage
+  before clipping, rather than loading the whole lesson into memory.
 - The lesson page now warns that Mark should listen first, select short useful
   clips, and make whole-lesson transcription a rare fallback.
 - Raw transcript is collapsed by default.
@@ -95,6 +98,7 @@ Important hosted env vars:
 - The shell and lesson view have first-pass iPad landscape polish: sticky app
   chrome, larger touch targets, a sticky lesson history panel, and a wider
   lesson workspace.
+- The app has an SVG icon to avoid favicon 404 console noise.
 - Repertoire now treats spine/core repertoire as one concept: the star toggle.
   The status dropdown is lifecycle-only: learning, maintenance, parked.
 
