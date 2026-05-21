@@ -20,6 +20,57 @@ Keep entries concise. Put stable product truth in `project-brief.md`, current
 implementation truth in `current-state.md`, and priority sequencing in
 `roadmap.md`.
 
+## 2026-05-21 - Background Transcription Queue And Dashboard Totals
+
+Branch: `main`
+
+Implementation commit: `ddc633c`
+
+Work done:
+
+- Reworked lesson transcription from a synchronous API request into durable
+  `transcription_jobs` and `transcription_job_chunks` rows.
+- Added a Netlify `transcribe-lesson-background` function and a shared local/job
+  runner that chunks audio into 3-minute transcription calls.
+- Added transcription status polling and visible queued/running/failed/complete
+  progress in the lesson modal.
+- Added lesson-page warnings to listen first, select short useful clips, and
+  reserve whole-lesson transcription for rare cases.
+- Added dashboard totals by piece, exercise, practice item, and recent day.
+- Added first-pass iPad landscape polish to the app shell and lesson workspace.
+
+Commands run:
+
+```bash
+npm run typecheck
+npm run db:generate
+npm run build
+npm run db:migrate
+git diff --check
+git commit -m "Add transcription jobs and practice dashboard totals"
+```
+
+Migration status:
+
+- Generated `drizzle/0006_hot_starfox.sql`.
+- Applied successfully to Neon with `npm run db:migrate`.
+
+What Mark should test next:
+
+- Open an imported lesson, make one short useful teaching clip, authorise
+  transcription, and watch the modal progress through queued/running/complete.
+- Check the dashboard on iPad landscape after a practice session with linked
+  piece/exercise/task items.
+- Only retry the previous 57-minute whole-lesson transcription as a proof test;
+  the normal workflow should be clip-first.
+
+Known caveats:
+
+- A very long full-lesson request still makes many paid OpenAI calls and may
+  leave the transcript saved while the later lesson-summary extraction fails.
+- Netlify background function logs should be checked if a live queued job does
+  not advance.
+
 ## 2026-05-21 - Chunk Full-Recording Transcription
 
 Branch: `main`

@@ -2,7 +2,7 @@
 
 Last updated: 2026-05-21
 
-Latest implementation commit: `0284bb9 Chunk full lesson transcription audio`
+Latest implementation commit: `ddc633c Add transcription jobs and practice dashboard totals`
 
 ## Working Environment
 
@@ -55,8 +55,15 @@ Important hosted env vars:
 - Segment transcription sends selected clips by default.
 - Full-recording transcription requires explicit confirmation if no segments are
   selected.
-- Password-gated transcription route calls OpenAI, saves transcript, writes
-  lesson summary, and inserts candidate lesson extracts.
+- Password-gated transcription now queues a durable transcription job and returns
+  immediately. On Netlify it invokes a `-background` function; locally it runs
+  the same job runner in the dev server process.
+- Transcription jobs split selected clips or rare full-lesson requests into
+  3-minute audio chunks, update chunk/job progress in Neon, save partial
+  transcript text as chunks complete, and can retry failed jobs without
+  redoing already completed chunks.
+- The lesson page now warns that Mark should listen first, select short useful
+  clips, and make whole-lesson transcription a rare fallback.
 - Raw transcript is collapsed by default.
 - Lesson summary is shown as compact bullet-style review.
 - Candidate practice items can be kept or discarded.
@@ -82,16 +89,22 @@ Important hosted env vars:
 - The Quartet accompaniment panel has been removed from the live practice UI.
 - Recordings can be deleted; practice recordings can be linked to repertoire
   pieces from `/recordings`.
-- The dashboard has a first-pass activity log from completed `session_items`.
+- The dashboard has activity totals from completed `session_items`, including
+  total time, logged items, sessions, linked recordings, and breakdowns by
+  piece, exercise, practice item, and the last 7 days.
+- The shell and lesson view have first-pass iPad landscape polish: sticky app
+  chrome, larger touch targets, a sticky lesson history panel, and a wider
+  lesson workspace.
 - Repertoire now treats spine/core repertoire as one concept: the star toggle.
   The status dropdown is lifecycle-only: learning, maintenance, parked.
 
 ## Latest Database Shape
 
-Latest migration: `drizzle/0005_sturdy_sabra.sql`
+Latest migration: `drizzle/0006_hot_starfox.sql`
 
-This adds `recordings.session_item_id` so practice passage recordings can attach
-to the exact item being practised, not only the overall session or piece.
+This adds `transcription_jobs` and `transcription_job_chunks`, plus supporting
+enums, so lesson transcription can run as a durable queued/background workflow
+with visible progress and resumable chunk state.
 
 ## Important Files
 
@@ -104,6 +117,10 @@ to the exact item being practised, not only the overall session or piece.
 - Lesson segment editor: `src/components/lesson-segment-review.tsx`
 - Audio player: `src/components/audio-strip.tsx`
 - Transcription API: `src/app/api/transcriptions/route.ts`
+- Transcription status API: `src/app/api/transcriptions/status/route.ts`
+- Transcription job runner: `src/lib/server/transcription-job.ts`
+- Netlify transcription background function:
+  `netlify/functions/transcribe-lesson-background.ts`
 - Lesson audio storage: `src/lib/server/lesson-audio-storage.ts`
 - Practice screen: `src/app/practice/practice-screen.tsx`
 - Chart aide memoir asset: `public/reference/chart-aide-memoir.png`
@@ -124,6 +141,7 @@ to the exact item being practised, not only the overall session or piece.
 
 ```bash
 npm run typecheck
+npm run db:generate
 npm run build
 npm run db:migrate
 git diff --check
@@ -136,11 +154,10 @@ git diff --check
   script and the initial archive import is complete. The next work is app-side
   review: open imported lessons, mark useful clips, and use the passworded
   transcription flow only on selected teaching segments.
-- Full-recording transcription is blocked for recordings over 60 minutes; long
-  lessons should usually be clipped first so the app sends only useful teaching
-  segments. When full-recording transcription is explicitly authorised for a
-  recording under 60 minutes, the server chunks audio into 10-minute
-  transcription calls to avoid OpenAI audio-token limits.
+- Full-recording transcription is blocked for recordings over 60 minutes and is
+  intentionally presented as a rare fallback. Under 60 minutes, the job runner
+  still chunks the audio into 3-minute calls, but Mark should usually create and
+  transcribe short useful clips first.
 - Long lesson recording still uploads a browser blob on stop; robust hour-long
   capture should eventually move toward chunked or resilient background storage.
 - Lesson segment editor has a first-pass chapter rail and review queue, but
@@ -148,8 +165,8 @@ git diff --check
 - AI-generated practice candidates may still need manual narrowing inside a
   clip.
 - Practice sessions now run and log active time to `session_items`, and the
-  dashboard shows first-pass totals. A richer session review/history view is
-  still needed.
+  dashboard shows useful first-pass totals by piece, exercise, practice item,
+  and recent day. A richer session review/history view is still needed.
 - Practice passage recordings can be saved, replayed, deleted, and linked to a
   piece, but not yet renamed inline or transcribed.
 - Repertoire add/edit supports current and target tempo in the modal. Row
@@ -169,22 +186,25 @@ git diff --check
 
 Current feedback to test next:
 
-1. Edit a practice-list item and confirm title, notes, confidence, importance,
+1. Open an imported lesson, select one short useful clip, authorise
+   transcription, and watch the queued/running/completed progress state.
+2. Retry the previously failed 57-minute lesson only if needed, confirming the
+   warning copy makes whole-lesson transcription feel exceptional.
+3. Review the dashboard on iPad landscape and confirm time totals by piece,
+   exercise, practice item, and recent days match recent practice sessions.
+4. Edit a practice-list item and confirm title, notes, confidence, importance,
    piece link, and frequency persist.
-2. Build a practice session from an existing practice-list item.
-3. Add a one-off session item and confirm it is clearly session-only.
-4. Start a live session, click rows to switch active items, mark one item `Done
+5. Build a practice session from an existing practice-list item.
+6. Add a one-off session item and confirm it is clearly session-only.
+7. Start a live session, click rows to switch active items, mark one item `Done
    and log time`, and confirm the next item advances in order.
-5. Use `Not today` and confirm it does not update last-practised metadata.
-6. Confirm no planned-duration labels are visible in the session builder.
-7. Confirm the Quartet area is gone.
-8. Delete a lesson/practice recording from `/recordings`.
-9. Link a practice recording to a repertoire piece and confirm it appears on the
+8. Use `Not today` and confirm it does not update last-practised metadata.
+9. Confirm no planned-duration labels are visible in the session builder.
+10. Confirm the Quartet area is gone.
+11. Delete a lesson/practice recording from `/recordings`.
+12. Link a practice recording to a repertoire piece and confirm it appears on the
    piece page.
-10. Check the dashboard activity log after completing timed practice items.
-11. Open imported archive lessons, confirm playback works, create a useful
-    clip, and transcribe only that selected clip.
-12. Later, add Mark's 12-keys graphic/reference card.
+13. Later, add Mark's 12-keys graphic/reference card.
 
 ## Current Git Notes
 

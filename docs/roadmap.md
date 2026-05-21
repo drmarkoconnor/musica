@@ -74,11 +74,19 @@ Next:
 
 ## Phase 5: Transcription, Lesson Memory, And Extraction
 
-Status: working for selected clips.
+Status: working for selected clips, with background queue/progress.
 
 Done:
 
 - Passworded transcription through OpenAI.
+- Durable transcription jobs and chunk rows in Neon.
+- Netlify background function for long-running transcription work.
+- 3-minute transcription chunks for selected clips and rare full-lesson retries.
+- Progress polling in the transcription modal.
+- Failed chunk/job state can be retried without redoing completed chunks when
+  the selected clip set is unchanged.
+- Lesson-page warnings steer Mark toward listening first and selecting short
+  clips, with whole-lesson transcription framed as a rare fallback.
 - Hidden raw transcript.
 - AI lesson summary.
 - Candidate practice extraction.
@@ -91,6 +99,8 @@ Next:
 - Better distinction between lesson memory, context note, practice note, and
   actual exercise.
 - Manual editing before saving candidate practice items.
+- Consider a transcription usage/cost ledger after the background flow has been
+  tested on real archive lessons.
 - Journal/diary-style lesson memory view in v2.
 
 ## Phase 6: Practice List And Repertoire Management
@@ -163,9 +173,10 @@ needs a clearer activity surface:
   explicitly labelled as session-only.
 - Practice recordings attach to the active `session_item` and should surface
   from the linked piece/task where available.
-- The dashboard has first-pass totals from completed session items.
-- A later dashboard should aggregate more deeply by day, piece, exercise,
-  practice task, and source.
+- The dashboard aggregates completed session-item time by day, piece, exercise,
+  and practice task.
+- A later dashboard should add drill-downs, session review, skips, confidence
+  changes, source/lesson links, and longer-range reflection views.
 
 ## Phase 8: Smart Resurfacing
 
@@ -249,6 +260,11 @@ Status: later.
 5. Test ordered advancement, row selection, `Done and log time`, and `Not
    today`.
 6. Test recording delete and practice-recording piece linking.
-7. Test the dashboard activity log after completing a timed item.
-8. Add Mark's 12-keys reference graphic/card when supplied.
-9. Continue richer session history and dashboard drill-downs.
+7. Test the dashboard totals after completing timed practice items linked to a
+   piece, an exercise, and a lesson-derived practice item.
+8. Open an imported archive lesson, create a short useful clip, authorise
+   transcription, and watch queued/running/completed progress.
+9. Treat full-lesson transcription as an exception; retry the previous
+   57-minute failure only to prove the 3-minute background chunk path works.
+10. Add Mark's 12-keys reference graphic/card when supplied.
+11. Continue richer session history and dashboard drill-downs.
