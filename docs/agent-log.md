@@ -24,7 +24,7 @@ implementation truth in `current-state.md`, and priority sequencing in
 
 Branch: `main`
 
-Commit: not committed yet.
+Commit: `0284bb9` (pushed to `origin/main`)
 
 Work done:
 
@@ -48,6 +48,7 @@ sed -n ... src/app/api/transcriptions/route.ts
 npm run typecheck
 npm run build
 git diff --check
+git push origin main
 ```
 
 Migration status: no database migration.
@@ -66,7 +67,7 @@ Known caveats:
 
 Branch: `main`
 
-Commit: not committed yet.
+Commit: `f645ac9` (pushed to `origin/main`)
 
 Work done:
 
@@ -97,6 +98,7 @@ npx tsx -e ... storage bucket count checks
 npm run typecheck
 npm run build
 git diff --check
+git push origin main
 ```
 
 Migration status: no schema migration. Data repair updated storage metadata for
@@ -120,14 +122,14 @@ Known caveats:
 
 - One old practice recording had already lost its temporary local audio file, so
   it is retained as metadata but no longer presented as playable.
-- Code changes still need to be committed/deployed for the live hydration and
-  long-transcription guard fixes.
+- Live deployment should include these fixes once Netlify finishes building
+  `main`.
 
 ## 2026-05-21 - Lesson Archive Import Completed
 
 Branch: `main`
 
-Commit: not committed yet.
+Commit: `f645ac9` (pushed to `origin/main`)
 
 Work done:
 
@@ -174,7 +176,7 @@ Known caveats:
 
 Branch: `main`
 
-Commit: not committed yet.
+Commit: `f645ac9` (pushed to `origin/main`)
 
 Work done:
 
@@ -226,7 +228,7 @@ Known caveats:
 
 Branch: `main`
 
-Commit: not committed yet.
+Commit: `f645ac9` (pushed to `origin/main`)
 
 Work done:
 

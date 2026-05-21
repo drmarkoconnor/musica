@@ -2,7 +2,7 @@
 
 Last updated: 2026-05-21
 
-Latest implementation commit: `d0df3ed Add practice chart aide memoir overlay`
+Latest implementation commit: `0284bb9 Chunk full lesson transcription audio`
 
 ## Working Environment
 
