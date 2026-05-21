@@ -137,8 +137,10 @@ git diff --check
   review: open imported lessons, mark useful clips, and use the passworded
   transcription flow only on selected teaching segments.
 - Full-recording transcription is blocked for recordings over 60 minutes; long
-  lessons should be clipped first so the app sends only useful teaching
-  segments.
+  lessons should usually be clipped first so the app sends only useful teaching
+  segments. When full-recording transcription is explicitly authorised for a
+  recording under 60 minutes, the server chunks audio into 10-minute
+  transcription calls to avoid OpenAI audio-token limits.
 - Long lesson recording still uploads a browser blob on stop; robust hour-long
   capture should eventually move toward chunked or resilient background storage.
 - Lesson segment editor has a first-pass chapter rail and review queue, but

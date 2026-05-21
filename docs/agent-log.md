@@ -20,6 +20,48 @@ Keep entries concise. Put stable product truth in `project-brief.md`, current
 implementation truth in `current-state.md`, and priority sequencing in
 `roadmap.md`.
 
+## 2026-05-21 - Chunk Full-Recording Transcription
+
+Branch: `main`
+
+Commit: not committed yet.
+
+Work done:
+
+- Investigated continued transcription failure after the 60-minute guard.
+- Found the latest failed transcript error from OpenAI:
+  `400 Total number of tokens in instructions + audio is too large for this model`.
+- Confirmed the failed recording was 57 minutes 37 seconds, so it correctly
+  passed the 60-minute app guard but was still too large for one transcription
+  model request.
+- Updated full-recording transcription so recordings over 10 minutes are clipped
+  into 10-minute chunks and transcribed sequentially.
+- Kept the overall full-recording guard at 60 minutes.
+
+Commands run:
+
+```bash
+git status -sb
+npx tsx -e ... latest transcript failure query
+npx tsx -e ... selected segment summary query
+sed -n ... src/app/api/transcriptions/route.ts
+npm run typecheck
+npm run build
+git diff --check
+```
+
+Migration status: no database migration.
+
+What Mark should test next:
+
+- Retry the failed 57-minute lesson full transcription after deploy, or better,
+  create useful clips and transcribe those.
+
+Known caveats:
+
+- Chunked full-recording transcription will make several OpenAI calls and may
+  take longer than short selected clips.
+
 ## 2026-05-21 - Audio Playback And Hydration Repair
 
 Branch: `main`

@@ -27,6 +27,7 @@ export const runtime = "nodejs";
 export const maxDuration = 300;
 
 const MAX_FULL_RECORDING_TRANSCRIPTION_SECONDS = 60 * 60;
+const MAX_TRANSCRIPTION_CHUNK_SECONDS = 10 * 60;
 
 type TranscriptionRequest = {
   lessonId?: unknown;
@@ -55,6 +56,28 @@ function formatTimestamp(totalSeconds: number) {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
+function fullRecordingChunks(durationSeconds: number) {
+  const chunks = [];
+
+  for (
+    let startsAtSeconds = 0, index = 0;
+    startsAtSeconds < durationSeconds;
+    startsAtSeconds += MAX_TRANSCRIPTION_CHUNK_SECONDS, index += 1
+  ) {
+    chunks.push({
+      endsAtSeconds: Math.min(
+        startsAtSeconds + MAX_TRANSCRIPTION_CHUNK_SECONDS,
+        durationSeconds,
+      ),
+      id: `full-recording-${index + 1}`,
+      startsAtSeconds,
+      title: `Full recording part ${index + 1}`,
+    });
+  }
+
+  return chunks;
 }
 
 async function markTranscriptFailed({
@@ -454,10 +477,47 @@ export async function POST(request: Request) {
         await clipped.cleanup();
       }
     } else {
-      const transcription = await transcribeAudioFile({ filePath: audioFile.filePath });
-      transcriptionText = transcription.text;
-      transcriptionModel = transcription.model;
-      transcriptionDurationMs = transcription.durationMs;
+      const recordingDurationSeconds = recording.durationSeconds ?? 0;
+
+      if (recordingDurationSeconds > MAX_TRANSCRIPTION_CHUNK_SECONDS) {
+        const { clipAudioSegments } = await import("@/lib/server/audio-segments");
+        const fullRecordingSegments = fullRecordingChunks(recordingDurationSeconds);
+        const clipped = await clipAudioSegments({
+          segments: fullRecordingSegments,
+          sourceFilePath: audioFile.filePath,
+        });
+
+        try {
+          const chunkTexts: string[] = [];
+
+          for (const [index, clippedSegment] of clipped.clippedSegments.entries()) {
+            const transcription = await transcribeAudioFile({
+              filePath: clippedSegment.filePath,
+            });
+            transcriptionModel = transcription.model;
+            transcriptionDurationMs += transcription.durationMs;
+            chunkTexts.push(
+              [
+                `[Full recording part ${index + 1}. Original audio ${formatTimestamp(
+                  clippedSegment.segment.startsAtSeconds,
+                )}-${formatTimestamp(clippedSegment.segment.endsAtSeconds)}.]`,
+                transcription.text,
+              ].join("\n"),
+            );
+          }
+
+          transcriptionText = chunkTexts.join("\n\n");
+        } finally {
+          await clipped.cleanup();
+        }
+      } else {
+        const transcription = await transcribeAudioFile({
+          filePath: audioFile.filePath,
+        });
+        transcriptionText = transcription.text;
+        transcriptionModel = transcription.model;
+        transcriptionDurationMs = transcription.durationMs;
+      }
     }
 
     const completedAt = new Date().toISOString();
