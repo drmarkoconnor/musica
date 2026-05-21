@@ -20,6 +20,51 @@ Keep entries concise. Put stable product truth in `project-brief.md`, current
 implementation truth in `current-state.md`, and priority sequencing in
 `roadmap.md`.
 
+## 2026-05-22 - Dashboard Lessons And Practice Session Cleanup
+
+Branch: `main`
+
+Implementation commit: `b7dc6c2`
+
+Work done:
+
+- Removed smart queue and recent lesson extraction cards from the dashboard.
+- Moved activity directly under the launch cards and added weekly practice bars
+  plus a simple practice-mix graphic.
+- Added a repertoire-piece dropdown to the practice session builder so any
+  active song can be added separately from smart queue suggestions.
+- Split practice passage "spoken note to future self" from general item notes,
+  saved it with practice recordings, and rendered it beside saved passages.
+- Changed `/lessons` to open on start/record controls plus lesson history
+  instead of auto-loading a lesson executive summary.
+- Added guarded deletion for empty lesson shells once their recordings have
+  already been removed.
+
+Commands run:
+
+```bash
+git status -sb
+npm run typecheck
+npm run build
+git diff --check
+git commit -m "Refine dashboard lessons and practice session flows"
+```
+
+Migration status: no database migration.
+
+What Mark should test next:
+
+- Dashboard: confirm activity and graphics are visible immediately.
+- Practice: add a non-smart-queue song, record a passage, and check the spoken
+  note appears beside the saved clip.
+- Lessons: confirm the page starts on controls/history and delete an empty
+  dummy lesson shell.
+
+Known caveats:
+
+- Empty lesson deletion is intentionally blocked while the lesson still has
+  recordings; delete those from `/recordings` first.
+
 ## 2026-05-22 - Stream Lesson Blobs For Background Transcription
 
 Branch: `main`

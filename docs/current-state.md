@@ -1,8 +1,8 @@
 # Practice Loop Current State
 
-Last updated: 2026-05-21
+Last updated: 2026-05-22
 
-Latest implementation commit: `983675a Stream lesson blobs for transcription jobs`
+Latest implementation commit: `b7dc6c2 Refine dashboard lessons and practice session flows`
 
 ## Working Environment
 
@@ -95,9 +95,20 @@ Important hosted env vars:
 - The dashboard has activity totals from completed `session_items`, including
   total time, logged items, sessions, linked recordings, and breakdowns by
   piece, exercise, practice item, and the last 7 days.
+- The dashboard is now activity-first: smart queue and recent lesson extraction
+  cards are off the dashboard, and activity has simple weekly bar and practice
+  mix graphics above the detailed log.
 - The shell and lesson view have first-pass iPad landscape polish: sticky app
   chrome, larger touch targets, a sticky lesson history panel, and a wider
   lesson workspace.
+- `/practice` can add any active repertoire piece directly from a dropdown,
+  separately from the smart queue and practice-list item dropdown.
+- Practice passage recordings have a dedicated "spoken note to future self"
+  field that is saved with the recording and rendered beside saved passages in
+  the live session and on `/recordings`.
+- `/lessons` now opens on start/record controls plus lesson history, without
+  auto-loading the latest lesson summary. Empty lesson shells can be deleted
+  after their recordings have been removed.
 - The app has an SVG icon to avoid favicon 404 console noise.
 - Repertoire now treats spine/core repertoire as one concept: the star toggle.
   The status dropdown is lifecycle-only: learning, maintenance, parked.
@@ -135,6 +146,7 @@ with visible progress and resumable chunk state.
   `src/app/api/practice-recordings/[recordingId]/route.ts`
 - Lesson recording delete API:
   `src/app/api/lesson-recordings/[recordingId]/route.ts`
+- Empty lesson delete API: `src/app/api/lessons/[lessonId]/route.ts`
 - Practice audio storage: `src/lib/server/practice-audio-storage.ts`
 - Lead sheet upload: `src/app/api/piece-assets/upload/route.ts`
 - Lead sheet file route: `src/app/api/piece-assets/[assetId]/file/route.ts`
@@ -190,25 +202,32 @@ git diff --check
 
 Current feedback to test next:
 
-1. Open an imported lesson, select one short useful clip, authorise
+1. Open `/dashboard` and confirm activity appears directly under the launch
+   cards, with weekly and practice-mix graphics.
+2. Start a practice session, add a repertoire piece that is not in the smart
+   queue, record a passage with a spoken future-self note, and confirm the note
+   appears beside the saved passage.
+3. Open `/lessons` and confirm it starts on controls/history; delete an empty
+   lesson shell after removing its recordings.
+4. Open an imported lesson, select one short useful clip, authorise
    transcription, and watch the queued/running/completed progress state.
-2. Retry the previously failed 57-minute lesson only if needed, confirming the
+5. Retry the previously failed 57-minute lesson only if needed, confirming the
    warning copy makes whole-lesson transcription feel exceptional.
-3. Review the dashboard on iPad landscape and confirm time totals by piece,
+6. Review the dashboard on iPad landscape and confirm time totals by piece,
    exercise, practice item, and recent days match recent practice sessions.
-4. Edit a practice-list item and confirm title, notes, confidence, importance,
+7. Edit a practice-list item and confirm title, notes, confidence, importance,
    piece link, and frequency persist.
-5. Build a practice session from an existing practice-list item.
-6. Add a one-off session item and confirm it is clearly session-only.
-7. Start a live session, click rows to switch active items, mark one item `Done
+8. Build a practice session from an existing practice-list item.
+9. Add a one-off session item and confirm it is clearly session-only.
+10. Start a live session, click rows to switch active items, mark one item `Done
    and log time`, and confirm the next item advances in order.
-8. Use `Not today` and confirm it does not update last-practised metadata.
-9. Confirm no planned-duration labels are visible in the session builder.
-10. Confirm the Quartet area is gone.
-11. Delete a lesson/practice recording from `/recordings`.
-12. Link a practice recording to a repertoire piece and confirm it appears on the
+11. Use `Not today` and confirm it does not update last-practised metadata.
+12. Confirm no planned-duration labels are visible in the session builder.
+13. Confirm the Quartet area is gone.
+14. Delete a lesson/practice recording from `/recordings`.
+15. Link a practice recording to a repertoire piece and confirm it appears on the
    piece page.
-13. Later, add Mark's 12-keys graphic/reference card.
+16. Later, add Mark's 12-keys graphic/reference card.
 
 ## Current Git Notes
 

@@ -1,6 +1,6 @@
 # Practice Loop Roadmap
 
-Last updated: 2026-05-21
+Last updated: 2026-05-22
 
 ## Roadmap Rule
 
@@ -50,6 +50,9 @@ Done:
 
 - Browser lesson recording.
 - Lesson creation and recording metadata.
+- Lesson screen opens on start/record controls and history rather than
+  auto-loading a previous summary.
+- Empty lesson shells can be deleted after their recordings have been removed.
 - Protected audio playback.
 - Teaching segment creation and adjustment.
 - Selected segment minute preview before transcription.
@@ -117,6 +120,8 @@ Done:
 - Repertoire rows link to piece pages.
 - Lead sheets attached to pieces.
 - Practice session builder can pick existing practice-list items.
+- Practice session builder can add any active repertoire piece from a dedicated
+  song dropdown, separate from smart queue suggestions.
 - Spine/core tune is now a single visible concept: the star toggle. The status
   dropdown is lifecycle-only.
 
@@ -147,6 +152,8 @@ Done:
 - Clickable/selectable session rows with ordered next-item advancement.
 - Planned-duration labels removed from the visible session UI.
 - Attach short practice recordings to the active session item.
+- Save and display a dedicated spoken note to future self with practice passage
+  recordings.
 - Quartet accompaniment area removed.
 - Optional chart aide memoir overlay when a live practice session starts.
 
@@ -173,8 +180,9 @@ needs a clearer activity surface:
   explicitly labelled as session-only.
 - Practice recordings attach to the active `session_item` and should surface
   from the linked piece/task where available.
-- The dashboard aggregates completed session-item time by day, piece, exercise,
-  and practice task.
+- The dashboard is activity-first and aggregates completed session-item time by
+  day, piece, exercise, and practice task, with simple weekly and practice-mix
+  graphics.
 - A later dashboard should add drill-downs, session review, skips, confidence
   changes, source/lesson links, and longer-range reflection views.
 
@@ -260,11 +268,15 @@ Status: later.
 5. Test ordered advancement, row selection, `Done and log time`, and `Not
    today`.
 6. Test recording delete and practice-recording piece linking.
-7. Test the dashboard totals after completing timed practice items linked to a
+7. Test the dashboard totals and graphics after completing timed practice items linked to a
    piece, an exercise, and a lesson-derived practice item.
-8. Open an imported archive lesson, create a short useful clip, authorise
+8. In `/practice`, add a repertoire piece that is not in the smart queue, record
+   a passage, and confirm its future-self note persists.
+9. Open `/lessons`, confirm it starts with controls/history, and delete an empty
+   lesson shell after deleting its recordings.
+10. Open an imported archive lesson, create a short useful clip, authorise
    transcription, and watch queued/running/completed progress.
-9. Treat full-lesson transcription as an exception; retry the previous
+11. Treat full-lesson transcription as an exception; retry the previous
    57-minute failure only to prove the 3-minute background chunk path works.
-10. Add Mark's 12-keys reference graphic/card when supplied.
-11. Continue richer session history and dashboard drill-downs.
+12. Add Mark's 12-keys reference graphic/card when supplied.
+13. Continue richer session history and dashboard drill-downs.
