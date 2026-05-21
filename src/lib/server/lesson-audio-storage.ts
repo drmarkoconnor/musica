@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import {
@@ -125,6 +125,12 @@ export async function materializeLessonAudioFile({
   const filePath = localLessonAudioPath(storageBucket, storagePath);
 
   if (filePath) {
+    try {
+      await access(filePath);
+    } catch {
+      return null;
+    }
+
     return {
       cleanup: async () => {},
       filePath,

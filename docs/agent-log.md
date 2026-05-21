@@ -20,6 +20,218 @@ Keep entries concise. Put stable product truth in `project-brief.md`, current
 implementation truth in `current-state.md`, and priority sequencing in
 `roadmap.md`.
 
+## 2026-05-21 - Audio Playback And Hydration Repair
+
+Branch: `main`
+
+Commit: not committed yet.
+
+Work done:
+
+- Investigated Mark's browser errors after the archive import.
+- Confirmed the reported recording ID was an older `local-lesson-audio` row,
+  not an archive import.
+- Migrated 2 legacy local lesson recordings and 2 local test-audio lesson rows
+  to Netlify Blobs, then updated their Neon metadata.
+- Marked 1 stale local practice recording as non-playable because its temporary
+  local file no longer exists.
+- Added hosted read-model filtering for local-only audio buckets.
+- Replaced default `toLocaleDateString()` rendering with deterministic date
+  labels to avoid React hydration text mismatches.
+- Made local missing lesson audio return unavailable before transcription
+  rather than falling into a long failing request.
+- Blocked full-recording transcription for recordings over 60 minutes and
+  improved transcription error display so non-password failures show their
+  actual server message.
+
+Commands run:
+
+```bash
+npx tsx -e ... inspect reported lesson_recording
+curl -i -H 'Range: bytes=0-0' .../api/lesson-recordings/fdba.../file
+npx tsx ... migrate legacy local lesson recordings to Netlify Blobs
+npx tsx ... migrate local test-audio lesson rows and mark stale practice row
+npx tsx -e ... storage bucket count checks
+npm run typecheck
+npm run build
+git diff --check
+```
+
+Migration status: no schema migration. Data repair updated storage metadata for
+legacy local audio rows.
+
+Verification:
+
+- The reported `fdba...` recording now returns `206 Partial Content` locally
+  through the protected file route.
+- An imported archive recording also returns `206 Partial Content`.
+- All `lesson_recordings` rows now use `storage_bucket = netlify-blobs`.
+
+What Mark should test next:
+
+- Reload the live site and `/recordings` after the next deployment.
+- Confirm the console no longer shows React #418 hydration errors.
+- Play the previously failing lesson recording.
+- On a long archive lesson, create a useful clip before transcribing.
+
+Known caveats:
+
+- One old practice recording had already lost its temporary local audio file, so
+  it is retained as metadata but no longer presented as playable.
+- Code changes still need to be committed/deployed for the live hydration and
+  long-transcription guard fixes.
+
+## 2026-05-21 - Lesson Archive Import Completed
+
+Branch: `main`
+
+Commit: not committed yet.
+
+Work done:
+
+- Ran the private `lessonrecordings/` archive write import.
+- Uploaded 31 non-duplicate lesson recordings to Netlify Blobs.
+- Inserted 31 matching imported `lessons` rows and 31 `lesson_recordings` rows
+  in Neon.
+- Skipped 4 exact duplicate audio files.
+- Verified imported database rows span 2024-10-02 through 2026-04-10.
+- Updated import/current-state/roadmap docs.
+
+Commands run:
+
+```bash
+node -e ... DATABASE_URL/NETLIFY_SITE_ID/NETLIFY_BLOBS_TOKEN presence check
+npm run lessons:import-recordings -- --source lessonrecordings --write
+npx tsx -e ... imported lesson_recordings count check
+npx tsx -e ... imported lessons count check
+```
+
+Migration status: no database migration.
+
+Import status:
+
+- Complete: 31 imported, 4 duplicates skipped.
+- No transcription or OpenAI calls were run.
+- Result manifest is local and ignored:
+  `lessonrecordings/.practice-loop-import-result.json`.
+
+What Mark should test next:
+
+- Open `/lessons` and confirm imported archive lessons appear.
+- Play one imported recording through the protected audio route.
+- Create one useful teaching clip and run passworded transcription only for the
+  selected clip.
+
+Known caveats:
+
+- The archive importer is intentionally sequential and quiet during upload.
+- Future archive additions can be rerun with the same command; existing storage
+  paths should be treated idempotently.
+
+## 2026-05-21 - Lesson Archive Importer
+
+Branch: `main`
+
+Commit: not committed yet.
+
+Work done:
+
+- Added `scripts/import-lesson-recordings.ts`.
+- Added `npm run lessons:import-recordings`.
+- The importer dry-runs by default, reads duration and embedded creation time
+  with `ffprobe`, hashes files, skips exact duplicate audio, and writes its
+  private manifest inside ignored `lessonrecordings/`.
+- Write mode is designed to upload non-duplicate archive audio to Netlify Blobs
+  and insert `lessons`/`lesson_recordings` metadata without transcription.
+- Updated `.env.example`, `docs/current-state.md`, `docs/roadmap.md`, and
+  `docs/lesson-recording-import-plan.md`.
+
+Commands run:
+
+```bash
+git status -sb
+git log --oneline -5
+npm run lessons:import-recordings -- --source lessonrecordings --dry-run
+npm run lessons:import-recordings -- --source lessonrecordings --write --limit 1
+npm run typecheck
+npm run build
+git check-ignore -v lessonrecordings/.practice-loop-import-dry-run.json
+git diff --check
+```
+
+Migration status: no database migration.
+
+Import status:
+
+- Dry-run succeeded: 35 audio files discovered, 31 selected, 4 exact duplicates
+  skipped, about 31.35 selected audio hours.
+- Write mode stopped before upload or DB writes because local Netlify Blob
+  credentials are missing.
+
+What Mark should do next:
+
+- Add `NETLIFY_SITE_ID` and `NETLIFY_BLOBS_TOKEN` to `.env.local`.
+- Run `npm run lessons:import-recordings -- --source lessonrecordings --write`.
+- Open `/lessons`, confirm archive lessons appear, and process useful clips
+  through the existing passworded transcription flow.
+
+Known caveats:
+
+- The importer does not call OpenAI or create transcripts.
+- It relies on `ffprobe` being available on the local PATH.
+
+## 2026-05-21 - Private Lesson Recording Archive Investigation
+
+Branch: `main`
+
+Commit: not committed yet.
+
+Work done:
+
+- Audited the new private `lessonrecordings/` source archive without importing,
+  uploading, or transcribing any audio.
+- Confirmed the archive is about 35 `.m4a` files, 549 MB, and 35.8 hours.
+- Found 4 exact duplicate pairs by SHA-256 hash.
+- Confirmed embedded M4A `creation_time` metadata is reliable enough to drive
+  lesson dates where filenames are ambiguous.
+- Added `lessonrecordings/` to `.gitignore`.
+- Added `docs/lesson-recording-import-plan.md` with the recommended Blob-backed
+  metadata import path.
+- Updated `docs/current-state.md` and `docs/roadmap.md`.
+
+Commands run:
+
+```bash
+git status -sb
+git log --oneline -5
+sed -n ... docs/project-brief.md docs/current-state.md docs/roadmap.md docs/agent-log.md
+sed -n ... src/db/schema.ts src/lib/server/lesson-audio-storage.ts
+sed -n ... src/app/api/lesson-recordings/upload/route.ts
+sed -n ... src/app/api/transcriptions/route.ts
+find lessonrecordings ...
+du -sh lessonrecordings
+ffprobe ...
+shasum -a 256 ...
+git check-ignore -v lessonrecordings ...
+```
+
+Migration status: no database migration and no database writes.
+
+What to test next:
+
+- Implement a dry-run archive importer that creates a local manifest and skips
+  duplicate hashes.
+- Choose whether the first real import should target Netlify Blobs for hosted
+  playback/transcription or a local-only ignored folder for trial review.
+- After import, review lessons manually and transcribe selected teaching clips,
+  not the whole archive by default.
+
+Known caveats:
+
+- Hosted Netlify cannot play local-only archive files; hosted use needs private
+  object storage.
+- No build was needed for `.gitignore` and documentation-only changes.
+
 ## 2026-05-21 - Chart Aide Memoir Overlay
 
 Branch: `practice-session-repertoire-roadmap`

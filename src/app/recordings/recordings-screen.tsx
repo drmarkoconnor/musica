@@ -9,7 +9,19 @@ import { Section } from "@/components/section";
 import { StatusPill } from "@/components/status-pill";
 import type { PracticeLoopReadModel } from "@/lib/data";
 import { useLanguage } from "@/lib/language";
-import { formatDuration } from "@/lib/utils";
+import { formatDateLabel, formatDuration } from "@/lib/utils";
+
+function lessonRecordingAudioSrc(recording: { id: string; storageBucket: string }) {
+  if (
+    recording.storageBucket === "local-test-audio" ||
+    recording.storageBucket === "local-lesson-audio" ||
+    recording.storageBucket === "netlify-blobs"
+  ) {
+    return `/api/lesson-recordings/${recording.id}/file`;
+  }
+
+  return undefined;
+}
 
 function practiceRecordingAudioSrc(recording: { id: string; storageBucket: string }) {
   if (
@@ -99,6 +111,7 @@ export function RecordingsScreen({ data }: { data: PracticeLoopReadModel }) {
         <div className="space-y-3">
           {sortedLessonRecordings.map((recording) => {
             const lesson = lessons.find((item) => item.id === recording.lessonId);
+            const audioSrc = lessonRecordingAudioSrc(recording);
             const pendingId = `lesson:${recording.id}`;
             const isConfirmingDelete = pendingDeleteId === pendingId;
             const isSaving = savingId === pendingId;
@@ -124,14 +137,11 @@ export function RecordingsScreen({ data }: { data: PracticeLoopReadModel }) {
                   </div>
                   <StatusPill tone="blue">{t("lessons")}</StatusPill>
                 </div>
-                <AudioStrip
-                  audioSrc={`/api/lesson-recordings/${recording.id}/file`}
-                  title={recording.title}
-                />
+                <AudioStrip audioSrc={audioSrc} title={recording.title} />
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                   <span className="text-xs font-medium text-stone-500">
                     {formatDuration(recording.durationSeconds)} /{" "}
-                    {new Date(recording.recordedAt).toLocaleDateString()}
+                    {formatDateLabel(recording.recordedAt)}
                   </span>
                   <button
                     className="inline-flex items-center gap-2 rounded-md border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-800 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"

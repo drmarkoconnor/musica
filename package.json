@@ -14,6 +14,7 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx scripts/seed.ts",
+    "lessons:import-recordings": "tsx scripts/import-lesson-recordings.ts",
     "leadsheets:import": "tsx scripts/import-leadsheets.ts",
     "ai:transcribe:test": "tsx scripts/transcribe-test-audio.ts"
   },

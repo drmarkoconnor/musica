@@ -8,6 +8,8 @@ import { cn } from "@/lib/utils";
 
 type RequestState = "idle" | "loading" | "success" | "error";
 
+const MAX_FULL_RECORDING_TRANSCRIPTION_SECONDS = 60 * 60;
+
 export function TranscriptionGate({
   lessonId,
   recordingDurationSeconds,
@@ -29,6 +31,9 @@ export function TranscriptionGate({
   const [requestState, setRequestState] = useState<RequestState>("idle");
   const [message, setMessage] = useState("");
   const hasSelectedSegments = selectedSegmentCount > 0;
+  const isFullRecordingTooLong =
+    !hasSelectedSegments &&
+    recordingDurationSeconds > MAX_FULL_RECORDING_TRANSCRIPTION_SECONDS;
   const selectedMinutes = Math.ceil(selectedSegmentSeconds / 60);
   const fullRecordingMinutes = Math.ceil((recordingDurationSeconds || 0) / 60);
 
@@ -49,8 +54,11 @@ export function TranscriptionGate({
     });
 
     if (!response.ok) {
+      const body = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
       setRequestState("error");
-      setMessage(t("passwordFailed"));
+      setMessage(body?.error ?? t("passwordFailed"));
       return;
     }
 
@@ -122,6 +130,13 @@ export function TranscriptionGate({
                       {selectedSegmentCount} / {selectedMinutes} {t("minutes")}
                     </strong>
                   </p>
+                ) : isFullRecordingTooLong ? (
+                  <p>
+                    {t("fullRecordingTooLong")}{" "}
+                    <strong>
+                      {fullRecordingMinutes} {t("minutes")}
+                    </strong>
+                  </p>
                 ) : (
                   <div className="space-y-2">
                     <p>
@@ -184,7 +199,8 @@ export function TranscriptionGate({
                   disabled={
                     requestState === "loading" ||
                     password.length === 0 ||
-                    (!hasSelectedSegments && !includeFullRecording)
+                    (!hasSelectedSegments &&
+                      (isFullRecordingTooLong || !includeFullRecording))
                   }
                   type="submit"
                 >

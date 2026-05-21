@@ -26,6 +26,8 @@ import { getTestAudioFixture } from "@/lib/server/test-audio-fixtures";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
+const MAX_FULL_RECORDING_TRANSCRIPTION_SECONDS = 60 * 60;
+
 type TranscriptionRequest = {
   lessonId?: unknown;
   recordingId?: unknown;
@@ -388,6 +390,20 @@ export async function POST(request: Request) {
         {
           error:
             "No teaching segments selected. Confirm full-recording transcription to continue.",
+        },
+        { status: 400 },
+      );
+    }
+
+    if (
+      selectedSegments.length === 0 &&
+      body.includeFullRecording === true &&
+      (recording.durationSeconds ?? 0) > MAX_FULL_RECORDING_TRANSCRIPTION_SECONDS
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "This recording is too long for full-recording transcription. Create one or more teaching clips and transcribe the selected clips instead.",
         },
         { status: 400 },
       );

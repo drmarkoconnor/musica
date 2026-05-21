@@ -106,13 +106,23 @@ function mergeWithFallback(model: PracticeLoopReadModel): PracticeLoopReadModel 
   const visiblePieceAssets = isHostedApp
     ? model.pieceAssets.filter((asset) => asset.storageBucket !== "local-docs")
     : model.pieceAssets;
+  const visibleLessonRecordings = isHostedApp
+    ? model.lessonRecordings.filter(
+        (recording) => recording.storageBucket === "netlify-blobs",
+      )
+    : model.lessonRecordings;
+  const visibleRecordings = isHostedApp
+    ? model.recordings.filter(
+        (recording) => recording.storageBucket === "netlify-blobs",
+      )
+    : model.recordings;
 
   return {
     tags: model.tags.length > 0 ? model.tags : fallback.tags,
     pieces: model.pieces.length > 0 ? model.pieces : fallback.pieces,
     exercises: model.exercises.length > 0 ? model.exercises : fallback.exercises,
     lessons: model.lessons,
-    lessonRecordings: model.lessonRecordings,
+    lessonRecordings: visibleLessonRecordings,
     lessonSegments: model.lessonSegments,
     lessonSegmentTranscripts: model.lessonSegmentTranscripts,
     transcripts: model.transcripts,
@@ -127,7 +137,7 @@ function mergeWithFallback(model: PracticeLoopReadModel): PracticeLoopReadModel 
         ? model.practiceSessions
         : fallback.practiceSessions,
     sessionItems: model.sessionItems,
-    recordings: model.recordings,
+    recordings: visibleRecordings,
     smartQueue:
       model.smartQueue.length > 0
         ? model.smartQueue

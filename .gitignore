@@ -11,6 +11,7 @@ docs/test-audio/
 docs/lesson-recordings/
 docs/practice-recordings/
 docs/piece-assets/
+lessonrecordings/
 
 .env
 .env.*

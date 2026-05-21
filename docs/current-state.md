@@ -1,6 +1,6 @@
 # Practice Loop Current State
 
-Last updated: 2026-05-20
+Last updated: 2026-05-21
 
 Latest implementation commit: `d0df3ed Add practice chart aide memoir overlay`
 
@@ -21,6 +21,8 @@ Important hosted env vars:
 - `TRANSCRIPTION_PASSWORD`
 - `OPENAI_API_KEY`
 - `DATABASE_URL`
+- `NETLIFY_SITE_ID` required for local scripts that write directly to Netlify
+  Blobs
 - `NETLIFY_BLOBS_TOKEN` optional fallback
 - `PRACTICE_LOOP_AUDIO_STORAGE=netlify-blobs` optional local override
 - `PRACTICE_LOOP_ASSET_STORAGE=netlify-blobs` optional local override
@@ -35,10 +37,18 @@ Important hosted env vars:
 - Import/upload lead sheets through `/assets/leadsheets`.
 - Lead-sheet PDFs/images stored in Netlify Blobs on hosted app, with metadata in
   `piece_assets`.
+- A private local source archive, `lessonrecordings/`, exists for older lesson
+  audio and is ignored by git. The first archive import uploaded 31
+  non-duplicate recordings to Netlify Blobs, inserted matching `lessons` and
+  `lesson_recordings` rows in Neon, and skipped 4 exact duplicates.
+- Legacy local lesson/test recordings have also been moved to Netlify Blobs, so
+  all `lesson_recordings` rows now use `storage_bucket = netlify-blobs`.
 - Create lessons and record live lesson audio in browser.
 - Starting a live lesson recording clears the previous lesson context and saves a
   fresh timestamped lesson when stopped.
 - Play lesson recordings through protected server routes.
+- Hosted read-model filtering hides local-only audio records that cannot be
+  served by Netlify.
 - Mark useful lesson clips before transcription.
 - Lesson clip review now has an audio-first chapter rail and created-clip review
   queue, so saved clip titles and notes can be edited before transcription.
@@ -107,6 +117,8 @@ to the exact item being practised, not only the overall session or piece.
 - Practice audio storage: `src/lib/server/practice-audio-storage.ts`
 - Lead sheet upload: `src/app/api/piece-assets/upload/route.ts`
 - Lead sheet file route: `src/app/api/piece-assets/[assetId]/file/route.ts`
+- Private lesson archive import plan:
+  `docs/lesson-recording-import-plan.md`
 
 ## Commands Recently Verified
 
@@ -120,6 +132,13 @@ git diff --check
 ## Known Gaps
 
 - Arbitrary lesson audio upload still has placeholder UI.
+- Bulk import for the private `lessonrecordings/` archive has a dry-run/write
+  script and the initial archive import is complete. The next work is app-side
+  review: open imported lessons, mark useful clips, and use the passworded
+  transcription flow only on selected teaching segments.
+- Full-recording transcription is blocked for recordings over 60 minutes; long
+  lessons should be clipped first so the app sends only useful teaching
+  segments.
 - Long lesson recording still uploads a browser blob on stop; robust hour-long
   capture should eventually move toward chunked or resilient background storage.
 - Lesson segment editor has a first-pass chapter rail and review queue, but
@@ -161,7 +180,9 @@ Current feedback to test next:
 9. Link a practice recording to a repertoire piece and confirm it appears on the
    piece page.
 10. Check the dashboard activity log after completing timed practice items.
-11. Later, add Mark's 12-keys graphic/reference card.
+11. Open imported archive lessons, confirm playback works, create a useful
+    clip, and transcribe only that selected clip.
+12. Later, add Mark's 12-keys graphic/reference card.
 
 ## Current Git Notes
 

@@ -62,6 +62,8 @@ export const translations = {
     selectedSegmentsWillTranscribe: "Selected teaching segments will be transcribed:",
     noSegmentsWillTranscribeFull:
       "No teaching segments are selected. This would transcribe the full recording:",
+    fullRecordingTooLong:
+      "This recording is too long to send whole. Create one or more teaching clips first:",
     confirmFullTranscription: "I understand this will send the full recording.",
     password: "Password",
     authorise: "Authorise",
@@ -341,6 +343,8 @@ export const translations = {
       "Saranno trascritti i segmenti didattici selezionati:",
     noSegmentsWillTranscribeFull:
       "Nessun segmento didattico e selezionato. Questo trascriverebbe tutta la registrazione:",
+    fullRecordingTooLong:
+      "Questa registrazione e troppo lunga da inviare intera. Crea prima uno o piu segmenti didattici:",
     confirmFullTranscription:
       "Ho capito che verra inviata tutta la registrazione.",
     password: "Password",

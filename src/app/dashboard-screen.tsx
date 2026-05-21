@@ -17,7 +17,7 @@ import { StatusPill } from "@/components/status-pill";
 import type { PracticeLoopReadModel } from "@/lib/data";
 import { useLanguage } from "@/lib/language";
 import { pieceTempoLabel } from "@/lib/piece-labels";
-import { formatDuration } from "@/lib/utils";
+import { formatDateLabel, formatDuration } from "@/lib/utils";
 
 export function DashboardScreen({ data }: { data: PracticeLoopReadModel }) {
   const { t } = useLanguage();
@@ -251,7 +251,7 @@ export function DashboardScreen({ data }: { data: PracticeLoopReadModel }) {
                 </p>
                 <p className="text-xs text-stone-500">
                   {item.recordedAt
-                    ? new Date(item.recordedAt).toLocaleDateString()
+                    ? formatDateLabel(item.recordedAt)
                     : t("notYet")}
                 </p>
               </div>

@@ -1,6 +1,6 @@
 # Practice Loop Roadmap
 
-Last updated: 2026-05-20
+Last updated: 2026-05-21
 
 ## Roadmap Rule
 
@@ -56,10 +56,17 @@ Done:
 - Server-side ffmpeg clipping before transcription.
 - Audio-first chapter rail for long lesson orientation.
 - Created-clip review queue with title and note editing before transcription.
+- Private archive dry-run importer for `lessonrecordings/`, with exact duplicate
+  detection and no transcription side effects.
+- Initial private archive import: 31 non-duplicate recordings uploaded to
+  Netlify Blobs and linked into Neon lesson metadata, with 4 exact duplicates
+  skipped.
 
 Next:
 
 - Arbitrary audio upload.
+- Review imported archive lessons in the app, create useful teaching clips, and
+  transcribe selected clips only.
 - Better long-recording studio: split, merge, chunk creation, true waveform
   data, deeper zoom/focus editing, and clearer clip states.
 - More nuanced start/end editing beyond the original 30 second pre-roll and 10
@@ -232,12 +239,16 @@ Status: later.
 
 ## Immediate Next Best Steps
 
-1. Test the new practice-list edit flow.
-2. Test building a session from existing practice-list items plus one-off
+1. Open `/lessons` and confirm imported archive lessons play through the
+   protected audio route.
+2. Create one useful teaching clip from an imported lesson and transcribe only
+   that selected clip.
+3. Test the new practice-list edit flow.
+4. Test building a session from existing practice-list items plus one-off
    session items.
-3. Test ordered advancement, row selection, `Done and log time`, and `Not
+5. Test ordered advancement, row selection, `Done and log time`, and `Not
    today`.
-4. Test recording delete and practice-recording piece linking.
-5. Test the dashboard activity log after completing a timed item.
-6. Add Mark's 12-keys reference graphic/card when supplied.
-7. Continue richer session history and dashboard drill-downs.
+6. Test recording delete and practice-recording piece linking.
+7. Test the dashboard activity log after completing a timed item.
+8. Add Mark's 12-keys reference graphic/card when supplied.
+9. Continue richer session history and dashboard drill-downs.
