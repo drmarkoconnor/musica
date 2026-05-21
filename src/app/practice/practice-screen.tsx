@@ -7,8 +7,10 @@ import {
   Clock3,
   ListPlus,
   Loader2,
+  MessageSquareText,
   Minus,
   Mic2,
+  Music2,
   Pause,
   Play,
   Plus,
@@ -25,6 +27,7 @@ import type { PracticeLoopReadModel } from "@/lib/data";
 import { useLanguage } from "@/lib/language";
 import type {
   Confidence,
+  Piece,
   PracticeTask,
   Recording,
   SessionItemStatus,
@@ -138,10 +141,14 @@ export function PracticeScreen({ data }: { data: PracticeLoopReadModel }) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [customTitle, setCustomTitle] = useState("");
+  const [selectedPieceId, setSelectedPieceId] = useState("");
   const [selectedPracticeTaskId, setSelectedPracticeTaskId] = useState("");
   const [chartAideMemoirEnabled, setChartAideMemoirEnabled] = useState(false);
   const [isChartAideMemoirOpen, setIsChartAideMemoirOpen] = useState(false);
   const [notesByItem, setNotesByItem] = useState<Record<string, string>>({});
+  const [spokenNoteByItem, setSpokenNoteByItem] = useState<Record<string, string>>(
+    {},
+  );
   const [confidenceByItem, setConfidenceByItem] = useState<
     Record<string, Confidence | undefined>
   >({});
@@ -194,6 +201,9 @@ export function PracticeScreen({ data }: { data: PracticeLoopReadModel }) {
   const selectablePracticeTasks = data.practiceTasks
     .filter((task) => task.status !== "parked" && task.status !== "mastered")
     .sort((left, right) => left.title.localeCompare(right.title));
+  const selectablePieces = data.pieces
+    .filter((piece) => piece.status !== "parked")
+    .sort((left, right) => left.title.localeCompare(right.title));
 
   function sourceLabelFor(item: SmartQueueItem) {
     if (item.kind === "lesson_task") return t("sourceLesson");
@@ -230,6 +240,21 @@ export function PracticeScreen({ data }: { data: PracticeLoopReadModel }) {
       taskId: task.id,
       pieceId: task.linkedPieceId,
       exerciseId: task.linkedExerciseId,
+      status: "planned",
+      actualSeconds: 0,
+    };
+  }
+
+  function planItemFromPiece(piece: Piece): SessionPlanItem {
+    return {
+      id: `piece-${piece.id}`,
+      title: piece.title,
+      reason: piece.isSpineTune ? t("spineTune") : t("repertoire"),
+      minutes: piece.isSpineTune ? 18 : 14,
+      confidence: piece.confidence,
+      sourceLabel: t("piece"),
+      pieceId: piece.id,
+      tempo: piece.currentTempo || piece.targetTempo || undefined,
       status: "planned",
       actualSeconds: 0,
     };
@@ -378,6 +403,30 @@ export function PracticeScreen({ data }: { data: PracticeLoopReadModel }) {
     }
 
     setSelectedPracticeTaskId("");
+  }
+
+  function addPiece(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const piece = selectablePieces.find((item) => item.id === selectedPieceId);
+
+    if (!piece) return;
+
+    const existing = planItems.find((item) => item.pieceId === piece.id);
+    if (existing) {
+      setActivePlanItemId(existing.id);
+      return;
+    }
+
+    const planItem = planItemFromPiece(piece);
+    if (sessionId) {
+      void addItemToLiveSession(planItem);
+    } else {
+      setPlanItems((current) => [...current, planItem]);
+      setActivePlanItemId(planItem.id);
+    }
+
+    setSelectedPieceId("");
   }
 
   function addCustomItem(event: FormEvent<HTMLFormElement>) {
@@ -551,6 +600,7 @@ export function PracticeScreen({ data }: { data: PracticeLoopReadModel }) {
     setActivePlanItemId(null);
     setPlanItems([]);
     setNotesByItem({});
+    setSpokenNoteByItem({});
     setConfidenceByItem({});
     setIsChartAideMemoirOpen(false);
     setStatusMessage(t("sessionSaved"));
@@ -579,7 +629,7 @@ export function PracticeScreen({ data }: { data: PracticeLoopReadModel }) {
     formData.append("practiceSessionId", context.practiceSessionId);
     formData.append("sessionItemId", context.sessionItemId);
     formData.append("durationSeconds", String(durationSeconds));
-    formData.append("spokenNote", notesByItem[context.itemId] ?? "");
+    formData.append("spokenNote", spokenNoteByItem[context.itemId] ?? "");
 
     const response = await fetch("/api/practice-recordings/upload", {
       method: "POST",
@@ -610,7 +660,7 @@ export function PracticeScreen({ data }: { data: PracticeLoopReadModel }) {
         storagePath: body.storagePath,
         practiceSessionId: context.practiceSessionId,
         sessionItemId: context.sessionItemId,
-        spokenNote: notesByItem[context.itemId] ?? undefined,
+        spokenNote: spokenNoteByItem[context.itemId] ?? undefined,
       },
       ...current,
     ]);
@@ -949,54 +999,78 @@ export function PracticeScreen({ data }: { data: PracticeLoopReadModel }) {
 
           <Section title={t("practicePassages")}>
             <div className="space-y-4 rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-medium leading-6 text-stone-600">
-                    {t("practicePassagesNote")}
-                  </p>
-                  {isPracticeRecording ? (
-                    <p className="mt-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-900">
-                      {t("recordingNow")} {formatClock(practiceRecordingElapsed)}
+              <div className="grid gap-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium leading-6 text-stone-600">
+                      {t("practicePassagesNote")}
                     </p>
-                  ) : null}
-                </div>
-                <button
-                  className={cn(
-                    "inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60",
-                    isPracticeRecording
-                      ? "bg-rose-700 text-white hover:bg-rose-800"
-                      : "bg-emerald-950 text-white hover:bg-emerald-900",
-                  )}
-                  disabled={
-                    !activePlanItem?.persistedId ||
-                    !isLive ||
-                    isPracticeRecorderBusy
-                  }
-                  onClick={() => {
-                    if (isPracticeRecording) {
-                      stopPracticeRecording();
-                      return;
+                    {isPracticeRecording ? (
+                      <p className="mt-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-900">
+                        {t("recordingNow")} {formatClock(practiceRecordingElapsed)}
+                      </p>
+                    ) : null}
+                  </div>
+                  <button
+                    className={cn(
+                      "inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60",
+                      isPracticeRecording
+                        ? "bg-rose-700 text-white hover:bg-rose-800"
+                        : "bg-emerald-950 text-white hover:bg-emerald-900",
+                    )}
+                    disabled={
+                      !activePlanItem?.persistedId ||
+                      !isLive ||
+                      isPracticeRecorderBusy
                     }
+                    onClick={() => {
+                      if (isPracticeRecording) {
+                        stopPracticeRecording();
+                        return;
+                      }
 
-                    void startPracticeRecording();
-                  }}
-                  type="button"
-                >
-                  {isPracticeRecorderBusy ? (
-                    <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
-                  ) : isPracticeRecording ? (
-                    <Square aria-hidden="true" className="h-4 w-4 fill-current" />
-                  ) : (
-                    <Mic2 aria-hidden="true" className="h-4 w-4" />
-                  )}
-                  {isPracticeRecording
-                    ? t("stopAndSavePracticeRecording")
-                    : practiceRecordingState === "requesting"
-                      ? t("waitingForMicrophone")
-                      : practiceRecordingState === "saving"
-                        ? t("savingRecording")
-                        : t("startPracticeRecording")}
-                </button>
+                      void startPracticeRecording();
+                    }}
+                    type="button"
+                  >
+                    {isPracticeRecorderBusy ? (
+                      <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
+                    ) : isPracticeRecording ? (
+                      <Square aria-hidden="true" className="h-4 w-4 fill-current" />
+                    ) : (
+                      <Mic2 aria-hidden="true" className="h-4 w-4" />
+                    )}
+                    {isPracticeRecording
+                      ? t("stopAndSavePracticeRecording")
+                      : practiceRecordingState === "requesting"
+                        ? t("waitingForMicrophone")
+                        : practiceRecordingState === "saving"
+                          ? t("savingRecording")
+                          : t("startPracticeRecording")}
+                  </button>
+                </div>
+
+                <label className="block">
+                  <span className="text-sm font-semibold text-stone-800">
+                    {t("spokenNote")}
+                  </span>
+                  <textarea
+                    className="mt-2 min-h-20 w-full resize-none rounded-md border border-stone-300 p-3 text-sm outline-none transition focus:border-emerald-800 focus:ring-2 focus:ring-emerald-800/20 disabled:cursor-not-allowed disabled:bg-stone-50"
+                    disabled={!activePlanItem || !isLive}
+                    onChange={(event) => {
+                      if (!activePlanItem) return;
+                      setSpokenNoteByItem((current) => ({
+                        ...current,
+                        [activePlanItem.id]: event.target.value,
+                      }));
+                    }}
+                    value={
+                      activePlanItem
+                        ? spokenNoteByItem[activePlanItem.id] ?? ""
+                        : ""
+                    }
+                  />
+                </label>
               </div>
 
               {practiceRecordingMessage ? (
@@ -1015,12 +1089,25 @@ export function PracticeScreen({ data }: { data: PracticeLoopReadModel }) {
               {activeItemRecordings.length > 0 ? (
                 <div className="space-y-2">
                   {activeItemRecordings.map((recording) => (
-                    <AudioStrip
-                      audioSrc={practiceRecordingAudioSrc(recording)}
-                      density="compact"
+                    <div
+                      className="rounded-md border border-stone-200 bg-stone-50 p-2"
                       key={recording.id}
-                      title={recording.title}
-                    />
+                    >
+                      <AudioStrip
+                        audioSrc={practiceRecordingAudioSrc(recording)}
+                        density="compact"
+                        title={recording.title}
+                      />
+                      {recording.spokenNote ? (
+                        <div className="mt-2 flex items-start gap-2 px-1 text-sm leading-6 text-stone-700">
+                          <MessageSquareText
+                            aria-hidden="true"
+                            className="mt-0.5 h-4 w-4 flex-none text-stone-500"
+                          />
+                          <p>{recording.spokenNote}</p>
+                        </div>
+                      ) : null}
+                    </div>
                   ))}
                 </div>
               ) : (
@@ -1097,7 +1184,7 @@ export function PracticeScreen({ data }: { data: PracticeLoopReadModel }) {
                     [activePlanItem.id]: event.target.value,
                   }));
                 }}
-                placeholder={t("spokenNote")}
+                placeholder={t("notes")}
                 value={activePlanItem ? notesByItem[activePlanItem.id] ?? "" : ""}
               />
               <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -1291,6 +1378,32 @@ export function PracticeScreen({ data }: { data: PracticeLoopReadModel }) {
                 })}
               </ul>
               <div className="space-y-2 border-t border-stone-200 p-3">
+                <form
+                  className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]"
+                  onSubmit={addPiece}
+                >
+                  <select
+                    className="rounded-md border border-stone-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-emerald-800 focus:ring-2 focus:ring-emerald-800/20"
+                    onChange={(event) => setSelectedPieceId(event.target.value)}
+                    value={selectedPieceId}
+                  >
+                    <option value="">{t("chooseRepertoirePiece")}</option>
+                    {selectablePieces.map((piece) => (
+                      <option key={piece.id} value={piece.id}>
+                        {piece.title}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    className="inline-flex items-center justify-center gap-2 rounded-md bg-sky-950 px-3 py-2 text-sm font-semibold text-white transition hover:bg-sky-900 disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={isSaving || !selectedPieceId}
+                    type="submit"
+                  >
+                    <Music2 aria-hidden="true" className="h-4 w-4" />
+                    {t("addAnySong")}
+                  </button>
+                </form>
+
                 <form
                   className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]"
                   onSubmit={addPracticeTask}

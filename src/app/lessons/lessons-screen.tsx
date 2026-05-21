@@ -111,16 +111,13 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
         a.lessonDate,
     ),
   );
-  const [selectedLessonId, setSelectedLessonId] = useState(
-    sortedLessons[0]?.id ?? "",
-  );
+  const [selectedLessonId, setSelectedLessonId] = useState("");
   const [liveRecordingPreview, setLiveRecordingPreview] =
     useState<LiveRecordingPreview | null>(null);
   const [pendingSavedLessonId, setPendingSavedLessonId] = useState("");
   const activeLesson =
-    liveRecordingPreview === null
-      ? (sortedLessons.find((lesson) => lesson.id === selectedLessonId) ??
-        sortedLessons[0])
+    liveRecordingPreview === null && selectedLessonId
+      ? sortedLessons.find((lesson) => lesson.id === selectedLessonId)
       : undefined;
   const recordingsForActiveLesson = activeLesson
     ? lessonRecordings
@@ -182,6 +179,10 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
     Record<string, "idle" | "saving" | "saved" | "error">
   >({});
   const [errorMessage, setErrorMessage] = useState("");
+  const [pendingDeleteLessonId, setPendingDeleteLessonId] = useState("");
+  const [lessonDeleteState, setLessonDeleteState] = useState<
+    "idle" | "saving" | "error"
+  >("idle");
 
   useEffect(() => {
     if (
@@ -228,8 +229,39 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
     }
 
     setSaveState("saved");
+    const body = (await response.json().catch(() => null)) as {
+      id?: string;
+    } | null;
+    if (body?.id) {
+      setSelectedLessonId(body.id);
+    }
     router.refresh();
     setTimeout(() => closeModal(), 250);
+  }
+
+  async function handleDeleteEmptyLesson(lessonId: string) {
+    setLessonDeleteState("saving");
+    setErrorMessage("");
+
+    const response = await fetch(`/api/lessons/${lessonId}`, {
+      method: "DELETE",
+    });
+
+    if (!response.ok) {
+      const body = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+      setLessonDeleteState("error");
+      setErrorMessage(body?.error ?? t("saveFailed"));
+      return;
+    }
+
+    if (selectedLessonId === lessonId) {
+      setSelectedLessonId("");
+    }
+    setPendingDeleteLessonId("");
+    setLessonDeleteState("idle");
+    router.refresh();
   }
 
   async function handleAttachTestAudio() {
@@ -339,7 +371,7 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
               <h1 className="mt-1 text-2xl font-semibold text-stone-950">
                 {liveRecordingPreview
                   ? previewLessonTitle(liveRecordingPreview.startedAt)
-                  : (activeLesson?.title ?? t("notYet"))}
+                  : t("lessons")}
               </h1>
               {liveRecordingPreview ? (
                 <p className="mt-2 text-sm text-stone-600">
@@ -366,7 +398,7 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
           <p className="mt-4 whitespace-pre-line text-sm leading-6 text-stone-600">
             {liveRecordingPreview
               ? t("recordingWillCreateLesson")
-              : activeLesson?.summary || t("notYet")}
+              : t("selectLessonOrRecord")}
           </p>
           <div className="mt-5 flex flex-col gap-2">
             <button
@@ -405,6 +437,11 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
             </ComingSoonButton>
           </div>
           <div className="mt-6 border-t border-stone-200 pt-4">
+            {lessonDeleteState === "error" && errorMessage ? (
+              <p className="mb-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+                {errorMessage}
+              </p>
+            ) : null}
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-sm font-semibold text-stone-950">
                 {t("lessonHistory")}
@@ -422,35 +459,85 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
                   (item) =>
                     item.lessonId === lesson.id && item.status !== "discarded",
                 ).length;
+                const transcriptCount = transcripts.filter(
+                  (item) => item.lessonId === lesson.id,
+                ).length;
                 const isSelected = activeLesson?.id === lesson.id;
+                const canDeleteAsEmpty =
+                  recordingCount === 0 &&
+                  extractCount === 0 &&
+                  transcriptCount === 0;
+                const isConfirmingDelete = pendingDeleteLessonId === lesson.id;
+                const isDeleting =
+                  isConfirmingDelete && lessonDeleteState === "saving";
 
                 return (
-                  <button
-                    className={`grid w-full grid-cols-[1fr_auto] gap-3 px-3 py-2 text-left transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                      isSelected ? "bg-emerald-50" : "bg-white hover:bg-stone-50"
-                    }`}
-                    disabled={liveRecordingPreview !== null}
+                  <div
+                    className={isSelected ? "bg-emerald-50" : "bg-white"}
                     key={lesson.id}
-                    onClick={() => setSelectedLessonId(lesson.id)}
-                    type="button"
                   >
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm font-semibold text-stone-950">
-                        {lesson.title}
+                    <button
+                      className="grid w-full grid-cols-[1fr_auto] gap-3 px-3 py-2 text-left transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={liveRecordingPreview !== null}
+                      onClick={() => setSelectedLessonId(lesson.id)}
+                      type="button"
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-semibold text-stone-950">
+                          {lesson.title}
+                        </span>
+                        <span className="mt-0.5 block text-xs text-stone-500">
+                          {lesson.lessonDate} / {lesson.teacher || t("notYet")}
+                        </span>
                       </span>
-                      <span className="mt-0.5 block text-xs text-stone-500">
-                        {lesson.lessonDate} / {lesson.teacher || t("notYet")}
+                      <span className="flex flex-col items-end gap-1 text-xs text-stone-500">
+                        <span>
+                          {recordingCount} {t("clips")}
+                        </span>
+                        <span>
+                          {extractCount} {t("practiceElement")}
+                        </span>
                       </span>
-                    </span>
-                    <span className="flex flex-col items-end gap-1 text-xs text-stone-500">
-                      <span>
-                        {recordingCount} {t("clips")}
-                      </span>
-                      <span>
-                        {extractCount} {t("practiceElement")}
-                      </span>
-                    </span>
-                  </button>
+                    </button>
+                    {canDeleteAsEmpty ? (
+                      <div className="border-t border-stone-100 px-3 py-2">
+                        {isConfirmingDelete ? (
+                          <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-rose-200 bg-rose-50 px-2 py-1.5 text-xs text-rose-900">
+                            <span>{t("confirmDeleteLesson")}</span>
+                            <div className="flex gap-1.5">
+                              <button
+                                className="rounded-md bg-white px-2 py-1 font-semibold text-rose-800"
+                                disabled={isDeleting}
+                                onClick={() =>
+                                  void handleDeleteEmptyLesson(lesson.id)
+                                }
+                                type="button"
+                              >
+                                {isDeleting ? t("saving") : t("delete")}
+                              </button>
+                              <button
+                                className="rounded-md bg-white px-2 py-1 font-semibold text-stone-700"
+                                disabled={isDeleting}
+                                onClick={() => setPendingDeleteLessonId("")}
+                                type="button"
+                              >
+                                {t("cancel")}
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <button
+                            className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-semibold text-rose-800 transition hover:bg-rose-50"
+                            onClick={() => setPendingDeleteLessonId(lesson.id)}
+                            type="button"
+                          >
+                            <Trash2 aria-hidden="true" className="h-3.5 w-3.5" />
+                            {t("deleteEmptyLesson")}
+                          </button>
+                        )}
+                      </div>
+                    ) : null}
+                  </div>
                 );
               })}
             </div>
@@ -543,6 +630,18 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
               ) : null}
             </>
           )}
+          {!liveRecordingPreview && !activeLesson ? (
+            <div className="grid min-h-72 place-items-center rounded-lg border border-dashed border-stone-300 bg-stone-50 px-4 py-8 text-center">
+              <div className="max-w-md">
+                <p className="text-sm font-semibold text-stone-950">
+                  {t("selectLessonOrRecord")}
+                </p>
+                <p className="mt-2 text-sm leading-6 text-stone-600">
+                  {t("emptyLessonWorkspace")}
+                </p>
+              </div>
+            </div>
+          ) : null}
           {activeLesson && recording && recordingAudioSrc ? (
             <>
               <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">
@@ -716,6 +815,7 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
         />
       ) : null}
 
+      {activeLesson ? (
       <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
         <Section title={t("lessonSummary")}>
           <div className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
@@ -814,6 +914,7 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
           </Section>
         ) : null}
       </div>
+      ) : null}
 
       {isModalOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/50 p-4">

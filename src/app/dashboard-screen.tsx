@@ -9,11 +9,8 @@ import {
   Timer,
 } from "lucide-react";
 import { ActionCard } from "@/components/action-card";
-import { AudioStrip } from "@/components/audio-strip";
-import { ConfidenceMeter } from "@/components/confidence-meter";
 import { LanguageToggle } from "@/components/language-toggle";
 import { Section } from "@/components/section";
-import { StatusPill } from "@/components/status-pill";
 import type { PracticeLoopReadModel } from "@/lib/data";
 import { useLanguage } from "@/lib/language";
 import { pieceTempoLabel } from "@/lib/piece-labels";
@@ -23,6 +20,10 @@ type PracticeTotalRow = {
   id: string;
   label: string;
   seconds: number;
+};
+
+type PracticeDayRow = PracticeTotalRow & {
+  shortLabel: string;
 };
 
 function buildPracticeTotals<T>(
@@ -49,12 +50,138 @@ function buildPracticeTotals<T>(
   );
 }
 
+function dateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
 function isWithinLastSevenDays(value: string) {
   const timestamp = Date.parse(value);
 
   if (Number.isNaN(timestamp)) return false;
 
   return timestamp >= Date.now() - 7 * 24 * 60 * 60 * 1000;
+}
+
+function lastSevenDayRows(
+  items: Array<{ actualSeconds: number; recordedAt: string }>,
+): PracticeDayRow[] {
+  const formatter = new Intl.DateTimeFormat("en-GB", { weekday: "short" });
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const rows: PracticeDayRow[] = [];
+
+  for (let offset = 6; offset >= 0; offset -= 1) {
+    const date = new Date(today);
+    date.setDate(today.getDate() - offset);
+    const id = dateKey(date);
+    const seconds = items
+      .filter((item) => item.recordedAt.slice(0, 10) === id)
+      .reduce((total, item) => total + item.actualSeconds, 0);
+
+    rows.push({
+      id,
+      label: formatDateLabel(id),
+      seconds,
+      shortLabel: formatter.format(date),
+    });
+  }
+
+  return rows;
+}
+
+function PracticeBarGraphic({
+  emptyLabel,
+  rows,
+  title,
+}: {
+  emptyLabel: string;
+  rows: PracticeDayRow[];
+  title: string;
+}) {
+  const maxSeconds = Math.max(...rows.map((row) => row.seconds), 0);
+
+  return (
+    <div className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
+      <h3 className="text-sm font-semibold text-stone-950">{title}</h3>
+      <div className="mt-4 grid h-36 grid-cols-7 items-end gap-2">
+        {rows.map((row) => {
+          const heightPercent =
+            maxSeconds > 0 ? Math.max(8, (row.seconds / maxSeconds) * 100) : 8;
+
+          return (
+            <div className="flex h-full min-w-0 flex-col justify-end gap-2" key={row.id}>
+              <div className="flex h-full items-end">
+                <div
+                  aria-label={`${row.label}: ${formatDuration(row.seconds)}`}
+                  className="w-full rounded-t-md bg-emerald-700/85"
+                  style={{ height: `${heightPercent}%` }}
+                />
+              </div>
+              <span className="truncate text-center text-xs font-medium text-stone-500">
+                {row.shortLabel}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      {maxSeconds === 0 ? (
+        <p className="mt-3 text-sm text-stone-600">{emptyLabel}</p>
+      ) : null}
+    </div>
+  );
+}
+
+function PracticeMixGraphic({
+  emptyLabel,
+  rows,
+  title,
+}: {
+  emptyLabel: string;
+  rows: PracticeTotalRow[];
+  title: string;
+}) {
+  const maxSeconds = Math.max(...rows.map((row) => row.seconds), 0);
+
+  return (
+    <div className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
+      <h3 className="text-sm font-semibold text-stone-950">{title}</h3>
+      <div className="mt-4 space-y-3">
+        {rows.length === 0 ? (
+          <p className="text-sm text-stone-600">{emptyLabel}</p>
+        ) : null}
+        {rows.slice(0, 5).map((row, index) => (
+          <div className="space-y-1.5" key={row.id}>
+            <div className="flex items-center justify-between gap-3 text-sm">
+              <span className="truncate font-medium text-stone-800">
+                {row.label}
+              </span>
+              <span className="font-semibold tabular-nums text-stone-950">
+                {formatDuration(row.seconds)}
+              </span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-stone-100">
+              <div
+                className={
+                  index % 3 === 0
+                    ? "h-full rounded-full bg-sky-700"
+                    : index % 3 === 1
+                      ? "h-full rounded-full bg-emerald-700"
+                      : "h-full rounded-full bg-amber-600"
+                }
+                style={{
+                  width: `${maxSeconds > 0 ? (row.seconds / maxSeconds) * 100 : 0}%`,
+                }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function PracticeTotalsPanel({
@@ -100,7 +227,6 @@ export function DashboardScreen({ data }: { data: PracticeLoopReadModel }) {
     practiceTasks,
     recordings,
     sessionItems,
-    smartQueue,
   } = data;
   const activePieces = pieces.filter((piece) => piece.status !== "parked");
   const neglectedPieces = activePieces.filter((piece) =>
@@ -179,6 +305,24 @@ export function DashboardScreen({ data }: { data: PracticeLoopReadModel }) {
     (item) => formatDateLabel(item.recordedAt),
     (item) => item.actualSeconds,
   ).sort((left, right) => right.id.localeCompare(left.id));
+  const sevenDayRows = lastSevenDayRows(completedSessionItems);
+  const practiceMixRows = [
+    {
+      id: "pieces",
+      label: t("byPiece"),
+      seconds: pieceTotals.reduce((total, row) => total + row.seconds, 0),
+    },
+    {
+      id: "exercises",
+      label: t("byExercise"),
+      seconds: exerciseTotals.reduce((total, row) => total + row.seconds, 0),
+    },
+    {
+      id: "practice-items",
+      label: t("byPracticeItem"),
+      seconds: practiceItemTotals.reduce((total, row) => total + row.seconds, 0),
+    },
+  ].filter((row) => row.seconds > 0);
 
   return (
     <div className="space-y-8">
@@ -235,74 +379,6 @@ export function DashboardScreen({ data }: { data: PracticeLoopReadModel }) {
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_0.9fr]">
-        <Section title={t("smartQueue")}>
-          <div className="space-y-3">
-            {smartQueue.map((item) => (
-              <div
-                className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm"
-                key={item.id}
-              >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0 space-y-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <StatusPill
-                        tone={
-                          item.kind === "lesson_task"
-                            ? "amber"
-                            : item.kind === "exercise"
-                              ? "green"
-                              : "blue"
-                        }
-                      >
-                        {item.kind === "lesson_task"
-                          ? t("newFromLesson")
-                          : item.kind === "exercise"
-                            ? t("warmUp")
-                            : t("spineTune")}
-                      </StatusPill>
-                    </div>
-                    <h3 className="text-lg font-semibold text-stone-950">
-                      {item.title}
-                    </h3>
-                    <p className="text-sm text-stone-600">{item.reason}</p>
-                  </div>
-                  {item.confidence ? (
-                    <ConfidenceMeter value={item.confidence} />
-                  ) : null}
-                </div>
-              </div>
-            ))}
-          </div>
-        </Section>
-
-        <Section title={t("recentLessonItems")}>
-          <div className="space-y-3">
-            {practiceTasks.slice(0, 2).map((task) => (
-              <div
-                className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm"
-                key={task.id}
-              >
-                <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
-                  <h3 className="text-base font-semibold text-stone-950">
-                    {task.title}
-                  </h3>
-                  <StatusPill tone="green">{task.status}</StatusPill>
-                </div>
-                <p className="text-sm leading-6 text-stone-600">{task.body}</p>
-                <div className="mt-3">
-                  <AudioStrip
-                    endsAtSeconds={task.endsAtSeconds}
-                    startsAtSeconds={task.startsAtSeconds}
-                    title={task.title}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </Section>
-      </div>
-
       <Section title={t("activityLog")}>
         <div className="grid gap-3 md:grid-cols-4">
           <div className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
@@ -337,6 +413,18 @@ export function DashboardScreen({ data }: { data: PracticeLoopReadModel }) {
               {linkedPracticeRecordings.length}
             </p>
           </div>
+        </div>
+        <div className="mt-4 grid gap-3 lg:grid-cols-[1.1fr_0.9fr]">
+          <PracticeBarGraphic
+            emptyLabel={t("noLoggedTimeYet")}
+            rows={sevenDayRows}
+            title={t("weeklyPractice")}
+          />
+          <PracticeMixGraphic
+            emptyLabel={t("noLoggedTimeYet")}
+            rows={practiceMixRows}
+            title={t("practiceMix")}
+          />
         </div>
         <div className="mt-4 grid gap-3 xl:grid-cols-4">
           <PracticeTotalsPanel

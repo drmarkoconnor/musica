@@ -14,6 +14,10 @@ export const translations = {
     recordingWillCreateLesson:
       "This recording will create a fresh timestamped lesson when you stop and save.",
     recordingStartedAt: "Started",
+    selectLessonOrRecord:
+      "Start a live lesson recording, create a lesson, or choose a lesson from the list.",
+    emptyLessonWorkspace:
+      "The audio studio, clip review, and transcription controls will appear here once a lesson recording is saved or selected.",
     fromLessons: "Practice List",
     repertoire: "Repertoire",
     practiceSession: "Practice Session",
@@ -43,6 +47,8 @@ export const translations = {
     optionalConfidence: "Optional confidence",
     customItem: "Custom item",
     choosePracticeListItem: "Choose from practice list",
+    chooseRepertoirePiece: "Choose any repertoire piece",
+    addAnySong: "Add song",
     sessionOnlyItem: "One-off item for this session",
     addSessionOnlyItem: "Add one-off",
     chartAideMemoir: "Chart aide memoir",
@@ -221,6 +227,8 @@ export const translations = {
     spokenNote: "Spoken note to future self",
     lessonRecordings: "Lesson recordings",
     practiceRecordings: "Practice recordings",
+    deleteEmptyLesson: "Delete empty lesson",
+    confirmDeleteLesson: "Delete this empty lesson?",
     confirmDeleteRecording:
       "Delete this recording permanently? This also removes the stored audio file.",
     linkToPiece: "Link to piece",
@@ -238,6 +246,8 @@ export const translations = {
     bpm: "BPM",
     minutes: "min",
     activityLog: "Activity log",
+    weeklyPractice: "Weekly practice",
+    practiceMix: "Practice mix",
     practiceTotals: "Practice totals",
     byPiece: "By piece",
     byExercise: "By exercise",
@@ -311,6 +321,10 @@ export const translations = {
     recordingWillCreateLesson:
       "Questa registrazione creera una nuova lezione con timestamp quando fermi e salvi.",
     recordingStartedAt: "Iniziata",
+    selectLessonOrRecord:
+      "Avvia una registrazione live, crea una lezione, oppure scegli una lezione dalla lista.",
+    emptyLessonWorkspace:
+      "Lo studio audio, la revisione clip e i controlli di trascrizione appariranno qui quando una registrazione e salvata o selezionata.",
     fromLessons: "Lista studio",
     repertoire: "Repertorio",
     practiceSession: "Sessione di studio",
@@ -340,6 +354,8 @@ export const translations = {
     optionalConfidence: "Sicurezza opzionale",
     customItem: "Elemento personalizzato",
     choosePracticeListItem: "Scegli dalla lista studio",
+    chooseRepertoirePiece: "Scegli un brano dal repertorio",
+    addAnySong: "Aggiungi brano",
     sessionOnlyItem: "Elemento solo per questa sessione",
     addSessionOnlyItem: "Aggiungi singolo",
     chartAideMemoir: "Chart aide memoir",
@@ -521,6 +537,8 @@ export const translations = {
     spokenNote: "Nota vocale al futuro se stesso",
     lessonRecordings: "Registrazioni di lezioni",
     practiceRecordings: "Registrazioni di studio",
+    deleteEmptyLesson: "Elimina lezione vuota",
+    confirmDeleteLesson: "Eliminare questa lezione vuota?",
     confirmDeleteRecording:
       "Eliminare definitivamente questa registrazione? Verra rimosso anche il file audio.",
     linkToPiece: "Collega a brano",
@@ -538,6 +556,8 @@ export const translations = {
     bpm: "BPM",
     minutes: "min",
     activityLog: "Registro attivita",
+    weeklyPractice: "Studio settimanale",
+    practiceMix: "Mix di studio",
     practiceTotals: "Totali di studio",
     byPiece: "Per brano",
     byExercise: "Per esercizio",
