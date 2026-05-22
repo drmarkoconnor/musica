@@ -20,6 +20,49 @@ Keep entries concise. Put stable product truth in `project-brief.md`, current
 implementation truth in `current-state.md`, and priority sequencing in
 `roadmap.md`.
 
+## 2026-05-22 - Delete No-Recording Dummy Lessons
+
+Branch: `main`
+
+Implementation commit: `5977762`
+
+Work done:
+
+- Investigated why the visible dummy lessons did not delete.
+- Found the UI only exposed deletion for lessons with no recordings, extracts,
+  or transcripts, while the dummy lessons had 0 recordings but old extracted
+  practice candidates.
+- Changed the lesson history delete affordance to appear for any lesson with no
+  recordings.
+- Deleted 7 no-recording May 2026 dummy lesson shells directly from Neon.
+- Verified there are now 0 lessons with no recordings.
+
+Commands run:
+
+```bash
+npm run typecheck
+npm run build
+git diff --check
+npx tsx -e ... no-recording lessons query
+npx tsx -e ... delete 7 no-recording dummy lessons
+npx tsx -e ... verify no-recording lessons query
+git commit -m "Allow deleting lessons without recordings"
+```
+
+Migration status: no database migration. Data cleanup deleted 7 dummy `lessons`
+rows with no `lesson_recordings`.
+
+What Mark should test next:
+
+- Reload `/lessons` after deploy and confirm the top dummy May 2026 lesson rows
+  are gone.
+- If a future lesson has no recordings, confirm the delete action is visible.
+
+Known caveats:
+
+- Lesson deletion remains blocked by the API while a lesson still has any
+  recording rows.
+
 ## 2026-05-22 - Dashboard Lessons And Practice Session Cleanup
 
 Branch: `main`

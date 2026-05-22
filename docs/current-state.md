@@ -2,7 +2,7 @@
 
 Last updated: 2026-05-22
 
-Latest implementation commit: `b7dc6c2 Refine dashboard lessons and practice session flows`
+Latest implementation commit: `5977762 Allow deleting lessons without recordings`
 
 ## Working Environment
 
@@ -107,8 +107,8 @@ Important hosted env vars:
   field that is saved with the recording and rendered beside saved passages in
   the live session and on `/recordings`.
 - `/lessons` now opens on start/record controls plus lesson history, without
-  auto-loading the latest lesson summary. Empty lesson shells can be deleted
-  after their recordings have been removed.
+  auto-loading the latest lesson summary. Lesson shells with no recordings can
+  be deleted even if they still have old dummy extracts.
 - The app has an SVG icon to avoid favicon 404 console noise.
 - Repertoire now treats spine/core repertoire as one concept: the star toggle.
   The status dropdown is lifecycle-only: learning, maintenance, parked.
@@ -207,8 +207,9 @@ Current feedback to test next:
 2. Start a practice session, add a repertoire piece that is not in the smart
    queue, record a passage with a spoken future-self note, and confirm the note
    appears beside the saved passage.
-3. Open `/lessons` and confirm it starts on controls/history; delete an empty
-   lesson shell after removing its recordings.
+3. Open `/lessons` and confirm it starts on controls/history; no-recording
+   dummy lessons should be gone, and any future no-recording shell should show
+   a delete action.
 4. Open an imported lesson, select one short useful clip, authorise
    transcription, and watch the queued/running/completed progress state.
 5. Retry the previously failed 57-minute lesson only if needed, confirming the
