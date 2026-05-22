@@ -463,10 +463,7 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
                   (item) => item.lessonId === lesson.id,
                 ).length;
                 const isSelected = activeLesson?.id === lesson.id;
-                const canDeleteAsEmpty =
-                  recordingCount === 0 &&
-                  extractCount === 0 &&
-                  transcriptCount === 0;
+                const canDeleteWithoutRecordings = recordingCount === 0;
                 const isConfirmingDelete = pendingDeleteLessonId === lesson.id;
                 const isDeleting =
                   isConfirmingDelete && lessonDeleteState === "saving";
@@ -499,7 +496,7 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
                         </span>
                       </span>
                     </button>
-                    {canDeleteAsEmpty ? (
+                    {canDeleteWithoutRecordings ? (
                       <div className="border-t border-stone-100 px-3 py-2">
                         {isConfirmingDelete ? (
                           <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-rose-200 bg-rose-50 px-2 py-1.5 text-xs text-rose-900">
@@ -532,7 +529,7 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
                             type="button"
                           >
                             <Trash2 aria-hidden="true" className="h-3.5 w-3.5" />
-                            {t("deleteEmptyLesson")}
+                            {t("deleteNoRecordingLesson")}
                           </button>
                         )}
                       </div>

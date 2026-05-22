@@ -228,6 +228,7 @@ export const translations = {
     lessonRecordings: "Lesson recordings",
     practiceRecordings: "Practice recordings",
     deleteEmptyLesson: "Delete empty lesson",
+    deleteNoRecordingLesson: "Delete lesson with no recording",
     confirmDeleteLesson: "Delete this empty lesson?",
     confirmDeleteRecording:
       "Delete this recording permanently? This also removes the stored audio file.",
@@ -538,6 +539,7 @@ export const translations = {
     lessonRecordings: "Registrazioni di lezioni",
     practiceRecordings: "Registrazioni di studio",
     deleteEmptyLesson: "Elimina lezione vuota",
+    deleteNoRecordingLesson: "Elimina lezione senza registrazione",
     confirmDeleteLesson: "Eliminare questa lezione vuota?",
     confirmDeleteRecording:
       "Eliminare definitivamente questa registrazione? Verra rimosso anche il file audio.",
