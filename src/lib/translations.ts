@@ -102,6 +102,33 @@ export const translations = {
     microphoneUnavailable:
       "Microphone recording is not available in this browser.",
     recordingUploadFailed: "Recording could not be saved. Please try again.",
+    recordingUploadFailedRecoverable:
+      "Recording could not be uploaded, but a rescue copy is stored in this browser.",
+    recordingStoredLocally:
+      "A rescue copy is being kept in this browser. When you stop, the app will save it to the server.",
+    recordingLocalBackupUnavailable:
+      "Recording started, but this browser would not grant local rescue storage. Keep this tab open until it saves.",
+    recordingServerUploadPaused:
+      "Server save is slow. The browser rescue copy can retry or download later.",
+    recordingUploadTimedOut:
+      "Server save timed out. The browser rescue copy can retry or download later.",
+    saveDeviceCopy: "Save a device copy",
+    saveDeviceCopyHelp:
+      "You will choose a file before recording. This gives you a normal local audio file as well as the app save.",
+    saveDeviceCopyUnsupported:
+      "This browser cannot write a file during recording. Use Download copy if a rescue recording appears.",
+    deviceCopySkipped: "Device copy skipped. Browser rescue storage is still active.",
+    deviceCopyFailed:
+      "The device copy could not be written. Browser rescue storage is still active.",
+    deviceCopySaved: "Device copy saved",
+    recoverableRecordings: "Unsaved recordings",
+    recordingRescueReady:
+      "Do not discard these until the recording plays in the app. Retry saving, or download a copy.",
+    retrySavingRecording: "Retry save",
+    downloadRecoveryCopy: "Download copy",
+    discardRecoveryCopy: "Discard copy",
+    recordingRecoveryUnavailable: "The rescue copy is not available.",
+    recordingRecoveryActionFailed: "That recovery action failed. Try again.",
     uploadAudio: "Upload audio",
     transcript: "Transcript",
     teachingReview: "Teaching review",
@@ -413,6 +440,34 @@ export const translations = {
     microphoneUnavailable:
       "La registrazione dal microfono non e disponibile in questo browser.",
     recordingUploadFailed: "Impossibile salvare la registrazione. Riprova.",
+    recordingUploadFailedRecoverable:
+      "Impossibile caricare la registrazione, ma una copia di recupero e salvata in questo browser.",
+    recordingStoredLocally:
+      "Una copia di recupero resta in questo browser. Quando interrompi, l'app la salvera sul server.",
+    recordingLocalBackupUnavailable:
+      "Registrazione avviata, ma questo browser non ha concesso lo spazio locale di recupero. Tieni aperta questa scheda finche viene salvata.",
+    recordingServerUploadPaused:
+      "Il salvataggio server e lento. La copia di recupero del browser potra riprovare o essere scaricata dopo.",
+    recordingUploadTimedOut:
+      "Il salvataggio server e scaduto. La copia di recupero del browser potra riprovare o essere scaricata dopo.",
+    saveDeviceCopy: "Salva una copia sul dispositivo",
+    saveDeviceCopyHelp:
+      "Sceglierai un file prima della registrazione. Cosi hai anche un file audio locale normale oltre al salvataggio nell'app.",
+    saveDeviceCopyUnsupported:
+      "Questo browser non puo scrivere un file durante la registrazione. Usa Scarica copia se appare una registrazione di recupero.",
+    deviceCopySkipped:
+      "Copia sul dispositivo saltata. Il recupero nel browser resta attivo.",
+    deviceCopyFailed:
+      "Impossibile scrivere la copia sul dispositivo. Il recupero nel browser resta attivo.",
+    deviceCopySaved: "Copia sul dispositivo salvata",
+    recoverableRecordings: "Registrazioni non salvate",
+    recordingRescueReady:
+      "Non scartarle finche la registrazione non si riproduce nell'app. Riprova a salvare oppure scarica una copia.",
+    retrySavingRecording: "Riprova salvataggio",
+    downloadRecoveryCopy: "Scarica copia",
+    discardRecoveryCopy: "Scarta copia",
+    recordingRecoveryUnavailable: "La copia di recupero non e disponibile.",
+    recordingRecoveryActionFailed: "Azione di recupero non riuscita. Riprova.",
     uploadAudio: "Carica audio",
     transcript: "Trascrizione",
     teachingReview: "Revisione didattica",

@@ -1,6 +1,6 @@
 # Practice Loop Roadmap
 
-Last updated: 2026-05-22
+Last updated: 2026-05-23
 
 ## Roadmap Rule
 
@@ -49,6 +49,18 @@ Status: working, needs editor polish.
 Done:
 
 - Browser lesson recording.
+- Browser lesson recording now keeps a local IndexedDB rescue draft while
+  recording, saves small clips through the simpler direct upload path, uses
+  chunked upload sessions for larger recordings or fallback saves, and
+  retries/downloads/discards unsaved drafts after failed saves.
+- Mobile recording save waits are bounded so iPad/WebKit browsers should fail
+  recoverably instead of hanging indefinitely on `Saving recording`.
+- Browser lesson recording has a default-on `Save a device copy` option where
+  supported, so a user-granted local audio file is written while recording.
+- Lesson audio upload has a first-pass real file picker backed by the lesson
+  recording upload route.
+- Normal lesson UI no longer exposes the development test-audio attachment, and
+  the fixture API is gated behind `PRACTICE_LOOP_ENABLE_TEST_AUDIO=true`.
 - Lesson creation and recording metadata.
 - Lesson screen opens on start/record controls and history rather than
   auto-loading a previous summary.
@@ -67,11 +79,12 @@ Done:
 
 Next:
 
-- Arbitrary audio upload.
 - Review imported archive lessons in the app, create useful teaching clips, and
   transcribe selected clips only.
 - Better long-recording studio: split, merge, chunk creation, true waveform
   data, deeper zoom/focus editing, and clearer clip states.
+- Consider multipart/object-compose storage later if final server assembly ever
+  becomes too memory-heavy for very long recordings.
 - More nuanced start/end editing beyond the original 30 second pre-roll and 10
   second trim idea.
 

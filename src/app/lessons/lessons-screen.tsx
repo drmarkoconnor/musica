@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { type ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, Check, Edit3, Plus, Trash2, Upload, X } from "lucide-react";
 import { AudioStrip } from "@/components/audio-strip";
@@ -9,14 +9,9 @@ import { LessonRecorder } from "@/components/lesson-recorder";
 import { LessonSegmentReview } from "@/components/lesson-segment-review";
 import { Section } from "@/components/section";
 import { StatusPill } from "@/components/status-pill";
-import { TeachingTranscriptReview } from "@/components/teaching-transcript-review";
 import { TranscriptionGate } from "@/components/transcription-password-modal";
 import type { PracticeLoopReadModel } from "@/lib/data";
 import { useLanguage } from "@/lib/language";
-import {
-  TEST_LESSON_FIXTURE_ID,
-  TEST_LESSON_FIXTURE_STORAGE_PATH,
-} from "@/lib/teaching-review";
 import type { LessonExtract } from "@/lib/types";
 import { formatDuration } from "@/lib/utils";
 
@@ -65,6 +60,30 @@ function emptyLessonForm(): LessonFormValues {
   };
 }
 
+function audioDurationForFile(file: File) {
+  return new Promise<number | null>((resolve) => {
+    const audio = document.createElement("audio");
+    const url = URL.createObjectURL(file);
+    const timeoutId = window.setTimeout(() => {
+      URL.revokeObjectURL(url);
+      resolve(null);
+    }, 5000);
+
+    audio.preload = "metadata";
+    audio.onloadedmetadata = () => {
+      window.clearTimeout(timeoutId);
+      URL.revokeObjectURL(url);
+      resolve(Number.isFinite(audio.duration) ? Math.round(audio.duration) : null);
+    };
+    audio.onerror = () => {
+      window.clearTimeout(timeoutId);
+      URL.revokeObjectURL(url);
+      resolve(null);
+    };
+    audio.src = url;
+  });
+}
+
 function transcriptBulletItems(text: string) {
   return text
     .split(/\n+|(?<=[.!?])\s+/)
@@ -102,6 +121,7 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
     lessonSegmentTranscripts,
     transcripts,
   } = data;
+  const uploadInputRef = useRef<HTMLInputElement>(null);
   const sortedLessons = [...lessons].sort((a, b) =>
     (
       lessonRecordings.find((item) => item.lessonId === b.id)?.recordedAt ??
@@ -154,8 +174,6 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
   const selectedSegmentCount = segmentsForRecording.filter(
     (item) => item.status === "selected",
   ).length;
-  const isTestAudioRecording =
-    recording?.storagePath === TEST_LESSON_FIXTURE_STORAGE_PATH;
   const lessonTranscripts = activeLesson
     ? transcripts.filter((item) => item.lessonId === activeLesson.id)
     : [];
@@ -172,7 +190,7 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
   const [saveState, setSaveState] = useState<
     "idle" | "saving" | "saved" | "error"
   >("idle");
-  const [attachState, setAttachState] = useState<
+  const [uploadState, setUploadState] = useState<
     "idle" | "saving" | "saved" | "error"
   >("idle");
   const [extractActionState, setExtractActionState] = useState<
@@ -264,25 +282,63 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
     router.refresh();
   }
 
-  async function handleAttachTestAudio() {
-    if (!activeLesson) return;
+  async function handleAudioUpload(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.currentTarget.value = "";
 
-    setAttachState("saving");
-    const response = await fetch("/api/lesson-recordings", {
+    if (!file) return;
+
+    setUploadState("saving");
+    setErrorMessage("");
+
+    const recordedAt = file.lastModified ? new Date(file.lastModified) : new Date();
+    const formData = new FormData();
+    const durationSeconds = await audioDurationForFile(file);
+
+    formData.append("audio", file);
+    formData.append("title", activeLesson?.title ?? previewLessonTitle(recordedAt));
+    formData.append("teacher", activeLesson?.teacher ?? "Leo");
+    formData.append(
+      "lessonDate",
+      activeLesson?.lessonDate ?? localLessonDate(recordedAt),
+    );
+    formData.append("recordedAt", recordedAt.toISOString());
+    formData.append(
+      "summary",
+      activeLesson?.summary ||
+        "Uploaded in Practice Loop. Ready for authorised transcription.",
+    );
+    if (activeLesson) {
+      formData.append("lessonId", activeLesson.id);
+    }
+    if (durationSeconds) {
+      formData.append("durationSeconds", String(durationSeconds));
+    }
+
+    const response = await fetch("/api/lesson-recordings/upload", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        lessonId: activeLesson.id,
-        fixtureId: TEST_LESSON_FIXTURE_ID,
-      }),
+      body: formData,
     });
 
     if (!response.ok) {
-      setAttachState("error");
+      const body = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+
+      setUploadState("error");
+      setErrorMessage(body?.error ?? t("recordingUploadFailed"));
       return;
     }
 
-    setAttachState("saved");
+    const body = (await response.json().catch(() => null)) as {
+      lessonId?: string;
+    } | null;
+
+    if (body?.lessonId) {
+      setSelectedLessonId(body.lessonId);
+    }
+
+    setUploadState("saved");
     router.refresh();
   }
 
@@ -432,9 +488,31 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
                 router.refresh();
               }}
             />
-            <ComingSoonButton className="min-h-12 w-full py-3" icon={Upload}>
-              {t("uploadAudio")}
-            </ComingSoonButton>
+            <input
+              accept="audio/*,video/mp4"
+              className="sr-only"
+              onChange={(event) => void handleAudioUpload(event)}
+              ref={uploadInputRef}
+              type="file"
+            />
+            <button
+              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-md border border-stone-300 px-3 py-3 text-sm font-semibold text-stone-700 transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={liveRecordingPreview !== null || uploadState === "saving"}
+              onClick={() => uploadInputRef.current?.click()}
+              type="button"
+            >
+              <Upload aria-hidden="true" className="h-4 w-4" />
+              {uploadState === "saving"
+                ? t("savingRecording")
+                : uploadState === "saved"
+                  ? t("audioAttached")
+                  : t("uploadAudio")}
+            </button>
+            {uploadState === "error" && errorMessage ? (
+              <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+                {errorMessage}
+              </p>
+            ) : null}
           </div>
           <div className="mt-6 border-t border-stone-200 pt-4">
             {lessonDeleteState === "error" && errorMessage ? (
@@ -604,26 +682,6 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
                     </div>
                   ))}
                 </div>
-              ) : null}
-              {!recording && activeLesson ? (
-                <button
-                  className="inline-flex items-center justify-center gap-2 rounded-md border border-stone-300 px-3 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-60"
-                  disabled={attachState === "saving"}
-                  onClick={() => void handleAttachTestAudio()}
-                  type="button"
-                >
-                  <Upload aria-hidden="true" className="h-4 w-4" />
-                  {attachState === "saving"
-                    ? t("saving")
-                    : attachState === "saved"
-                      ? t("audioAttached")
-                      : t("attachTestAudio")}
-                </button>
-              ) : null}
-              {attachState === "error" ? (
-                <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
-                  {t("saveFailed")}
-                </p>
               ) : null}
             </>
           )}
@@ -802,14 +860,6 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
             })}
           </div>
         </Section>
-      ) : null}
-
-      {activeLesson && recording && recordingAudioSrc && isTestAudioRecording ? (
-        <TeachingTranscriptReview
-          audioSrc={recordingAudioSrc}
-          lessonId={activeLesson.id}
-          recordingId={recording.id}
-        />
       ) : null}
 
       {activeLesson ? (

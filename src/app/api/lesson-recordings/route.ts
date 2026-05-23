@@ -16,6 +16,13 @@ function isUuid(value: string) {
 }
 
 export async function POST(request: Request) {
+  if (process.env.PRACTICE_LOOP_ENABLE_TEST_AUDIO !== "true") {
+    return NextResponse.json(
+      { error: "Test audio fixtures are disabled." },
+      { status: 404 },
+    );
+  }
+
   let body: LessonRecordingRequestBody;
 
   try {

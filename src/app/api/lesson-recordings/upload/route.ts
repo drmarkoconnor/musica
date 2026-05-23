@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
 import path from "node:path";
-import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { createDatabaseClient } from "@/db/client";
-import { lessonRecordings, lessons } from "@/db/schema";
-import { saveLessonAudio } from "@/lib/server/lesson-audio-storage";
+import {
+  deleteLessonAudio,
+  saveLessonAudio,
+} from "@/lib/server/lesson-audio-storage";
+import { createLessonRecordingMetadata } from "@/lib/server/lesson-recording-metadata";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -65,6 +66,16 @@ function parseDurationSeconds(value: string) {
   return Math.min(Math.round(durationSeconds), 8 * 60 * 60);
 }
 
+function parseRecordedAt(value: string) {
+  if (!value) return null;
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return null;
+
+  return date.toISOString();
+}
+
 function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     value,
@@ -102,7 +113,7 @@ export async function POST(request: Request) {
   }
 
   const now = new Date();
-  const recordedAt = now.toISOString();
+  const recordedAt = parseRecordedAt(formString(formData, "recordedAt")) ?? now.toISOString();
   const rawLessonId = formString(formData, "lessonId");
   const requestedLessonId = rawLessonId && isUuid(rawLessonId) ? rawLessonId : "";
   const lessonDate = formString(formData, "lessonDate") || todayDate();
@@ -136,56 +147,33 @@ export async function POST(request: Request) {
     );
   }
 
-  const db = createDatabaseClient();
   let lessonId = "";
   let recordingId = "";
 
   try {
-    if (requestedLessonId) {
-      const [existingLesson] = await db
-        .select({ id: lessons.id })
-        .from(lessons)
-        .where(eq(lessons.id, requestedLessonId));
-
-      if (existingLesson) {
-        lessonId = existingLesson.id;
-        await db
-          .update(lessons)
-          .set({ status: "recorded", updatedAt: recordedAt })
-          .where(eq(lessons.id, lessonId));
-      }
-    }
-
-    if (!lessonId) {
-      const [lesson] = await db
-        .insert(lessons)
-        .values({
-          title,
-          teacher,
-          lessonDate,
-          status: "recorded",
-          summary,
-          updatedAt: recordedAt,
-        })
-        .returning({ id: lessons.id });
-      lessonId = lesson.id;
-    }
-
-    const [recording] = await db
-      .insert(lessonRecordings)
-      .values({
-        lessonId,
-        title: "Live lesson recording",
-        storageBucket: storedAudio.storageBucket,
-        storagePath: storedAudio.storagePath,
+    const metadataResult = await createLessonRecordingMetadata({
+      metadata: {
         durationSeconds,
+        lessonDate,
+        lessonId: requestedLessonId || undefined,
         recordedAt,
-        notes: "Recorded from the browser microphone.",
-      })
-      .returning({ id: lessonRecordings.id });
+        summary,
+        teacher,
+        title,
+      },
+      storedAudio,
+    });
 
-    recordingId = recording.id;
+    lessonId = metadataResult.lessonId;
+    recordingId = metadataResult.recordingId;
   } catch {
+    await deleteLessonAudio({
+      storageBucket: storedAudio.storageBucket,
+      storagePath: storedAudio.storagePath,
+    }).catch((error) => {
+      console.error("Orphaned lesson audio cleanup failed", error);
+    });
+
     return NextResponse.json(
       { error: "Recording metadata could not be saved." },
       { status: 502 },

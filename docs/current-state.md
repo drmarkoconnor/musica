@@ -1,6 +1,6 @@
 # Practice Loop Current State
 
-Last updated: 2026-05-22
+Last updated: 2026-05-23
 
 Latest implementation commit: `5977762 Allow deleting lessons without recordings`
 
@@ -41,11 +41,27 @@ Important hosted env vars:
   audio and is ignored by git. The first archive import uploaded 31
   non-duplicate recordings to Netlify Blobs, inserted matching `lessons` and
   `lesson_recordings` rows in Neon, and skipped 4 exact duplicates.
-- Legacy local lesson/test recordings have also been moved to Netlify Blobs, so
-  all `lesson_recordings` rows now use `storage_bucket = netlify-blobs`.
+- Legacy local lesson/test recordings have also been moved to Netlify Blobs, and
+  the accidental 2026-05-22 `local-test-audio` attachment has been removed from
+  Neon, so all remaining `lesson_recordings` rows use
+  `storage_bucket = netlify-blobs`.
 - Create lessons and record live lesson audio in browser.
 - Starting a live lesson recording clears the previous lesson context and saves a
   fresh timestamped lesson when stopped.
+- Live lesson recording keeps MediaRecorder chunks in memory and browser
+  IndexedDB as a rescue draft while recording. When stopped, small recordings
+  use the simpler direct upload path, and larger recordings or direct-upload
+  fallback use a server-side chunk upload session. Browser storage, device-copy,
+  MediaRecorder stop, and network waits are bounded so mobile browsers do not
+  sit in `Saving recording` forever. If upload fails, the lesson recorder shows
+  unsaved recordings with retry, download-copy, and discard actions.
+- Where the browser supports the File System Access API, lesson recording also
+  offers a default-on `Save a device copy` option before recording starts. The
+  user chooses a local file and the app writes chunks to it while recording.
+- The lesson screen now has a real audio upload control backed by the lesson
+  recording upload route, instead of a placeholder button.
+- The old local test-audio attachment flow is removed from the normal lesson UI
+  and its API route is disabled unless `PRACTICE_LOOP_ENABLE_TEST_AUDIO=true`.
 - Play lesson recordings through protected server routes.
 - Hosted read-model filtering hides local-only audio records that cannot be
   served by Netlify.
@@ -129,6 +145,16 @@ with visible progress and resumable chunk state.
 - Neon read model: `src/lib/data/neon-repository.ts`
 - Lesson screen: `src/app/lessons/lessons-screen.tsx`
 - Lesson recorder: `src/components/lesson-recorder.tsx`
+- Browser lesson recording rescue drafts:
+  `src/lib/browser/lesson-recording-drafts.ts`
+- Browser device recording backup:
+  `src/lib/browser/device-recording-backup.ts`
+- Chunked lesson upload session APIs:
+  `src/app/api/lesson-recordings/upload-session/*`
+- Chunked lesson upload storage:
+  `src/lib/server/lesson-recording-upload-sessions.ts`
+- Lesson recording metadata helper:
+  `src/lib/server/lesson-recording-metadata.ts`
 - Lesson segment editor: `src/components/lesson-segment-review.tsx`
 - Audio player: `src/components/audio-strip.tsx`
 - Transcription API: `src/app/api/transcriptions/route.ts`
@@ -165,7 +191,6 @@ git diff --check
 
 ## Known Gaps
 
-- Arbitrary lesson audio upload still has placeholder UI.
 - Bulk import for the private `lessonrecordings/` archive has a dry-run/write
   script and the initial archive import is complete. The next work is app-side
   review: open imported lessons, mark useful clips, and use the passworded
@@ -174,8 +199,11 @@ git diff --check
   intentionally presented as a rare fallback. Under 60 minutes, the job runner
   still chunks the audio into 3-minute calls, but Mark should usually create and
   transcribe short useful clips first.
-- Long lesson recording still uploads a browser blob on stop; robust hour-long
-  capture should eventually move toward chunked or resilient background storage.
+- Long lesson recording avoids one large client upload by sending small chunks
+  for larger recordings and retries, but final server assembly still
+  materializes the complete object before writing the final Netlify Blob. Later
+  storage can improve this further with multipart/object-compose semantics if
+  needed.
 - Lesson segment editor has a first-pass chapter rail and review queue, but
   still needs split, merge, true waveform data, and deeper zoom/focus editing.
 - AI-generated practice candidates may still need manual narrowing inside a
@@ -202,33 +230,40 @@ git diff --check
 
 Current feedback to test next:
 
-1. Open `/dashboard` and confirm activity appears directly under the launch
+1. Record a short live lesson with `Save a device copy` active, choose a local
+   file when prompted, stop the recording, and confirm both the app recording
+   and local file play.
+2. For a failed upload test, record a throwaway clip with network disabled, then
+   re-enable network and confirm the unsaved recording can retry and save.
+3. Upload a small audio file from `/lessons` and confirm it creates or attaches
+   a playable lesson recording.
+4. Open `/dashboard` and confirm activity appears directly under the launch
    cards, with weekly and practice-mix graphics.
-2. Start a practice session, add a repertoire piece that is not in the smart
+5. Start a practice session, add a repertoire piece that is not in the smart
    queue, record a passage with a spoken future-self note, and confirm the note
    appears beside the saved passage.
-3. Open `/lessons` and confirm it starts on controls/history; no-recording
+6. Open `/lessons` and confirm it starts on controls/history; no-recording
    dummy lessons should be gone, and any future no-recording shell should show
    a delete action.
-4. Open an imported lesson, select one short useful clip, authorise
+7. Open an imported lesson, select one short useful clip, authorise
    transcription, and watch the queued/running/completed progress state.
-5. Retry the previously failed 57-minute lesson only if needed, confirming the
+8. Retry the previously failed 57-minute lesson only if needed, confirming the
    warning copy makes whole-lesson transcription feel exceptional.
-6. Review the dashboard on iPad landscape and confirm time totals by piece,
+9. Review the dashboard on iPad landscape and confirm time totals by piece,
    exercise, practice item, and recent days match recent practice sessions.
-7. Edit a practice-list item and confirm title, notes, confidence, importance,
+10. Edit a practice-list item and confirm title, notes, confidence, importance,
    piece link, and frequency persist.
-8. Build a practice session from an existing practice-list item.
-9. Add a one-off session item and confirm it is clearly session-only.
-10. Start a live session, click rows to switch active items, mark one item `Done
+11. Build a practice session from an existing practice-list item.
+12. Add a one-off session item and confirm it is clearly session-only.
+13. Start a live session, click rows to switch active items, mark one item `Done
    and log time`, and confirm the next item advances in order.
-11. Use `Not today` and confirm it does not update last-practised metadata.
-12. Confirm no planned-duration labels are visible in the session builder.
-13. Confirm the Quartet area is gone.
-14. Delete a lesson/practice recording from `/recordings`.
-15. Link a practice recording to a repertoire piece and confirm it appears on the
+14. Use `Not today` and confirm it does not update last-practised metadata.
+15. Confirm no planned-duration labels are visible in the session builder.
+16. Confirm the Quartet area is gone.
+17. Delete a lesson/practice recording from `/recordings`.
+18. Link a practice recording to a repertoire piece and confirm it appears on the
    piece page.
-16. Later, add Mark's 12-keys graphic/reference card.
+19. Later, add Mark's 12-keys graphic/reference card.
 
 ## Current Git Notes
 
