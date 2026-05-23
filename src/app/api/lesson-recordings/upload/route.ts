@@ -38,12 +38,17 @@ function extensionForUpload(file: File) {
     .replace(/^\./, "");
   const extensionFromType = new Map([
     ["audio/aac", "aac"],
+    ["audio/m4a", "m4a"],
     ["audio/mp4", "m4a"],
     ["audio/mpeg", "mp3"],
     ["audio/ogg", "ogg"],
+    ["audio/wave", "wav"],
     ["audio/wav", "wav"],
     ["audio/webm", "webm"],
+    ["audio/x-m4a", "m4a"],
+    ["audio/x-wav", "wav"],
     ["video/mp4", "m4a"],
+    ["video/quicktime", "m4a"],
   ]).get(file.type.toLowerCase());
   const extension = extensionFromType ?? extensionFromName;
 
@@ -104,7 +109,8 @@ export async function POST(request: Request) {
   if (
     audio.type &&
     !audio.type.startsWith("audio/") &&
-    audio.type !== "video/mp4"
+    audio.type !== "video/mp4" &&
+    audio.type !== "video/quicktime"
   ) {
     return NextResponse.json(
       { error: "Uploaded file must be an audio recording." },

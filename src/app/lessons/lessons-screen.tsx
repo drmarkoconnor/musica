@@ -2,7 +2,16 @@
 
 import { type ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Check, Edit3, Plus, Trash2, Upload, X } from "lucide-react";
+import {
+  AlertTriangle,
+  Check,
+  Edit3,
+  Mic2,
+  Plus,
+  Trash2,
+  Upload,
+  X,
+} from "lucide-react";
 import { AudioStrip } from "@/components/audio-strip";
 import { ComingSoonButton } from "@/components/coming-soon-button";
 import { LessonRecorder } from "@/components/lesson-recorder";
@@ -26,6 +35,8 @@ type LiveRecordingPreview = {
   phase: "recording" | "saving";
   startedAt: Date;
 };
+
+const AUDIO_UPLOAD_TIMEOUT_MS = 120000;
 
 function todayDate() {
   return new Date().toISOString().slice(0, 10);
@@ -84,6 +95,24 @@ function audioDurationForFile(file: File) {
   });
 }
 
+async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init: RequestInit,
+  timeoutMs: number,
+) {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(input, {
+      ...init,
+      signal: controller.signal,
+    });
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
 function transcriptBulletItems(text: string) {
   return text
     .split(/\n+|(?<=[.!?])\s+/)
@@ -121,6 +150,7 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
     lessonSegmentTranscripts,
     transcripts,
   } = data;
+  const captureInputRef = useRef<HTMLInputElement>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const sortedLessons = [...lessons].sort((a, b) =>
     (
@@ -315,10 +345,26 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
       formData.append("durationSeconds", String(durationSeconds));
     }
 
-    const response = await fetch("/api/lesson-recordings/upload", {
-      method: "POST",
-      body: formData,
-    });
+    let response: Response;
+
+    try {
+      response = await fetchWithTimeout(
+        "/api/lesson-recordings/upload",
+        {
+          body: formData,
+          method: "POST",
+        },
+        AUDIO_UPLOAD_TIMEOUT_MS,
+      );
+    } catch (error) {
+      setUploadState("error");
+      setErrorMessage(
+        error instanceof Error && error.name === "AbortError"
+          ? t("recordingUploadTimedOut")
+          : t("recordingUploadFailed"),
+      );
+      return;
+    }
 
     if (!response.ok) {
       const body = (await response.json().catch(() => null)) as {
@@ -489,7 +535,28 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
               }}
             />
             <input
-              accept="audio/*,video/mp4"
+              accept="audio/*,video/mp4,video/quicktime"
+              capture="user"
+              className="sr-only"
+              onChange={(event) => void handleAudioUpload(event)}
+              ref={captureInputRef}
+              type="file"
+            />
+            <button
+              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-md border border-emerald-900 bg-emerald-50 px-3 py-3 text-sm font-semibold text-emerald-950 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={liveRecordingPreview !== null || uploadState === "saving"}
+              onClick={() => captureInputRef.current?.click()}
+              type="button"
+            >
+              <Mic2 aria-hidden="true" className="h-4 w-4" />
+              {uploadState === "saving"
+                ? t("savingRecording")
+                : uploadState === "saved"
+                  ? t("audioAttached")
+                  : t("recordWithDevice")}
+            </button>
+            <input
+              accept="audio/*,video/mp4,video/quicktime"
               className="sr-only"
               onChange={(event) => void handleAudioUpload(event)}
               ref={uploadInputRef}

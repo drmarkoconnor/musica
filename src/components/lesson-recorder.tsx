@@ -258,6 +258,38 @@ export function LessonRecorder({
     }
   }
 
+  async function startLocalRescueDraft(draft: LessonRecordingDraft) {
+    if (!lessonRecordingDraftStorageAvailable()) {
+      setMessage(t("recordingLocalBackupUnavailable"));
+      return;
+    }
+
+    try {
+      await requestPersistentRecordingStorage();
+      await saveLessonRecordingDraft(draft);
+      localBackupAvailableRef.current = true;
+
+      const existingChunks = chunksRef.current.slice();
+
+      existingChunks.forEach((blob, index) => {
+        const savePromise = saveLessonRecordingChunk({
+          blob,
+          draftId: draft.id,
+          index,
+        }).catch((error) => {
+          console.error("Lesson recording rescue catch-up save failed", error);
+          localBackupAvailableRef.current = false;
+          setMessage(t("recordingLocalBackupUnavailable"));
+        });
+
+        chunkSavePromisesRef.current.push(savePromise);
+      });
+    } catch (error) {
+      console.error("Lesson recording rescue setup failed", error);
+      setMessage(t("recordingLocalBackupUnavailable"));
+    }
+  }
+
   function draftForRecording(startedAt: Date, mimeType: string): LessonRecordingDraft {
     const now = new Date().toISOString();
     const validLessonId = lessonId && isUuid(lessonId) ? lessonId : undefined;
@@ -826,19 +858,6 @@ export function LessonRecorder({
         draft.deviceCopyFileName = deviceBackup.fileName;
       }
 
-      if (lessonRecordingDraftStorageAvailable()) {
-        try {
-          await requestPersistentRecordingStorage();
-          await saveLessonRecordingDraft(draft);
-          localBackupAvailableRef.current = true;
-        } catch (error) {
-          console.error("Lesson recording rescue setup failed", error);
-          setMessage(t("recordingLocalBackupUnavailable"));
-        }
-      } else {
-        setMessage(t("recordingLocalBackupUnavailable"));
-      }
-
       mediaRecorder.addEventListener("dataavailable", (event) => {
         if (event.data.size > 0) {
           chunksRef.current.push(event.data);
@@ -868,7 +887,9 @@ export function LessonRecorder({
       mediaRecorder.start(RECORDER_TIMESLICE_MS);
       onRecordingStarted?.(startedAt);
       setRecordingState("recording");
-    } catch {
+      void startLocalRescueDraft(draft);
+    } catch (error) {
+      console.error("Lesson recording start failed", error);
       if (deviceBackup) {
         await deviceBackup.writable.close().catch(() => {});
       }

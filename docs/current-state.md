@@ -48,13 +48,17 @@ Important hosted env vars:
 - Create lessons and record live lesson audio in browser.
 - Starting a live lesson recording clears the previous lesson context and saves a
   fresh timestamped lesson when stopped.
-- Live lesson recording keeps MediaRecorder chunks in memory and browser
-  IndexedDB as a rescue draft while recording. When stopped, small recordings
-  use the simpler direct upload path, and larger recordings or direct-upload
-  fallback use a server-side chunk upload session. Browser storage, device-copy,
-  MediaRecorder stop, and network waits are bounded so mobile browsers do not
-  sit in `Saving recording` forever. If upload fails, the lesson recorder shows
+- Live lesson recording starts the microphone path before browser rescue storage
+  setup, keeps MediaRecorder chunks in memory and browser IndexedDB as a rescue
+  draft while recording, then saves after stop. Small recordings use the simpler
+  direct upload path, and larger recordings or direct-upload fallback use a
+  server-side chunk upload session. Browser storage, device-copy, MediaRecorder
+  stop, and network waits are bounded so mobile browsers do not sit in
+  `Saving recording` forever. If upload fails, the lesson recorder shows
   unsaved recordings with retry, download-copy, and discard actions.
+- The lesson screen also has a `Record with device` path using the mobile
+  browser/native capture-file flow. This uses the same upload route as manual
+  audio upload and accepts iOS-style audio MIME types such as `audio/x-m4a`.
 - Where the browser supports the File System Access API, lesson recording also
   offers a default-on `Save a device copy` option before recording starts. The
   user chooses a local file and the app writes chunks to it while recording.

@@ -20,6 +20,224 @@ Keep entries concise. Put stable product truth in `project-brief.md`, current
 implementation truth in `current-state.md`, and priority sequencing in
 `roadmap.md`.
 
+## 2026-05-23 - Mobile Recording Fallback
+
+Branch: `main`
+
+Implementation commit: not committed yet.
+
+Work done:
+
+- Responded to follow-up report that lesson recording still would not work in
+  Chrome or on iPhone after the first hardening deploy.
+- Confirmed no new successful `lesson_recordings` rows appeared in Neon after
+  the mobile attempts.
+- Moved IndexedDB rescue setup behind the actual `MediaRecorder.start()` path so
+  mobile browser storage APIs cannot block the recording start.
+- Added a separate `Record with device` button on `/lessons` that uses the
+  phone/tablet native capture-file flow and then uploads through the existing
+  lesson audio upload route.
+- Widened lesson upload acceptance for iOS-style audio MIME types, including
+  `audio/x-m4a`, `audio/m4a`, and related WAV variants.
+- Added a client-side timeout around manual/native audio uploads.
+
+Commands run:
+
+```bash
+npm run typecheck
+npm run build
+git diff --check
+curl http://localhost:3001/lessons
+npx tsx -e ... iOS-style audio/x-m4a upload smoke test and cleanup
+```
+
+Migration status: no database migration. The iOS-style upload smoke created one
+tiny throwaway lesson recording, then deleted its audio object and DB rows.
+
+What Mark should test next:
+
+- On iPhone/iPad, first try `Record with device` on `/lessons`, record a short
+  clip, accept/use the resulting file, and confirm the lesson appears.
+- Then try `Start live lesson recording`; it should enter recording state more
+  quickly because rescue storage no longer blocks start-up.
+
+Known caveats:
+
+- iOS browser live recording still depends on WebKit `MediaRecorder`; the
+  native `Record with device` path is the safer fallback for immediate testing.
+
+## 2026-05-23 - iPad Brave Recording Save Hardening
+
+Branch: `main`
+
+Implementation commit: `e4723e0 Harden lesson recording saves`
+
+Production deploy: `https://jazzmusica.netlify.app`, ready at
+2026-05-23T07:35:23Z.
+
+Work done:
+
+- Responded to a report that even a short lesson clip hung on iPad using Brave.
+- Changed live lesson recording to avoid server upload work during recording:
+  chunks are kept in memory and browser rescue storage first, then saved after
+  stop.
+- Small recordings now use the simpler direct upload route first; larger
+  recordings and direct-upload fallback use server-side chunk upload sessions.
+- Added bounded waits/timeouts around IndexedDB rescue storage, persistent
+  storage prompts, device-copy writes/closes, MediaRecorder stop finalization,
+  and upload fetches so the UI should not remain stuck on `Saving recording`.
+- Added `requestData()` before `MediaRecorder.stop()` plus a stop-event fallback
+  for WebKit-style final-chunk delays.
+- Ensured same-tab save prefers complete in-memory chunks over a partially
+  persisted IndexedDB copy if browser storage is slow.
+
+Commands run:
+
+```bash
+npm run typecheck
+npm run build
+git diff --check
+curl http://localhost:3001/lessons
+npx tsx -e ... local direct-upload smoke test and cleanup
+npx tsx -e ... verify 0 Codex smoke lessons remain
+npx netlify link --id 4615fba6-fab5-42ab-be8a-616a65d46ed7
+git commit -m "Harden lesson recording saves"
+git push origin main
+npx netlify watch
+npx netlify api getDeploy ...
+```
+
+Migration status: no database migration. The direct-upload smoke created one
+tiny throwaway lesson recording, then deleted its audio object and DB rows.
+
+What Mark should test next:
+
+- On the iPad in Brave, record a 5-10 second lesson clip and stop it.
+- Confirm it either saves quickly or shows an unsaved recording with retry and
+  download options rather than hanging indefinitely.
+- If Brave still misbehaves, repeat once in Safari to isolate Brave-specific
+  shell behavior from iOS WebKit behavior.
+
+Known caveats:
+
+- Direct device-file writing is still unavailable on iPad browsers; iPad relies
+  on browser rescue storage plus download/retry recovery.
+- Very poor connectivity can still prevent server save, but it should now time
+  out into a recoverable state.
+
+## 2026-05-22 - Lesson Recording Chunking And Rescue Hardening
+
+Branch: `main`
+
+Implementation commit: `e4723e0 Harden lesson recording saves`
+
+Work done:
+
+- Investigated the failed hour-long live recording report.
+- Confirmed there was no new real lesson recording row in Neon and no recent
+  Netlify Blob for the failed take; the newest row was a development
+  `local-test-audio` fixture attached at 11:11 BST.
+- Removed that `local-test-audio` recording row from Neon and returned the
+  `First with the app` lesson to draft/no-recording state.
+- Removed the normal lesson UI path for attaching test audio and gated the test
+  fixture API behind `PRACTICE_LOOP_ENABLE_TEST_AUDIO=true`.
+- Added browser-local lesson recording rescue drafts in IndexedDB while
+  recording/uploading, with retry save, download copy, and discard controls.
+- Added server-side lesson recording upload sessions. Live recording now sends
+  small chunks to `/api/lesson-recordings/upload-session/*` and completes only
+  after the server assembles all chunks into the final lesson audio object.
+- Added a default-on `Save a device copy` option where supported by the browser;
+  Mark chooses a local file before recording and the app writes chunks to it
+  during recording.
+- Made device-copy success messaging depend on the local file stream closing
+  successfully, so the UI does not claim a device copy exists after a write
+  failure.
+- Turned the lesson upload placeholder into a real audio file upload control.
+- Preserved client `recordedAt` on upload and cleaned up newly stored audio if
+  metadata insertion fails.
+
+Commands run:
+
+```bash
+git status -sb
+npx tsx -e ... latest lesson_recordings query
+npx tsx -e ... Netlify Blobs orphan check
+npx tsx -e ... remove local-test-audio row
+npm run typecheck
+npm run build
+git diff --check
+node/npx tsx ... chunked upload session smoke test
+node --input-type=module -e ... lesson page smoke checks
+npx -y playwright screenshot --channel chrome ...
+```
+
+Migration status: no database migration. Data cleanup deleted 1 accidental
+`local-test-audio` `lesson_recordings` row and updated its lesson back to
+`draft`.
+
+What Mark should test next:
+
+- Record a short live lesson with `Save a device copy` enabled, stop it, and
+  confirm both the app recording and the local file play.
+- Test the failure path on a throwaway recording if possible: interrupt upload
+  and confirm the unsaved recording can be retried or downloaded.
+- Upload a small audio file from `/lessons` and confirm it creates or attaches a
+  playable lesson recording.
+
+Known caveats:
+
+- The already-lost hour-long take was not recoverable from server-side storage;
+  no DB row or recent blob existed for it.
+- Chrome/Edge support direct device-file writing; unsupported browsers still
+  fall back to browser rescue storage and download-copy recovery.
+- The app no longer depends on one large client upload, but final server
+  assembly still materializes the full recording before writing the Netlify
+  Blob. Multipart/object-compose storage can improve this later if needed.
+
+## 2026-05-22 - Leo Presentation Deck
+
+Branch: `main`
+
+Implementation commit: not committed yet.
+
+Work done:
+
+- Created a bilingual English/Italian presentation for explaining Practice Loop
+  to Leo as a professional educational product.
+- Captured live app screenshots after entering through the passworded app flow.
+- Added an interactive HTML deck with side-by-side English/Italian copy,
+  screenshot-led slides, cost-aware AI/manual-note positioning, and an original
+  click-to-start soft jazz backing bed.
+- Exported a PDF copy for easy sharing.
+
+Files added:
+
+- `public/presentations/practice-loop-leo/index.html`
+- `public/presentations/practice-loop-leo/practice-loop-for-leo.pdf`
+- `public/presentations/practice-loop-leo/screenshots/*.png`
+- `public/presentations/practice-loop-leo.zip`
+
+Commands run:
+
+```bash
+npx -y playwright screenshot ...
+npx -y playwright pdf ...
+git diff --check
+```
+
+Migration status: no database migration.
+
+What Mark should test next:
+
+- Open the HTML deck, step through the slides, and decide whether the
+  AI-transcription-cost slide should be more cautious before sharing with Leo.
+- Use the PDF if a non-interactive/email-safe version is needed.
+
+Known caveats:
+
+- The HTML deck's jazz bed is generated in the browser and requires a click to
+  start because browsers block autoplay audio.
+
 ## 2026-05-22 - Delete No-Recording Dummy Lessons
 
 Branch: `main`

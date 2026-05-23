@@ -55,6 +55,10 @@ Done:
   retries/downloads/discards unsaved drafts after failed saves.
 - Mobile recording save waits are bounded so iPad/WebKit browsers should fail
   recoverably instead of hanging indefinitely on `Saving recording`.
+- Live recording now starts before IndexedDB rescue setup finishes, avoiding a
+  mobile start-up stall on slow browser storage APIs.
+- The lesson screen has a mobile/native `Record with device` capture-file path,
+  with iOS-style audio MIME types accepted by the upload route.
 - Browser lesson recording has a default-on `Save a device copy` option where
   supported, so a user-granted local audio file is written while recording.
 - Lesson audio upload has a first-pass real file picker backed by the lesson
