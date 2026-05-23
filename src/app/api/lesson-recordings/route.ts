@@ -2,7 +2,10 @@ import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { createDatabaseClient } from "@/db/client";
 import { lessonRecordings, lessons } from "@/db/schema";
-import { getTestAudioFixture } from "@/lib/server/test-audio-fixtures";
+import {
+  getTestAudioFixture,
+  testAudioFixturesEnabled,
+} from "@/lib/server/test-audio-fixtures";
 
 type LessonRecordingRequestBody = {
   lessonId?: unknown;
@@ -16,7 +19,7 @@ function isUuid(value: string) {
 }
 
 export async function POST(request: Request) {
-  if (process.env.PRACTICE_LOOP_ENABLE_TEST_AUDIO !== "true") {
+  if (!testAudioFixturesEnabled()) {
     return NextResponse.json(
       { error: "Test audio fixtures are disabled." },
       { status: 404 },

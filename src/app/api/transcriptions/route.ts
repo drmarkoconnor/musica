@@ -2,7 +2,10 @@ import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { serverEnv } from "@/lib/server/env";
 import { transcribeAudioFile } from "@/lib/server/openai-transcription";
-import { getTestAudioFixture } from "@/lib/server/test-audio-fixtures";
+import {
+  getTestAudioFixture,
+  testAudioFixturesEnabled,
+} from "@/lib/server/test-audio-fixtures";
 import {
   createLessonTranscriptionJob,
   markTranscriptionJobFailed,
@@ -104,6 +107,13 @@ export async function POST(request: Request) {
   }
 
   if (typeof body.testAudioFixture === "string") {
+    if (!testAudioFixturesEnabled()) {
+      return NextResponse.json(
+        { error: "Test audio fixtures are disabled." },
+        { status: 404 },
+      );
+    }
+
     const fixture = getTestAudioFixture(body.testAudioFixture);
 
     if (!fixture) {

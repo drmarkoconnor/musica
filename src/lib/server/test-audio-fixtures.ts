@@ -49,6 +49,13 @@ export function getTestAudioFixture(fixtureId: string) {
   return testAudioFixtures[fixtureId] ?? null;
 }
 
+export function testAudioFixturesEnabled() {
+  return (
+    process.env.NODE_ENV !== "production" &&
+    process.env.PRACTICE_LOOP_ENABLE_TEST_AUDIO === "true"
+  );
+}
+
 export function localLessonRecordingStoragePath(fileName: string) {
   return `${LOCAL_LESSON_AUDIO_STORAGE_PREFIX}${fileName}`;
 }
