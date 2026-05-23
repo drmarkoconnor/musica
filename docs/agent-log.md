@@ -20,11 +20,72 @@ Keep entries concise. Put stable product truth in `project-brief.md`, current
 implementation truth in `current-state.md`, and priority sequencing in
 `roadmap.md`.
 
-## 2026-05-23 - Mobile Recording Fallback
+## 2026-05-23 - Transcription Retry Stale Job Fix
 
 Branch: `main`
 
 Implementation commit: not committed yet.
+
+Work done:
+
+- Investigated Mark's clarification that the earlier failure was the
+  transcription process.
+- Found the concrete stuck state in Neon: transcription job
+  `ad6e8dd1-2286-4354-a99d-2325501e9aed` for `Leo lesson - 2024-10-16 11:08`
+  was `running` at `Preparing recording`, with 0/1 chunks complete and its
+  chunk still `pending`.
+- Identified the retry bug: matching `running` jobs were treated as already
+  active, so re-authorising transcription did not restart a stale background
+  run.
+- Added stale-running detection. Re-authorising a matching stale job now resets
+  it to queued and returns `shouldStart: true`; status polling can also mark a
+  stale run failed with a restart instruction.
+- Ran a tiny end-to-end transcription smoke test through ffmpeg, OpenAI
+  transcription, OpenAI lesson analysis, DB writes, and cleanup.
+- Ran the exact stuck job locally; it completed successfully, saved the
+  transcript and segment memory, and created one candidate practice item.
+
+Commands run:
+
+```bash
+npx netlify logs --source functions --function transcribe-lesson-background --since 24h --json
+npx tsx -e ... inspect transcription jobs/chunks/transcripts
+npm run typecheck
+npx tsx -e ... end-to-end transcription smoke test and cleanup
+npx tsx -e ... reset stale job via createLessonTranscriptionJob
+npx tsx -e ... run stuck job ad6e8dd1...
+npx tsx -e ... verify completed job/chunk/transcript/segment memory/extract
+npm run typecheck
+npm run build
+git diff --check
+```
+
+Migration status: no database migration. The smoke test created one temporary
+local lesson/recording/selected segment, then deleted its rows and local audio
+file. The real stuck 2024-10-16 transcription job is now complete.
+
+What Mark should test next:
+
+- Open `Leo lesson - 2024-10-16 11:08` and confirm the useful clip memory and
+  candidate practice item are visible.
+- Transcribe one new short selected clip after deploy to confirm the retry path
+  no longer wedges if a background run stalls.
+
+Known caveats:
+
+- Selected-clip transcription still materializes the full source recording
+  before clipping. It worked locally for the stuck 74-second clip from a
+  one-hour source recording, but future storage work should avoid full-object
+  materialization for long recordings.
+
+## 2026-05-23 - Mobile Recording Fallback
+
+Branch: `main`
+
+Implementation commit: `0dcb54e Add mobile lesson recording fallback`
+
+Production deploy: `https://jazzmusica.netlify.app`, ready at
+2026-05-23T17:02:52Z.
 
 Work done:
 

@@ -2,7 +2,7 @@
 
 Last updated: 2026-05-23
 
-Latest implementation commit: `5977762 Allow deleting lessons without recordings`
+Latest implementation commit: `0dcb54e Add mobile lesson recording fallback`
 
 ## Working Environment
 
@@ -82,6 +82,10 @@ Important hosted env vars:
   3-minute audio chunks, update chunk/job progress in Neon, save partial
   transcript text as chunks complete, and can retry failed jobs without
   redoing already completed chunks.
+- Stale `running` transcription jobs are now restartable. If a background run
+  stalls long enough to stop updating progress, re-authorising transcription
+  resets the job to queued and starts it again; status polling can also mark a
+  stale run failed with a restart instruction instead of spinning forever.
 - The Netlify background transcription function initializes the Blobs context
   explicitly and materializes lesson audio by streaming the blob to temp storage
   before clipping, rather than loading the whole lesson into memory.

@@ -2,6 +2,10 @@ import { and, desc, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { createDatabaseClient } from "@/db/client";
 import { transcriptionJobs, transcripts } from "@/db/schema";
+import {
+  isStaleRunningTranscriptionJob,
+  markTranscriptionJobFailed,
+} from "@/lib/server/transcription-job";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -20,7 +24,7 @@ export async function GET(request: Request) {
   }
 
   const db = createDatabaseClient();
-  const [job] = jobId
+  let [job] = jobId
     ? await db
         .select()
         .from(transcriptionJobs)
@@ -37,6 +41,20 @@ export async function GET(request: Request) {
         )
         .orderBy(desc(transcriptionJobs.requestedAt))
         .limit(1);
+
+  if (job && isStaleRunningTranscriptionJob(job)) {
+    await markTranscriptionJobFailed({
+      errorMessage:
+        "Transcription stalled before finishing. Authorise transcription again to restart it.",
+      jobId: job.id,
+    });
+
+    [job] = await db
+      .select()
+      .from(transcriptionJobs)
+      .where(eq(transcriptionJobs.id, job.id))
+      .limit(1);
+  }
 
   const transcriptId = job?.transcriptId;
   const [transcript] = transcriptId

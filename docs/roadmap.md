@@ -105,6 +105,8 @@ Done:
 - Progress polling in the transcription modal.
 - Failed chunk/job state can be retried without redoing completed chunks when
   the selected clip set is unchanged.
+- Stale `running` jobs can be restarted instead of blocking future retries, and
+  status polling can surface a restartable stalled-run failure.
 - Lesson-page warnings steer Mark toward listening first and selecting short
   clips, with whole-lesson transcription framed as a rare fallback.
 - Hidden raw transcript.

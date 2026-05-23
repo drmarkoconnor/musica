@@ -29,6 +29,7 @@ import { transcribeAudioFile } from "@/lib/server/openai-transcription";
 
 export const MAX_FULL_RECORDING_TRANSCRIPTION_SECONDS = 60 * 60;
 export const MAX_TRANSCRIPTION_CHUNK_SECONDS = 3 * 60;
+const STALE_RUNNING_TRANSCRIPTION_JOB_MS = 20 * 60 * 1000;
 
 type TranscriptionMode = "selected_segments" | "full_recording";
 
@@ -55,6 +56,18 @@ export class TranscriptionRequestError extends Error {
 
 function nowIso() {
   return new Date().toISOString();
+}
+
+export function isStaleRunningTranscriptionJob(
+  job: Pick<TranscriptionJobRow, "status" | "updatedAt">,
+) {
+  if (job.status !== "running") return false;
+
+  const updatedAt = new Date(job.updatedAt).getTime();
+
+  if (!Number.isFinite(updatedAt)) return true;
+
+  return Date.now() - updatedAt > STALE_RUNNING_TRANSCRIPTION_JOB_MS;
 }
 
 function formatTimestamp(totalSeconds: number) {
@@ -504,7 +517,9 @@ export async function createLessonTranscriptionJob({
   });
 
   if (matchingJob) {
-    if (matchingJob.status === "failed") {
+    const shouldRestartStaleJob = isStaleRunningTranscriptionJob(matchingJob);
+
+    if (matchingJob.status === "failed" || shouldRestartStaleJob) {
       await db
         .update(transcriptionJobChunks)
         .set({
@@ -538,10 +553,16 @@ export async function createLessonTranscriptionJob({
         currentLabel:
           matchingJob.status === "failed"
             ? "Retry queued"
+            : shouldRestartStaleJob
+              ? "Restart queued after stalled run"
             : matchingJob.currentLabel,
         errorMessage: null,
         requestedAt,
-        status: matchingJob.status === "running" ? "running" : "queued",
+        startedAt: shouldRestartStaleJob ? null : matchingJob.startedAt,
+        status:
+          matchingJob.status === "running" && !shouldRestartStaleJob
+            ? "running"
+            : "queued",
         transcriptId,
         updatedAt: requestedAt,
       })
@@ -551,7 +572,7 @@ export async function createLessonTranscriptionJob({
       jobId: matchingJob.id,
       mode,
       selectedSegmentCount: selectedSegments.length,
-      shouldStart: matchingJob.status !== "running",
+      shouldStart: matchingJob.status !== "running" || shouldRestartStaleJob,
       totalChunks: chunks.length,
       transcriptId,
     };
