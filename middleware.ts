@@ -18,7 +18,7 @@ export async function middleware(request: NextRequest) {
 
   const { pathname, search } = request.nextUrl;
 
-  if (publicPaths.has(pathname)) {
+  if (publicPaths.has(pathname) || pathname.startsWith("/.netlify/functions/")) {
     return NextResponse.next();
   }
 

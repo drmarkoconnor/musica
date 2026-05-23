@@ -51,7 +51,22 @@ function shouldUseNetlifyBackgroundFunction(request: Request) {
     return true;
   }
 
-  return process.env.NODE_ENV === "production" && !isLocalRequest(request);
+  return process.env.NODE_ENV === "production" || !isLocalRequest(request);
+}
+
+function netlifyBackgroundFunctionUrl(request: Request) {
+  const siteUrl =
+    serverEnv("URL") ||
+    serverEnv("DEPLOY_PRIME_URL") ||
+    serverEnv("DEPLOY_URL") ||
+    (process.env.NODE_ENV === "production"
+      ? "https://jazzmusica.netlify.app"
+      : request.url);
+
+  return new URL(
+    "/.netlify/functions/transcribe-lesson-background",
+    siteUrl,
+  );
 }
 
 async function startTranscriptionJob({
@@ -64,7 +79,7 @@ async function startTranscriptionJob({
   request: Request;
 }) {
   if (shouldUseNetlifyBackgroundFunction(request)) {
-    const url = new URL("/.netlify/functions/transcribe-lesson-background", request.url);
+    const url = netlifyBackgroundFunctionUrl(request);
     console.info("Dispatching transcription job to Netlify background function", {
       jobId,
     });
@@ -74,6 +89,13 @@ async function startTranscriptionJob({
       headers: { "Content-Type": "application/json" },
       method: "POST",
     });
+    const contentType = response.headers.get("content-type") ?? "";
+
+    if (response.ok && contentType.includes("text/html")) {
+      throw new Error(
+        "Background transcription endpoint returned the app shell instead of starting.",
+      );
+    }
 
     if (!response.ok) {
       const body = (await response.json().catch(() => null)) as {
