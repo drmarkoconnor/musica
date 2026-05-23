@@ -35,8 +35,23 @@ function safeCompare(input: string, expected: string) {
   return timingSafeEqual(inputBuffer, expectedBuffer);
 }
 
-function shouldUseNetlifyBackgroundFunction() {
-  return serverEnv("NETLIFY") === "true";
+function isLocalRequest(request: Request) {
+  const hostname = new URL(request.url).hostname;
+
+  return (
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "[::1]"
+  );
+}
+
+function shouldUseNetlifyBackgroundFunction(request: Request) {
+  if (serverEnv("NETLIFY") === "true") return true;
+  if (serverEnv("CONTEXT") || serverEnv("DEPLOY_URL") || serverEnv("URL")) {
+    return true;
+  }
+
+  return process.env.NODE_ENV === "production" && !isLocalRequest(request);
 }
 
 async function startTranscriptionJob({
@@ -48,8 +63,12 @@ async function startTranscriptionJob({
   jobId: string;
   request: Request;
 }) {
-  if (shouldUseNetlifyBackgroundFunction()) {
+  if (shouldUseNetlifyBackgroundFunction(request)) {
     const url = new URL("/.netlify/functions/transcribe-lesson-background", request.url);
+    console.info("Dispatching transcription job to Netlify background function", {
+      jobId,
+    });
+
     const response = await fetch(url, {
       body: JSON.stringify({ jobId, token: expectedPassword }),
       headers: { "Content-Type": "application/json" },
@@ -66,6 +85,7 @@ async function startTranscriptionJob({
     return;
   }
 
+  console.info("Dispatching transcription job to local runner", { jobId });
   void runLessonTranscriptionJob({ jobId }).catch((error) => {
     const errorMessage =
       error instanceof Error ? error.message : "Transcription failed.";

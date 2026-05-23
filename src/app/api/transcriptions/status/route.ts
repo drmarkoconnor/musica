@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createDatabaseClient } from "@/db/client";
 import { transcriptionJobs, transcripts } from "@/db/schema";
 import {
+  isStaleQueuedTranscriptionJob,
   isStaleRunningTranscriptionJob,
   markTranscriptionJobFailed,
 } from "@/lib/server/transcription-job";
@@ -42,10 +43,16 @@ export async function GET(request: Request) {
         .orderBy(desc(transcriptionJobs.requestedAt))
         .limit(1);
 
-  if (job && isStaleRunningTranscriptionJob(job)) {
+  const queuedJobDidNotStart = job
+    ? isStaleQueuedTranscriptionJob(job)
+    : false;
+  const runningJobStalled = job ? isStaleRunningTranscriptionJob(job) : false;
+
+  if (job && (queuedJobDidNotStart || runningJobStalled)) {
     await markTranscriptionJobFailed({
-      errorMessage:
-        "Transcription stalled before finishing. Authorise transcription again to restart it.",
+      errorMessage: queuedJobDidNotStart
+        ? "Transcription did not start. Authorise transcription again to restart it."
+        : "Transcription stalled before finishing. Authorise transcription again to restart it.",
       jobId: job.id,
     });
 

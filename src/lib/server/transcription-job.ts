@@ -29,6 +29,7 @@ import { transcribeAudioFile } from "@/lib/server/openai-transcription";
 
 export const MAX_FULL_RECORDING_TRANSCRIPTION_SECONDS = 60 * 60;
 export const MAX_TRANSCRIPTION_CHUNK_SECONDS = 3 * 60;
+const STALE_QUEUED_TRANSCRIPTION_JOB_MS = 2 * 60 * 1000;
 const STALE_RUNNING_TRANSCRIPTION_JOB_MS = 20 * 60 * 1000;
 
 type TranscriptionMode = "selected_segments" | "full_recording";
@@ -63,11 +64,23 @@ export function isStaleRunningTranscriptionJob(
 ) {
   if (job.status !== "running") return false;
 
-  const updatedAt = new Date(job.updatedAt).getTime();
+  return timestampAgeExceeds(job.updatedAt, STALE_RUNNING_TRANSCRIPTION_JOB_MS);
+}
+
+export function isStaleQueuedTranscriptionJob(
+  job: Pick<TranscriptionJobRow, "startedAt" | "status" | "updatedAt">,
+) {
+  if (job.status !== "queued" || job.startedAt) return false;
+
+  return timestampAgeExceeds(job.updatedAt, STALE_QUEUED_TRANSCRIPTION_JOB_MS);
+}
+
+function timestampAgeExceeds(value: string, maxAgeMs: number) {
+  const updatedAt = new Date(value).getTime();
 
   if (!Number.isFinite(updatedAt)) return true;
 
-  return Date.now() - updatedAt > STALE_RUNNING_TRANSCRIPTION_JOB_MS;
+  return Date.now() - updatedAt > maxAgeMs;
 }
 
 function formatTimestamp(totalSeconds: number) {
