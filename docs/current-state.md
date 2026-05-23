@@ -2,7 +2,7 @@
 
 Last updated: 2026-05-23
 
-Latest implementation commit: `0dcb54e Add mobile lesson recording fallback`
+Latest implementation commit: `c2b1740 Restart stalled transcription jobs`
 
 ## Working Environment
 

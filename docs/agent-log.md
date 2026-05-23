@@ -24,7 +24,10 @@ implementation truth in `current-state.md`, and priority sequencing in
 
 Branch: `main`
 
-Implementation commit: not committed yet.
+Implementation commit: `c2b1740 Restart stalled transcription jobs`
+
+Production deploy: `https://jazzmusica.netlify.app`, ready at
+2026-05-23T17:21:38Z.
 
 Work done:
 
@@ -58,6 +61,11 @@ npx tsx -e ... verify completed job/chunk/transcript/segment memory/extract
 npm run typecheck
 npm run build
 git diff --check
+npx netlify build
+git push origin main
+npx netlify status
+npx netlify watch
+npx netlify api listSiteDeploys --data '{"site_id":"4615fba6-fab5-42ab-be8a-616a65d46ed7"}'
 ```
 
 Migration status: no database migration. The smoke test created one temporary
