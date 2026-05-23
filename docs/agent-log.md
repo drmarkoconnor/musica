@@ -20,6 +20,53 @@ Keep entries concise. Put stable product truth in `project-brief.md`, current
 implementation truth in `current-state.md`, and priority sequencing in
 `roadmap.md`.
 
+## 2026-05-23 - Disable Production Test Fixtures
+
+Branch: `main`
+
+Implementation commit: `c14e2a1 Disable test audio fixtures in production`
+
+Production deploy: `https://jazzmusica.netlify.app`, ready at
+2026-05-23T17:26:00Z.
+
+Work done:
+
+- Followed up Mark's report that a visible test clip path had been confusing
+  and unplayable.
+- Confirmed there are no current Neon lesson recording rows pointing at the old
+  local test fixture.
+- Added a shared fixture gate so test audio fixture APIs only work in
+  non-production when `PRACTICE_LOOP_ENABLE_TEST_AUDIO=true`.
+- Confirmed the live production transcription API rejects a fixture request
+  after authenticated login with `404 Test audio fixtures are disabled`.
+
+Commands run:
+
+```bash
+rg -n "testAudioFixture|fixture|test clip|Attach|transcription" src
+npx tsx -e ... inspect fixture recording rows
+npm run typecheck
+npm run build
+git diff --check
+NODE_ENV=production PRACTICE_LOOP_ENABLE_TEST_AUDIO=true npx tsx -e ... verify fixture gate
+git push origin main
+npx netlify watch
+npx netlify api listSiteDeploys --data '{"site_id":"4615fba6-fab5-42ab-be8a-616a65d46ed7"}'
+node - <<'NODE' ... authenticated production fixture rejection smoke
+```
+
+Migration status: no database migration.
+
+What Mark should test next:
+
+- Use only real lesson audio: `Record with device`, upload audio, then select a
+  short teaching clip and authorise transcription.
+
+Known caveats:
+
+- Translation keys and older docs still mention fixture/test wording, but the
+  production UI and API path are blocked for real use.
+
 ## 2026-05-23 - Transcription Retry Stale Job Fix
 
 Branch: `main`

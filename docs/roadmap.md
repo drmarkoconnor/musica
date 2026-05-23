@@ -64,7 +64,7 @@ Done:
 - Lesson audio upload has a first-pass real file picker backed by the lesson
   recording upload route.
 - Normal lesson UI no longer exposes the development test-audio attachment, and
-  the fixture API is gated behind `PRACTICE_LOOP_ENABLE_TEST_AUDIO=true`.
+  fixture APIs are blocked in production even if the old request path is called.
 - Lesson creation and recording metadata.
 - Lesson screen opens on start/record controls and history rather than
   auto-loading a previous summary.

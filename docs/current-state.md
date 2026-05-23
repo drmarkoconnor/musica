@@ -2,7 +2,7 @@
 
 Last updated: 2026-05-23
 
-Latest implementation commit: `c2b1740 Restart stalled transcription jobs`
+Latest implementation commit: `c14e2a1 Disable test audio fixtures in production`
 
 ## Working Environment
 
@@ -64,8 +64,9 @@ Important hosted env vars:
   user chooses a local file and the app writes chunks to it while recording.
 - The lesson screen now has a real audio upload control backed by the lesson
   recording upload route, instead of a placeholder button.
-- The old local test-audio attachment flow is removed from the normal lesson UI
-  and its API route is disabled unless `PRACTICE_LOOP_ENABLE_TEST_AUDIO=true`.
+- The old local test-audio attachment flow is removed from the normal lesson UI.
+  Test fixture APIs are blocked in production and only work in non-production
+  when `PRACTICE_LOOP_ENABLE_TEST_AUDIO=true`.
 - Play lesson recordings through protected server routes.
 - Hosted read-model filtering hides local-only audio records that cannot be
   served by Netlify.
