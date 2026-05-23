@@ -2,7 +2,7 @@
 
 Last updated: 2026-05-23
 
-Latest implementation commit: `c14e2a1 Disable test audio fixtures in production`
+Latest implementation commit: `9042101 Allow transcription background function through auth`
 
 ## Working Environment
 
@@ -79,10 +79,15 @@ Important hosted env vars:
 - Password-gated transcription now queues a durable transcription job and returns
   immediately. On Netlify it invokes a `-background` function; locally it runs
   the same job runner in the dev server process.
+- Netlify background transcription function paths bypass the whole-app auth
+  middleware. The transcription starter rejects accidental HTML app-shell
+  responses so a login page cannot masquerade as a started background job.
 - Transcription jobs split selected clips or rare full-lesson requests into
   3-minute audio chunks, update chunk/job progress in Neon, save partial
   transcript text as chunks complete, and can retry failed jobs without
   redoing already completed chunks.
+- Queued transcription jobs that never start now fail visibly with a retry
+  instruction instead of polling indefinitely.
 - Stale `running` transcription jobs are now restartable. If a background run
   stalls long enough to stop updating progress, re-authorising transcription
   resets the job to queued and starts it again; status polling can also mark a

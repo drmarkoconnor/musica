@@ -20,6 +20,77 @@ Keep entries concise. Put stable product truth in `project-brief.md`, current
 implementation truth in `current-state.md`, and priority sequencing in
 `roadmap.md`.
 
+## 2026-05-23 - Netlify Background Transcription Start Fix
+
+Branch: `main`
+
+Implementation commits:
+
+- `43ab678 Start transcription jobs reliably on Netlify`
+- `9042101 Allow transcription background function through auth`
+
+Production deploy: `https://jazzmusica.netlify.app`, ready at
+2026-05-23T20:23:36Z.
+
+Work done:
+
+- Investigated Mark's report that a newly recorded iPad lesson and selected
+  clip hung again after authorising transcription.
+- Found the live job `d2ba300a-3249-423a-bd02-c3d12f30c0c4` for
+  `Leo lesson - 23 May 2026 at 20:24` stuck in `queued` with no background
+  function logs.
+- Recovered Mark's clip by running that job directly; it completed, saved the
+  segment memory `Major Scales in Circle of Fourths`, and created candidate
+  practice item `Circle of Fourths Exercise`.
+- Fixed production dispatch so Netlify/prod requests use the background
+  function instead of the local fire-and-forget runner.
+- Added stale queued-job detection so jobs that never start fail visibly with a
+  retry instruction.
+- Found the deeper issue: the whole-app auth middleware intercepted
+  `/.netlify/functions/transcribe-lesson-background` and returned the login
+  shell as HTTP 200, so the starter believed the background job had started.
+- Allowed `/.netlify/functions/*` through the app auth middleware and made the
+  starter reject HTML app-shell responses from the background endpoint.
+- Ran a production smoke through login, audio upload, segment creation,
+  transcription authorisation, Netlify background function execution, polling to
+  `complete`, and cleanup.
+
+Commands run:
+
+```bash
+node ... netlify logs --source functions --since 2h --json
+node node_modules/tsx/dist/cli.mjs ... inspect recent lessons/jobs/chunks
+node node_modules/tsx/dist/cli.mjs ... run stuck job d2ba300a...
+npm run typecheck
+npm run build
+git diff --check
+node ... netlify build
+gh auth setup-git
+git push origin main
+node ... netlify watch
+node ... production function/login-path probe
+node ... production transcription smoke and cleanup
+node node_modules/tsx/dist/cli.mjs ... verify no smoke leftovers
+```
+
+Migration status: no database migration. The production smoke created a
+throwaway lesson/recording/segment/job and deleted the lesson/recording/audio
+after completion.
+
+What Mark should test next:
+
+- Refresh `/lessons`, open `Leo lesson - 23 May 2026 at 20:24`, and confirm the
+  recovered clip memory and candidate practice item are visible.
+- Record or upload one more very short real clip and authorise transcription;
+  it should move from queued to running within a few seconds.
+
+Known caveats:
+
+- Netlify background functions return `202` immediately with an empty response,
+  so the UI must rely on job polling for the true result.
+- The unrelated untracked `public/presentations/` folder remains local and was
+  not committed.
+
 ## 2026-05-23 - Disable Production Test Fixtures
 
 Branch: `main`

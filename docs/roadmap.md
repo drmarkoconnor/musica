@@ -107,6 +107,8 @@ Done:
   the selected clip set is unchanged.
 - Stale `running` jobs can be restarted instead of blocking future retries, and
   status polling can surface a restartable stalled-run failure.
+- Netlify background function dispatch now bypasses the app auth middleware,
+  and queued jobs that never start surface a retryable failure.
 - Lesson-page warnings steer Mark toward listening first and selecting short
   clips, with whole-lesson transcription framed as a rare fallback.
 - Hidden raw transcript.
