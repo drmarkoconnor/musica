@@ -63,6 +63,7 @@ export const translations = {
     stopClip: "Stop clip",
     playbackFailed: "Audio did not start. Try the play control again.",
     transcribeLesson: "Transcribe Lesson",
+    transcribeMoreClips: "Transcribe more clips",
     transcriptionNote:
       "Transcription uses paid AI processing and requires authorisation.",
     transcriptionClipFirstTitle: "Listen first, then select short clips",
@@ -85,6 +86,19 @@ export const translations = {
     transcriptionQueued: "Queued. You can leave this open or come back later.",
     transcriptionRunning: "Transcribing audio",
     transcriptionComplete: "Transcript saved to the lesson.",
+    transcriptionCompleteNextStep:
+      "Clip memories are saved below. Add another teaching segment if there is more to transcribe.",
+    transcriptionSuccessTitle: "Clip transcription complete",
+    transcriptionSuccessSelectedBody:
+      "The selected teaching clips are saved as lesson memory. Review the notes below, then keep any practice suggestions that are useful.",
+    transcriptionSuccessFullBody:
+      "The recording transcript is saved as lesson memory. Review the notes below, then keep any practice suggestions that are useful.",
+    transcriptionDetails: "Transcription details",
+    transcriptionMode: "Mode",
+    transcriptionModeClips: "Selected clips",
+    transcriptionModeFull: "Full recording",
+    reviewClipMemories: "Review memories",
+    chooseMoreClips: "Choose more clips",
     transcriptionFailed: "Transcription failed.",
     transcriptionProgress: "Progress",
     processingChunk: "Processing",
@@ -112,7 +126,7 @@ export const translations = {
       "Server save is slow. The browser rescue copy can retry or download later.",
     recordingUploadTimedOut:
       "Server save timed out. The browser rescue copy can retry or download later.",
-    saveDeviceCopy: "Save a device copy",
+    saveDeviceCopy: "Also save a local file",
     saveDeviceCopyHelp:
       "You will choose a file before recording. This gives you a normal local audio file as well as the app save.",
     saveDeviceCopyUnsupported:
@@ -129,8 +143,11 @@ export const translations = {
     discardRecoveryCopy: "Discard copy",
     recordingRecoveryUnavailable: "The rescue copy is not available.",
     recordingRecoveryActionFailed: "That recovery action failed. Try again.",
-    recordWithDevice: "Record with device",
-    uploadAudio: "Upload audio",
+    recordWithDevice: "Phone/iPad recorder",
+    recordWithDeviceHelp:
+      "Mobile fallback: ask the device to create a new audio file and upload it.",
+    uploadAudio: "Upload audio file",
+    uploadAudioHelp: "Choose an existing lesson audio file.",
     transcript: "Transcript",
     teachingReview: "Teaching review",
     lessonSummary: "Lesson summary",
@@ -157,8 +174,27 @@ export const translations = {
     markTeachingClipNote:
       "Choose the part of the recording that contains useful teaching, preview it, then save it as a review candidate.",
     teachingSegments: "Teaching segments",
+    clip: "Clip",
     usefulClipsFrom: "Useful clips from",
     usefulClipMemories: "Useful clip memories",
+    memoryLibrary: "Memory library",
+    leoMemoryTips: "Useful memory tips from Leo",
+    leoMemoryTipsNote:
+      "A listen-back library of teaching snippets. These can stay as context without becoming practice tasks.",
+    memoryTip: "Memory tip",
+    searchMemoryTips: "Search tips, tunes, topics",
+    noMemoryTips: "No memory tips match that search yet.",
+    allTopics: "All topics",
+    topicGeneralAdvice: "General advice",
+    topicHarmony: "Harmony",
+    topicRepertoire: "Repertoire",
+    topicRhythm: "Rhythm",
+    topicTechnique: "Technique",
+    topicVocal: "Vocal",
+    openSourceLesson: "Open lesson",
+    relatedPractice: "Related practice",
+    memoryTipNoPractice:
+      "Kept as a listening memory. It does not need to become a practice task.",
     clipTranscript: "Clip transcript",
     clipMemoryCaptured: "Transcript captured for this useful clip.",
     noPracticeItemSuggested: "No practice item suggested.",
@@ -178,9 +214,12 @@ export const translations = {
     backFiveSeconds: "Back 5 seconds",
     forwardFiveSeconds: "Forward 5 seconds",
     teachingSegmentsNote:
-      "Mark only the parts that contain useful teaching. These selected minutes are what the passworded transcription will send by default.",
+      "Mark only the parts that contain useful teaching. These chosen clips become the default material for transcription and lesson memory.",
     lessonMap: "Lesson map",
     chapterRail: "Chapter rail",
+    selectedClipMap: "Chosen clip map",
+    selectedClipMapNote:
+      "Only clips you have created appear here; these markers are not AI suggestions.",
     lessonRegion: "Region",
     focusRange: "Focus",
     currentDraftClip: "Current draft clip",
@@ -399,6 +438,7 @@ export const translations = {
     stopClip: "Ferma il frammento",
     playbackFailed: "L'audio non e partito. Riprova con il controllo play.",
     transcribeLesson: "Trascrivi la lezione",
+    transcribeMoreClips: "Trascrivi altre clip",
     transcriptionNote:
       "La trascrizione usa elaborazione AI a pagamento e richiede autorizzazione.",
     transcriptionClipFirstTitle: "Ascolta prima, poi scegli clip brevi",
@@ -424,6 +464,19 @@ export const translations = {
     transcriptionQueued: "In coda. Puoi lasciare aperto o tornare piu tardi.",
     transcriptionRunning: "Trascrizione audio",
     transcriptionComplete: "Trascrizione salvata nella lezione.",
+    transcriptionCompleteNextStep:
+      "Le memorie delle clip sono salvate sotto. Aggiungi un altro segmento didattico se c'e altro da trascrivere.",
+    transcriptionSuccessTitle: "Trascrizione clip completata",
+    transcriptionSuccessSelectedBody:
+      "Le clip didattiche selezionate sono salvate come memoria della lezione. Rivedi le note sotto, poi tieni solo i suggerimenti di studio utili.",
+    transcriptionSuccessFullBody:
+      "La trascrizione della registrazione e salvata come memoria della lezione. Rivedi le note sotto, poi tieni solo i suggerimenti di studio utili.",
+    transcriptionDetails: "Dettagli trascrizione",
+    transcriptionMode: "Modalita",
+    transcriptionModeClips: "Clip selezionate",
+    transcriptionModeFull: "Registrazione intera",
+    reviewClipMemories: "Rivedi memorie",
+    chooseMoreClips: "Scegli altre clip",
     transcriptionFailed: "Trascrizione non riuscita.",
     transcriptionProgress: "Avanzamento",
     processingChunk: "Elaborazione",
@@ -451,7 +504,7 @@ export const translations = {
       "Il salvataggio server e lento. La copia di recupero del browser potra riprovare o essere scaricata dopo.",
     recordingUploadTimedOut:
       "Il salvataggio server e scaduto. La copia di recupero del browser potra riprovare o essere scaricata dopo.",
-    saveDeviceCopy: "Salva una copia sul dispositivo",
+    saveDeviceCopy: "Salva anche un file locale",
     saveDeviceCopyHelp:
       "Sceglierai un file prima della registrazione. Cosi hai anche un file audio locale normale oltre al salvataggio nell'app.",
     saveDeviceCopyUnsupported:
@@ -469,8 +522,11 @@ export const translations = {
     discardRecoveryCopy: "Scarta copia",
     recordingRecoveryUnavailable: "La copia di recupero non e disponibile.",
     recordingRecoveryActionFailed: "Azione di recupero non riuscita. Riprova.",
-    recordWithDevice: "Registra con il dispositivo",
-    uploadAudio: "Carica audio",
+    recordWithDevice: "Registratore telefono/iPad",
+    recordWithDeviceHelp:
+      "Percorso mobile: chiede al dispositivo di creare un nuovo file audio e caricarlo.",
+    uploadAudio: "Carica file audio",
+    uploadAudioHelp: "Scegli un file audio lezione esistente.",
     transcript: "Trascrizione",
     teachingReview: "Revisione didattica",
     lessonSummary: "Riassunto della lezione",
@@ -497,8 +553,27 @@ export const translations = {
     markTeachingClipNote:
       "Scegli la parte della registrazione che contiene insegnamento utile, ascoltala, poi salvala come proposta da rivedere.",
     teachingSegments: "Segmenti didattici",
+    clip: "Clip",
     usefulClipsFrom: "Clip utili da",
     usefulClipMemories: "Memorie delle clip utili",
+    memoryLibrary: "Libreria memorie",
+    leoMemoryTips: "Consigli utili da Leo",
+    leoMemoryTipsNote:
+      "Una libreria di frammenti didattici da riascoltare. Possono restare come contesto senza diventare esercizi.",
+    memoryTip: "Consiglio",
+    searchMemoryTips: "Cerca consigli, brani, argomenti",
+    noMemoryTips: "Nessun consiglio corrisponde ancora a questa ricerca.",
+    allTopics: "Tutti gli argomenti",
+    topicGeneralAdvice: "Consigli generali",
+    topicHarmony: "Armonia",
+    topicRepertoire: "Repertorio",
+    topicRhythm: "Ritmo",
+    topicTechnique: "Tecnica",
+    topicVocal: "Voce",
+    openSourceLesson: "Apri lezione",
+    relatedPractice: "Studio collegato",
+    memoryTipNoPractice:
+      "Salvato come memoria da riascoltare. Non deve per forza diventare un esercizio.",
     clipTranscript: "Trascrizione della clip",
     clipMemoryCaptured: "Trascrizione salvata per questa clip utile.",
     noPracticeItemSuggested: "Nessun elemento di studio suggerito.",
@@ -518,9 +593,12 @@ export const translations = {
     backFiveSeconds: "Indietro 5 secondi",
     forwardFiveSeconds: "Avanti 5 secondi",
     teachingSegmentsNote:
-      "Segna solo le parti con insegnamento utile. Per impostazione predefinita la trascrizione con password inviera questi minuti selezionati.",
+      "Segna solo le parti con insegnamento utile. Queste clip scelte diventano il materiale predefinito per trascrizione e memoria della lezione.",
     lessonMap: "Mappa lezione",
     chapterRail: "Barra capitoli",
+    selectedClipMap: "Mappa clip scelte",
+    selectedClipMapNote:
+      "Qui appaiono solo le clip che hai creato; questi marcatori non sono suggerimenti AI.",
     lessonRegion: "Sezione",
     focusRange: "Focus",
     currentDraftClip: "Clip bozza corrente",

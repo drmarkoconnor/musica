@@ -1,8 +1,8 @@
 # Practice Loop Current State
 
-Last updated: 2026-05-23
+Last updated: 2026-05-25
 
-Latest implementation commit: `9042101 Allow transcription background function through auth`
+Latest implementation commit: `3ad3aec Add memory tip library`
 
 ## Working Environment
 
@@ -59,9 +59,14 @@ Important hosted env vars:
 - The lesson screen also has a `Record with device` path using the mobile
   browser/native capture-file flow. This uses the same upload route as manual
   audio upload and accepts iOS-style audio MIME types such as `audio/x-m4a`.
+- The mobile/native capture path is now labelled as a phone/iPad recorder,
+  hidden on desktop-style browsers, and visually matched to the normal upload
+  button. Desktop review now presents `Upload audio file` as the ordinary file
+  chooser path.
 - Where the browser supports the File System Access API, lesson recording also
-  offers a default-on `Save a device copy` option before recording starts. The
-  user chooses a local file and the app writes chunks to it while recording.
+  offers a default-on `Also save a local file` option before recording starts.
+  Unsupported browsers no longer show a disabled local-file checkbox; the
+  normal browser rescue/download path remains available after a failed save.
 - The lesson screen now has a real audio upload control backed by the lesson
   recording upload route, instead of a placeholder button.
 - The old local test-audio attachment flow is removed from the normal lesson UI.
@@ -71,8 +76,11 @@ Important hosted env vars:
 - Hosted read-model filtering hides local-only audio records that cannot be
   served by Netlify.
 - Mark useful lesson clips before transcription.
-- Lesson clip review now has an audio-first chapter rail and created-clip review
+- Lesson clip review now has an audio-first scrubber and created-clip review
   queue, so saved clip titles and notes can be edited before transcription.
+  The earlier artificial chapter rail has been removed from the clip-creation
+  area; the visual lesson map now appears only for clips the user has actually
+  created, including discarded/transcribed state and metadata.
 - Segment transcription sends selected clips by default.
 - Full-recording transcription requires explicit confirmation if no segments are
   selected.
@@ -95,8 +103,21 @@ Important hosted env vars:
 - The Netlify background transcription function initializes the Blobs context
   explicitly and materializes lesson audio by streaming the blob to temp storage
   before clipping, rather than loading the whole lesson into memory.
-- The lesson page now warns that Mark should listen first, select short useful
-  clips, and make whole-lesson transcription a rare fallback.
+- The lesson page warns that Mark should listen first, select short useful
+  clips, and make whole-lesson transcription a rare fallback before clip
+  transcription. Once clip memories exist, the warning is replaced by a success
+  state instead of implying that something went wrong.
+- Successful clip transcription now shows a completion state in the
+  authorisation modal with mode, clip count, minutes, and selected clip
+  metadata, plus actions to review memories or choose more clips.
+- Useful clip memories now use a memory-first card layout: listen-back range,
+  topic label, summary, raw clip transcript, and related practice suggestions
+  are presented as a reusable teaching memory rather than only a practice-item
+  extraction step.
+- `/lessons` includes a lightweight `Useful memory tips from Leo` library built
+  from completed clip memories. It supports search and topic filters, plays
+  the original clipped lesson audio, links back to the source lesson, and lets
+  general advice remain as listen-back context without becoming homework.
 - Raw transcript is collapsed by default.
 - Lesson summary is shown as compact bullet-style review.
 - Candidate practice items can be kept or discarded.
@@ -192,6 +213,8 @@ with visible progress and resumable chunk state.
 - Lead sheet file route: `src/app/api/piece-assets/[assetId]/file/route.ts`
 - Private lesson archive import plan:
   `docs/lesson-recording-import-plan.md`
+- Visual mockups for saved clip choices:
+  `public/lesson-clip-choice-mockups.html`
 
 ## Commands Recently Verified
 
@@ -218,8 +241,11 @@ git diff --check
   materializes the complete object before writing the final Netlify Blob. Later
   storage can improve this further with multipart/object-compose semantics if
   needed.
-- Lesson segment editor has a first-pass chapter rail and review queue, but
+- Lesson segment editor has a first-pass chosen-clip map and review queue, but
   still needs split, merge, true waveform data, and deeper zoom/focus editing.
+- The memory-tip library currently derives topics from clip text rather than
+  storing user-editable topic tags. A later pass could add editable topic/tag
+  metadata if the library grows.
 - AI-generated practice candidates may still need manual narrowing inside a
   clip.
 - Practice sessions now run and log active time to `session_items`, and the

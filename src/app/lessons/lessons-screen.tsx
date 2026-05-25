@@ -1,13 +1,22 @@
 "use client";
 
-import { type ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
+import {
+  type ChangeEvent,
+  FormEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
+  BookOpen,
   Check,
   Edit3,
   Mic2,
   Plus,
+  Search,
   Trash2,
   Upload,
   X,
@@ -35,6 +44,39 @@ type LiveRecordingPreview = {
   phase: "recording" | "saving";
   startedAt: Date;
 };
+
+type MemoryTipTopic =
+  | "harmony"
+  | "rhythm"
+  | "repertoire"
+  | "technique"
+  | "vocal"
+  | "general";
+
+type MemoryTip = {
+  audioSrc: string | undefined;
+  body: string;
+  endsAtSeconds: number;
+  id: string;
+  lessonDate: string;
+  lessonId: string;
+  lessonTitle: string;
+  practiceExtracts: LessonExtract[];
+  recordingId: string;
+  startsAtSeconds: number;
+  title: string;
+  topic: MemoryTipTopic;
+  transcript: string;
+};
+
+const MEMORY_TIP_TOPIC_LABELS = {
+  general: "topicGeneralAdvice",
+  harmony: "topicHarmony",
+  repertoire: "topicRepertoire",
+  rhythm: "topicRhythm",
+  technique: "topicTechnique",
+  vocal: "topicVocal",
+} as const;
 
 const AUDIO_UPLOAD_TIMEOUT_MS = 120000;
 
@@ -139,6 +181,44 @@ function audioSrcForRecording(recording?: { id: string; storageBucket: string })
   return undefined;
 }
 
+function memoryTipTopicForText(text: string): MemoryTipTopic {
+  const normalized = text.toLowerCase();
+
+  if (
+    /\b(sing|singer|voice|vocal|phrase|phrasing|breath|lyric)\b/.test(normalized)
+  ) {
+    return "vocal";
+  }
+
+  if (
+    /\b(chord|voicing|harmony|scale|minor|major|diminished|ii|dominant|rootless|slash)\b/.test(
+      normalized,
+    )
+  ) {
+    return "harmony";
+  }
+
+  if (
+    /\b(tune|song|standard|bridge|chorus|melody|passage|goodbye|valentine|autumn)\b/.test(
+      normalized,
+    )
+  ) {
+    return "repertoire";
+  }
+
+  if (/\b(rhythm|time|swing|comp|groove|pulse)\b/.test(normalized)) {
+    return "rhythm";
+  }
+
+  if (
+    /\b(finger|fingering|hand|touch|relax|technique|tempo)\b/.test(normalized)
+  ) {
+    return "technique";
+  }
+
+  return "general";
+}
+
 export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
   const { t } = useLanguage();
   const router = useRouter();
@@ -152,6 +232,7 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
   } = data;
   const captureInputRef = useRef<HTMLInputElement>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
+  const [showDeviceCapture, setShowDeviceCapture] = useState(false);
   const sortedLessons = [...lessons].sort((a, b) =>
     (
       lessonRecordings.find((item) => item.lessonId === b.id)?.recordedAt ??
@@ -211,7 +292,6 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
   const extracts = activeLesson
     ? lessonExtracts.filter((item) => item.lessonId === activeLesson.id)
     : [];
-  const linkedExtracts = extracts.filter((item) => item.segmentId);
   const unlinkedExtracts = extracts.filter((item) => !item.segmentId);
   const joinedTranscriptText = lessonTranscripts.map((item) => item.text).join("\n");
   const executiveSummaryItems = summaryBulletItems(activeLesson?.summary ?? "");
@@ -231,6 +311,110 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
   const [lessonDeleteState, setLessonDeleteState] = useState<
     "idle" | "saving" | "error"
   >("idle");
+  const [memoryTipSearch, setMemoryTipSearch] = useState("");
+  const [memoryTipTopicFilter, setMemoryTipTopicFilter] = useState<
+    MemoryTipTopic | "all"
+  >("all");
+  const memoryTips = useMemo(() => {
+    const lessonById = new Map(lessons.map((item) => [item.id, item]));
+    const recordingById = new Map(lessonRecordings.map((item) => [item.id, item]));
+    const segmentByTipId = new Map(lessonSegments.map((item) => [item.id, item]));
+    const extractsBySegmentId = new Map<string, LessonExtract[]>();
+
+    lessonExtracts.forEach((extract) => {
+      if (!extract.segmentId || extract.status === "discarded") return;
+
+      const current = extractsBySegmentId.get(extract.segmentId) ?? [];
+      current.push(extract);
+      extractsBySegmentId.set(extract.segmentId, current);
+    });
+
+    return lessonSegmentTranscripts
+      .filter((memory) => memory.status === "complete")
+      .map((memory) => {
+        const segment = segmentByTipId.get(memory.segmentId);
+        const lesson = lessonById.get(memory.lessonId);
+        const recording = recordingById.get(memory.recordingId);
+
+        if (!segment || !lesson || !recording) return null;
+
+        const title = memory.summaryTitle || segment.title;
+        const body = memory.summaryBody || segment.notes || t("clipMemoryCaptured");
+        const topic = memoryTipTopicForText(
+          [title, body, segment.notes, memory.text].join(" "),
+        );
+
+        return {
+          audioSrc: audioSrcForRecording(recording),
+          body,
+          endsAtSeconds: segment.endsAtSeconds,
+          id: memory.id,
+          lessonDate: lesson.lessonDate,
+          lessonId: lesson.id,
+          lessonTitle: lesson.title,
+          practiceExtracts: extractsBySegmentId.get(segment.id) ?? [],
+          recordingId: recording.id,
+          startsAtSeconds: segment.startsAtSeconds,
+          title,
+          topic,
+          transcript: memory.text,
+        } satisfies MemoryTip;
+      })
+      .filter((tip): tip is MemoryTip => tip !== null)
+      .sort((a, b) => {
+        const lessonOrder = b.lessonDate.localeCompare(a.lessonDate);
+        if (lessonOrder !== 0) return lessonOrder;
+
+        return a.startsAtSeconds - b.startsAtSeconds;
+      });
+  }, [
+    lessonExtracts,
+    lessonRecordings,
+    lessonSegmentTranscripts,
+    lessonSegments,
+    lessons,
+    t,
+  ]);
+  const availableMemoryTipTopics = (
+    ["harmony", "repertoire", "rhythm", "technique", "vocal", "general"] as const
+  ).filter((topic) => memoryTips.some((tip) => tip.topic === topic));
+  const filteredMemoryTips = useMemo(() => {
+    const query = memoryTipSearch.trim().toLowerCase();
+
+    return memoryTips.filter((tip) => {
+      if (memoryTipTopicFilter !== "all" && tip.topic !== memoryTipTopicFilter) {
+        return false;
+      }
+
+      if (!query) return true;
+
+      const haystack = [
+        tip.body,
+        tip.lessonDate,
+        tip.lessonTitle,
+        tip.title,
+        tip.transcript,
+        ...tip.practiceExtracts.map((extract) => `${extract.title} ${extract.body}`),
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      return haystack.includes(query);
+    });
+  }, [memoryTipSearch, memoryTipTopicFilter, memoryTips]);
+  const memoryTipsForActiveRecording = recording
+    ? memoryTips.filter((tip) => tip.recordingId === recording.id)
+    : [];
+
+  useEffect(() => {
+    const coarsePointer =
+      typeof window !== "undefined" &&
+      window.matchMedia("(pointer: coarse)").matches;
+    const touchCapable =
+      typeof navigator !== "undefined" && navigator.maxTouchPoints > 1;
+
+    setShowDeviceCapture(coarsePointer || touchCapable);
+  }, []);
 
   useEffect(() => {
     if (
@@ -461,6 +645,128 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
     );
   }
 
+  function renderMemoryTipCard(
+    tip: MemoryTip,
+    options: { showSource?: boolean } = {},
+  ) {
+    return (
+      <article
+        className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm"
+        key={tip.id}
+      >
+        <div className="grid gap-4 lg:grid-cols-[12rem_minmax(0,1fr)]">
+          <div className="rounded-md bg-stone-950 px-3 py-3 text-white">
+            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-stone-300">
+              {t("clipTime")}
+            </p>
+            <p className="mt-1 text-xl font-semibold tabular-nums">
+              {formatDuration(tip.startsAtSeconds)} -{" "}
+              {formatDuration(tip.endsAtSeconds)}
+            </p>
+            <p className="mt-2 text-xs leading-5 text-stone-300">
+              {tip.lessonDate}
+            </p>
+          </div>
+
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-emerald-800">
+                {t("memoryTip")}
+              </p>
+              <StatusPill tone="blue">
+                {t(MEMORY_TIP_TOPIC_LABELS[tip.topic])}
+              </StatusPill>
+            </div>
+            <h3 className="mt-1 text-lg font-semibold leading-tight text-stone-950">
+              {tip.title}
+            </h3>
+            <p className="mt-2 text-sm leading-6 text-stone-700">{tip.body}</p>
+
+            <div className="mt-3 grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
+              <AudioStrip
+                audioSrc={tip.audioSrc}
+                controlsMode="buttons"
+                density="compact"
+                endsAtSeconds={tip.endsAtSeconds}
+                showLabel={false}
+                showWaveform={false}
+                startsAtSeconds={tip.startsAtSeconds}
+                title={tip.title}
+              />
+              {options.showSource ? (
+                <button
+                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-stone-300 bg-white px-3 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-100"
+                  onClick={() => setSelectedLessonId(tip.lessonId)}
+                  type="button"
+                >
+                  <BookOpen aria-hidden="true" className="h-4 w-4" />
+                  {t("openSourceLesson")}
+                </button>
+              ) : null}
+            </div>
+
+            <details className="mt-3 rounded-md border border-stone-200 bg-stone-50">
+              <summary className="cursor-pointer px-3 py-2 text-sm font-semibold text-stone-800">
+                {t("clipTranscript")}
+              </summary>
+              <p className="border-t border-stone-200 bg-white px-3 py-3 text-sm leading-6 text-stone-700">
+                {tip.transcript || t("notYet")}
+              </p>
+            </details>
+
+            <div className="mt-3 rounded-md border border-stone-200 bg-stone-50 p-3">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <h4 className="text-sm font-semibold text-stone-950">
+                    {t("relatedPractice")}
+                  </h4>
+                  <p className="mt-1 text-xs leading-5 text-stone-500">
+                    {tip.lessonTitle}
+                  </p>
+                </div>
+                <StatusPill tone={tip.practiceExtracts.length > 0 ? "green" : "slate"}>
+                  {tip.practiceExtracts.length} {t("practiceElement")}
+                </StatusPill>
+              </div>
+
+              {tip.practiceExtracts.length === 0 ? (
+                <p className="mt-2 text-sm leading-6 text-stone-600">
+                  {t("memoryTipNoPractice")}
+                </p>
+              ) : (
+                <div className="mt-3 space-y-3">
+                  {tip.practiceExtracts.map((extract) => (
+                    <div
+                      className="rounded-md border border-stone-200 bg-white p-3"
+                      key={extract.id}
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <h5 className="text-sm font-semibold text-stone-950">
+                            {extract.title}
+                          </h5>
+                          <p className="mt-1 whitespace-pre-line text-sm leading-6 text-stone-600">
+                            {extract.body}
+                          </p>
+                        </div>
+                        <StatusPill
+                          tone={extract.status === "kept" ? "green" : "slate"}
+                        >
+                          {extract.status}
+                        </StatusPill>
+                      </div>
+                      {renderExtractActions(extract)}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </article>
+    );
+  }
+
   return (
     <div className="space-y-8">
       <div className="grid gap-4 xl:grid-cols-[24rem_minmax(0,1fr)]">
@@ -534,38 +840,46 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
                 router.refresh();
               }}
             />
+            {showDeviceCapture ? (
+              <>
+                <input
+                  accept="audio/*"
+                  capture="user"
+                  className="hidden"
+                  onChange={(event) => void handleAudioUpload(event)}
+                  ref={captureInputRef}
+                  type="file"
+                />
+                <button
+                  className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-md border border-stone-300 bg-white px-3 py-3 text-sm font-semibold text-stone-700 transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={
+                    liveRecordingPreview !== null || uploadState === "saving"
+                  }
+                  onClick={() => captureInputRef.current?.click()}
+                  title={t("recordWithDeviceHelp")}
+                  type="button"
+                >
+                  <Mic2 aria-hidden="true" className="h-4 w-4" />
+                  {uploadState === "saving"
+                    ? t("savingRecording")
+                    : uploadState === "saved"
+                      ? t("audioAttached")
+                      : t("recordWithDevice")}
+                </button>
+              </>
+            ) : null}
             <input
-              accept="audio/*,video/mp4,video/quicktime"
-              capture="user"
-              className="sr-only"
-              onChange={(event) => void handleAudioUpload(event)}
-              ref={captureInputRef}
-              type="file"
-            />
-            <button
-              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-md border border-emerald-900 bg-emerald-50 px-3 py-3 text-sm font-semibold text-emerald-950 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={liveRecordingPreview !== null || uploadState === "saving"}
-              onClick={() => captureInputRef.current?.click()}
-              type="button"
-            >
-              <Mic2 aria-hidden="true" className="h-4 w-4" />
-              {uploadState === "saving"
-                ? t("savingRecording")
-                : uploadState === "saved"
-                  ? t("audioAttached")
-                  : t("recordWithDevice")}
-            </button>
-            <input
-              accept="audio/*,video/mp4,video/quicktime"
-              className="sr-only"
+              accept="audio/*"
+              className="hidden"
               onChange={(event) => void handleAudioUpload(event)}
               ref={uploadInputRef}
               type="file"
             />
             <button
-              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-md border border-stone-300 px-3 py-3 text-sm font-semibold text-stone-700 transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-md border border-stone-300 bg-white px-3 py-3 text-sm font-semibold text-stone-700 transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-60"
               disabled={liveRecordingPreview !== null || uploadState === "saving"}
               onClick={() => uploadInputRef.current?.click()}
+              title={t("uploadAudioHelp")}
               type="button"
             >
               <Upload aria-hidden="true" className="h-4 w-4" />
@@ -766,20 +1080,22 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
           ) : null}
           {activeLesson && recording && recordingAudioSrc ? (
             <>
-              <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">
-                <div className="flex gap-2">
-                  <AlertTriangle
-                    aria-hidden="true"
-                    className="mt-0.5 h-4 w-4 flex-none text-amber-800"
-                  />
-                  <div>
-                    <p className="font-semibold">
-                      {t("transcriptionClipFirstTitle")}
-                    </p>
-                    <p>{t("transcriptionClipFirstBody")}</p>
+              {segmentTranscriptsForRecording.length === 0 ? (
+                <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">
+                  <div className="flex gap-2">
+                    <AlertTriangle
+                      aria-hidden="true"
+                      className="mt-0.5 h-4 w-4 flex-none text-amber-800"
+                    />
+                    <div>
+                      <p className="font-semibold">
+                        {t("transcriptionClipFirstTitle")}
+                      </p>
+                      <p>{t("transcriptionClipFirstBody")}</p>
+                    </div>
                   </div>
                 </div>
-              </div>
+              ) : null}
               <LessonSegmentReview
                 audioSrc={recordingAudioSrc}
                 durationSeconds={recording.durationSeconds}
@@ -796,6 +1112,14 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
               lessonId={activeLesson?.id ?? ""}
               recordingDurationSeconds={recording.durationSeconds}
               recordingId={recording.id}
+              selectedSegments={segmentsForRecording
+                .filter((item) => item.status === "selected")
+                .map((item) => ({
+                  endsAtSeconds: item.endsAtSeconds,
+                  id: item.id,
+                  startsAtSeconds: item.startsAtSeconds,
+                  title: item.title,
+                }))}
               selectedSegmentCount={selectedSegmentCount}
               selectedSegmentSeconds={selectedSegmentSeconds}
               transcriptErrorMessage={transcript?.errorMessage}
@@ -805,126 +1129,80 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
         </section>
       </div>
 
-      {recording && recordingAudioSrc && segmentTranscriptsForRecording.length > 0 ? (
+      {memoryTipsForActiveRecording.length > 0 ? (
         <Section title={t("usefulClipMemories")}>
           <div className="grid gap-3">
-            {segmentTranscriptsForRecording.map((memory, index) => {
-              const segment = segmentById.get(memory.segmentId);
-              if (!segment) return null;
+            {memoryTipsForActiveRecording.map((tip) => renderMemoryTipCard(tip))}
+          </div>
+        </Section>
+      ) : null}
 
-              const memoryExtracts = linkedExtracts.filter(
-                (extract) => extract.segmentId === memory.segmentId,
-              );
-              const cardTone =
-                index % 2 === 0
-                  ? "border-stone-200 bg-white"
-                  : "border-sky-100 bg-sky-50/70";
+      {memoryTips.length > 0 ? (
+        <Section eyebrow={t("memoryLibrary")} title={t("leoMemoryTips")}>
+          <div className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
+            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
+              <label className="block">
+                <span className="sr-only">{t("searchMemoryTips")}</span>
+                <span className="flex min-h-11 items-center gap-2 rounded-md border border-stone-300 bg-white px-3 py-2 text-stone-700 focus-within:border-emerald-800 focus-within:ring-2 focus-within:ring-emerald-800/20">
+                  <Search aria-hidden="true" className="h-4 w-4 text-stone-500" />
+                  <input
+                    className="min-w-0 flex-1 bg-transparent text-sm text-stone-950 outline-none"
+                    onChange={(event) => setMemoryTipSearch(event.target.value)}
+                    placeholder={t("searchMemoryTips")}
+                    value={memoryTipSearch}
+                  />
+                </span>
+              </label>
+              <span className="rounded-md bg-stone-50 px-3 py-2 text-sm font-semibold text-stone-700 ring-1 ring-stone-200">
+                {filteredMemoryTips.length} / {memoryTips.length}
+              </span>
+            </div>
 
-              return (
-                <article
-                  className={`rounded-lg border p-4 shadow-sm ${cardTone}`}
-                  key={memory.id}
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                aria-pressed={memoryTipTopicFilter === "all"}
+                className={`rounded-md border px-3 py-2 text-sm font-semibold transition ${
+                  memoryTipTopicFilter === "all"
+                    ? "border-emerald-900 bg-emerald-950 text-white"
+                    : "border-stone-300 bg-white text-stone-700 hover:bg-stone-100"
+                }`}
+                onClick={() => setMemoryTipTopicFilter("all")}
+                type="button"
+              >
+                {t("allTopics")}
+              </button>
+              {availableMemoryTipTopics.map((topic) => (
+                <button
+                  aria-pressed={memoryTipTopicFilter === topic}
+                  className={`rounded-md border px-3 py-2 text-sm font-semibold transition ${
+                    memoryTipTopicFilter === topic
+                      ? "border-emerald-900 bg-emerald-950 text-white"
+                      : "border-stone-300 bg-white text-stone-700 hover:bg-stone-100"
+                  }`}
+                  key={topic}
+                  onClick={() => setMemoryTipTopicFilter(topic)}
+                  type="button"
                 >
-                  <div className="grid gap-3 lg:grid-cols-[12rem_1fr_auto] lg:items-start">
-                    <div className="rounded-md bg-stone-950 px-3 py-2 text-white">
-                      <p className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-stone-300">
-                        {t("clipTime")}
-                      </p>
-                      <p className="mt-1 text-xl font-semibold tabular-nums">
-                        {formatDuration(segment.startsAtSeconds)} -{" "}
-                        {formatDuration(segment.endsAtSeconds)}
-                      </p>
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-lg font-semibold leading-tight text-stone-950">
-                          {memory.summaryTitle || segment.title}
-                        </h3>
-                        <StatusPill tone="blue">{memory.status}</StatusPill>
-                      </div>
-                      <p className="mt-2 text-sm leading-6 text-stone-700">
-                        {memory.summaryBody ||
-                          segment.notes ||
-                          t("clipMemoryCaptured")}
-                      </p>
-                    </div>
-                    <AudioStrip
-                      audioSrc={recordingAudioSrc}
-                      controlsMode="buttons"
-                      density="compact"
-                      endsAtSeconds={segment.endsAtSeconds}
-                      showLabel={false}
-                      showWaveform={false}
-                      startsAtSeconds={segment.startsAtSeconds}
-                      title={memory.summaryTitle || segment.title}
-                    />
-                  </div>
+                  {t(MEMORY_TIP_TOPIC_LABELS[topic])}
+                </button>
+              ))}
+            </div>
 
-                  <details className="mt-3 rounded-md border border-stone-200 bg-white/80">
-                    <summary className="cursor-pointer px-3 py-2 text-sm font-semibold text-stone-800">
-                      {t("clipTranscript")}
-                    </summary>
-                    <p className="border-t border-stone-200 px-3 py-3 text-sm leading-6 text-stone-700">
-                      {memory.text || t("notYet")}
-                    </p>
-                  </details>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-stone-600">
+              {t("leoMemoryTipsNote")}
+            </p>
 
-                  <div className="mt-3 rounded-md border border-stone-200 bg-white p-3">
-                    <h4 className="text-sm font-semibold text-stone-950">
-                      {t("suggestedPractice")}
-                    </h4>
-                    {memoryExtracts.length === 0 ? (
-                      <p className="mt-2 text-sm leading-6 text-stone-600">
-                        {t("noPracticeItemSuggested")}
-                      </p>
-                    ) : null}
-                    <div className="mt-3 space-y-3">
-                      {memoryExtracts.map((extract) => {
-                        const bounds = clipBoundsForExtract(extract);
-
-                        return (
-                          <div
-                            className="rounded-md border border-stone-200 p-3"
-                            key={extract.id}
-                          >
-                            <div className="flex flex-wrap items-start justify-between gap-3">
-                              <div>
-                                <h5 className="text-sm font-semibold text-stone-950">
-                                  {extract.title}
-                                </h5>
-                                <p className="mt-1 whitespace-pre-line text-sm leading-6 text-stone-600">
-                                  {extract.body}
-                                </p>
-                              </div>
-                              <StatusPill
-                                tone={
-                                  extract.status === "kept" ? "green" : "slate"
-                                }
-                              >
-                                {extract.status}
-                              </StatusPill>
-                            </div>
-                            <div className="mt-3">
-                              <AudioStrip
-                                audioSrc={recordingAudioSrc}
-                                controlsMode="buttons"
-                                density="compact"
-                                endsAtSeconds={bounds.endsAtSeconds}
-                                showLabel={false}
-                                showWaveform={false}
-                                startsAtSeconds={bounds.startsAtSeconds}
-                                title={extract.title}
-                              />
-                            </div>
-                            {renderExtractActions(extract)}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </article>
-              );
-            })}
+            <div className="mt-4 grid gap-3">
+              {filteredMemoryTips.length === 0 ? (
+                <p className="rounded-md border border-stone-200 bg-stone-50 px-3 py-3 text-sm leading-6 text-stone-600">
+                  {t("noMemoryTips")}
+                </p>
+              ) : (
+                filteredMemoryTips.map((tip) =>
+                  renderMemoryTipCard(tip, { showSource: true }),
+                )
+              )}
+            </div>
           </div>
         </Section>
       ) : null}

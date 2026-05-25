@@ -1,6 +1,6 @@
 # Practice Loop Roadmap
 
-Last updated: 2026-05-23
+Last updated: 2026-05-25
 
 ## Roadmap Rule
 
@@ -63,6 +63,9 @@ Done:
   supported, so a user-granted local audio file is written while recording.
 - Lesson audio upload has a first-pass real file picker backed by the lesson
   recording upload route.
+- Recording entry controls now distinguish desktop upload from the phone/iPad
+  capture fallback, and unsupported local-file writing is hidden instead of
+  shown as an unavailable checkbox.
 - Normal lesson UI no longer exposes the development test-audio attachment, and
   fixture APIs are blocked in production even if the old request path is called.
 - Lesson creation and recording metadata.
@@ -73,8 +76,12 @@ Done:
 - Teaching segment creation and adjustment.
 - Selected segment minute preview before transcription.
 - Server-side ffmpeg clipping before transcription.
-- Audio-first chapter rail for long lesson orientation.
+- Audio-first scrubber for long lesson orientation.
 - Created-clip review queue with title and note editing before transcription.
+- Chosen-clip map that visualizes only user-created clips with status and
+  metadata, rather than artificial pre-analysis lesson regions.
+- Visual mockups for the next saved-clip presentation pass:
+  `public/lesson-clip-choice-mockups.html`.
 - Private archive dry-run importer for `lessonrecordings/`, with exact duplicate
   detection and no transcription side effects.
 - Initial private archive import: 31 non-duplicate recordings uploaded to
@@ -111,6 +118,10 @@ Done:
   and queued jobs that never start surface a retryable failure.
 - Lesson-page warnings steer Mark toward listening first and selecting short
   clips, with whole-lesson transcription framed as a rare fallback.
+- Memory-first clip cards present each completed teaching segment as a reusable
+  listen-back memory with transcript and related practice suggestions.
+- `/lessons` has a lightweight `Useful memory tips from Leo` library with
+  search, topic filters, source-lesson links, and clipped audio playback.
 - Hidden raw transcript.
 - AI lesson summary.
 - Candidate practice extraction.
@@ -122,6 +133,7 @@ Next:
 - Per-segment returned cards for transcript, memory, and candidate items.
 - Better distinction between lesson memory, context note, practice note, and
   actual exercise.
+- Editable topic/tag metadata for memory tips if the listen-back library grows.
 - Manual editing before saving candidate practice items.
 - Consider a transcription usage/cost ledger after the background flow has been
   tested on real archive lessons.

@@ -177,7 +177,7 @@ export function LessonRecorder({
     LessonRecordingDraft[]
   >([]);
   const [isDeviceBackupSupported, setIsDeviceBackupSupported] = useState(false);
-  const [saveDeviceCopy, setSaveDeviceCopy] = useState(true);
+  const [saveDeviceCopy, setSaveDeviceCopy] = useState(false);
   const [recoveryState, setRecoveryState] = useState<
     Record<string, RecoveryState>
   >({});
@@ -1048,25 +1048,25 @@ export function LessonRecorder({
         {buttonLabel}
       </button>
 
-      <label className="flex items-start gap-2 rounded-md border border-stone-200 bg-white px-3 py-2 text-sm text-stone-700">
-        <input
-          checked={saveDeviceCopy && isDeviceBackupSupported}
-          className="mt-1 h-4 w-4 rounded border-stone-300 accent-emerald-900"
-          disabled={!isDeviceBackupSupported || isRecording || isBusy}
-          onChange={(event) => setSaveDeviceCopy(event.target.checked)}
-          type="checkbox"
-        />
-        <span>
-          <span className="block font-semibold text-stone-900">
-            {t("saveDeviceCopy")}
+      {isDeviceBackupSupported ? (
+        <label className="flex items-start gap-2 rounded-md border border-stone-200 bg-white px-3 py-2 text-sm text-stone-700">
+          <input
+            checked={saveDeviceCopy}
+            className="mt-1 h-4 w-4 rounded border-stone-300 accent-emerald-900"
+            disabled={isRecording || isBusy}
+            onChange={(event) => setSaveDeviceCopy(event.target.checked)}
+            type="checkbox"
+          />
+          <span>
+            <span className="block font-semibold text-stone-900">
+              {t("saveDeviceCopy")}
+            </span>
+            <span className="mt-0.5 block text-xs leading-5 text-stone-500">
+              {t("saveDeviceCopyHelp")}
+            </span>
           </span>
-          <span className="mt-0.5 block text-xs leading-5 text-stone-500">
-            {isDeviceBackupSupported
-              ? t("saveDeviceCopyHelp")
-              : t("saveDeviceCopyUnsupported")}
-          </span>
-        </span>
-      </label>
+        </label>
+      ) : null}
 
       {isRecording ? (
         <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-900">

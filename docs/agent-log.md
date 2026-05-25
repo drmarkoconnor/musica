@@ -20,6 +20,70 @@ Keep entries concise. Put stable product truth in `project-brief.md`, current
 implementation truth in `current-state.md`, and priority sequencing in
 `roadmap.md`.
 
+## 2026-05-25 - Recording Controls And Memory Tips Library
+
+Branch: `main`
+
+Implementation commit: `3ad3aec Add memory tip library`
+
+Work done:
+
+- Clarified lesson recording entry points: the native capture fallback is now
+  labelled as a phone/iPad recorder and hidden on desktop-style browsers, while
+  the normal file path reads `Upload audio file`.
+- Hid the local-file recording checkbox when the browser cannot write to a
+  user-chosen file during recording. Where supported, it remains selectable and
+  is labelled `Also save a local file`.
+- Removed the artificial pre-analysis chapter regions from the clip creation
+  area. The lesson map now appears in the created-clip review queue and only
+  visualizes actual saved clips, including discarded/transcribed state.
+- Replaced post-transcription warning states with a completion state: saved clip
+  memories suppress the pre-transcription warning, and the authorisation modal
+  shows success metadata after a job completes.
+- Added `public/lesson-clip-choice-mockups.html` with three visual directions
+  based on the real `Leo lesson - 2024-10-16 11:08` segments.
+- Implemented Option B from the mockups: completed clip memories now present as
+  listen-back teaching memories with topic, summary, transcript, audio, and
+  related practice suggestions.
+- Added a lightweight `Useful memory tips from Leo` library on `/lessons`, built
+  from completed clip memories with search, topic filters, clipped audio
+  playback, and source-lesson links.
+
+Commands run:
+
+```bash
+node --import tsx --env-file=.env.local -e ... inspect 2024-10-16 lesson segments
+./node_modules/.bin/tsc --noEmit
+PATH="/Users/moc/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:$PATH" ./node_modules/.bin/next build
+/usr/local/Cellar/git/2.47.1/bin/git diff --check
+PATH="/Users/moc/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:$PATH" ./node_modules/.bin/next dev --port 3001
+browser smoke of /lessons memory tip search and 2024-10-16 selected lesson
+```
+
+Migration status: no database migration.
+
+What Mark should test next:
+
+- On desktop, confirm `/lessons` shows only `Upload audio file` plus the live
+  recorder, not a duplicate native-capture file picker.
+- On iPad, confirm the phone/iPad recorder label makes the native capture path
+  clearer and that `Upload audio file` remains the existing-file route.
+- Open `Leo lesson - 2024-10-16 11:08` and confirm `Chosen clip map` shows the
+  four saved clip decisions without any artificial chapter regions.
+- Search `slash` in `Useful memory tips from Leo` and confirm the library shows
+  the two relevant listen-back memories.
+- Review `http://localhost:3001/lesson-clip-choice-mockups.html` for the three
+  saved-clip visual directions.
+
+Known caveats:
+
+- The normal system `git` shim is broken on this machine because Xcode command
+  line tools are missing; Homebrew Git was used for status/diff checks.
+- `npm` is not on the shell `PATH`; direct local binaries and the bundled
+  workspace Node were used.
+- The unrelated untracked `public/presentations/` folder remains local and was
+  not touched.
+
 ## 2026-05-23 - Netlify Background Transcription Start Fix
 
 Branch: `main`
