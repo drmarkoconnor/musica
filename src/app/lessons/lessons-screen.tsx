@@ -10,12 +10,9 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import {
-  AlertTriangle,
   BookOpen,
   Check,
   Edit3,
-  Mic2,
-  Plus,
   Search,
   Trash2,
   Upload,
@@ -23,6 +20,8 @@ import {
 } from "lucide-react";
 import { AudioStrip } from "@/components/audio-strip";
 import { ComingSoonButton } from "@/components/coming-soon-button";
+import { LearningPointCard } from "@/components/learning-point-card";
+import { uploadLessonAudio } from "@/lib/browser/upload-lesson-audio";
 import { LessonRecorder } from "@/components/lesson-recorder";
 import { LessonSegmentReview } from "@/components/lesson-segment-review";
 import { Section } from "@/components/section";
@@ -77,8 +76,6 @@ const MEMORY_TIP_TOPIC_LABELS = {
   technique: "topicTechnique",
   vocal: "topicVocal",
 } as const;
-
-const AUDIO_UPLOAD_TIMEOUT_MS = 120000;
 
 function todayDate() {
   return new Date().toISOString().slice(0, 10);
@@ -135,24 +132,6 @@ function audioDurationForFile(file: File) {
     };
     audio.src = url;
   });
-}
-
-async function fetchWithTimeout(
-  input: RequestInfo | URL,
-  init: RequestInit,
-  timeoutMs: number,
-) {
-  const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
-
-  try {
-    return await fetch(input, {
-      ...init,
-      signal: controller.signal,
-    });
-  } finally {
-    window.clearTimeout(timeoutId);
-  }
 }
 
 function transcriptBulletItems(text: string) {
@@ -230,9 +209,12 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
     lessonSegmentTranscripts,
     transcripts,
   } = data;
-  const captureInputRef = useRef<HTMLInputElement>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
-  const [showDeviceCapture, setShowDeviceCapture] = useState(false);
+  const attachInputRef = useRef<HTMLInputElement>(null);
+  const createDialogRef = useRef<HTMLDialogElement>(null);
+  const workspaceRef = useRef<HTMLElement>(null);
+  const retryUploadRef = useRef<{ file: File; lessonId?: string } | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<{ uploadedBytes: number; totalBytes: number; phase: "uploading" | "finalising" } | null>(null);
   const sortedLessons = [...lessons].sort((a, b) =>
     (
       lessonRecordings.find((item) => item.lessonId === b.id)?.recordedAt ??
@@ -243,6 +225,9 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
     ),
   );
   const [selectedLessonId, setSelectedLessonId] = useState("");
+  useEffect(() => {
+    setSelectedLessonId(new URLSearchParams(window.location.search).get("lesson") ?? "");
+  }, []);
   const [liveRecordingPreview, setLiveRecordingPreview] =
     useState<LiveRecordingPreview | null>(null);
   const [pendingSavedLessonId, setPendingSavedLessonId] = useState("");
@@ -255,7 +240,8 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
         .filter((item) => item.lessonId === activeLesson.id)
         .sort((a, b) => a.recordedAt.localeCompare(b.recordedAt))
     : [];
-  const recording = recordingsForActiveLesson.at(-1);
+  const [selectedRecordingId, setSelectedRecordingId] = useState("");
+  const recording = recordingsForActiveLesson.find((item) => item.id === selectedRecordingId) ?? recordingsForActiveLesson.at(-1);
   const recordingAudioSrc = audioSrcForRecording(recording);
   const segmentsForRecording = recording
     ? lessonSegments
@@ -288,7 +274,8 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
   const lessonTranscripts = activeLesson
     ? transcripts.filter((item) => item.lessonId === activeLesson.id)
     : [];
-  const transcript = lessonTranscripts[0];
+  const transcript = lessonTranscripts.find((item) => item.recordingId === recording?.id);
+  const activeLearningPoints = data.learningPoints.filter((point) => point.lessonId === activeLesson?.id && point.status !== "discarded").sort((a, b) => a.startsAtSeconds - b.startsAtSeconds);
   const extracts = activeLesson
     ? lessonExtracts.filter((item) => item.lessonId === activeLesson.id)
     : [];
@@ -407,16 +394,6 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
     : [];
 
   useEffect(() => {
-    const coarsePointer =
-      typeof window !== "undefined" &&
-      window.matchMedia("(pointer: coarse)").matches;
-    const touchCapable =
-      typeof navigator !== "undefined" && navigator.maxTouchPoints > 1;
-
-    setShowDeviceCapture(coarsePointer || touchCapable);
-  }, []);
-
-  useEffect(() => {
     if (
       pendingSavedLessonId &&
       sortedLessons.some((lesson) => lesson.id === pendingSavedLessonId)
@@ -425,6 +402,26 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
       setPendingSavedLessonId("");
     }
   }, [pendingSavedLessonId, sortedLessons]);
+
+  useEffect(() => {
+    const dialog = createDialogRef.current;
+    if (isModalOpen && dialog && !dialog.open) {
+      dialog.showModal();
+      dialog.querySelector<HTMLInputElement>("input")?.focus();
+    } else if (!isModalOpen && dialog?.open) dialog.close();
+  }, [isModalOpen]);
+
+  function selectLesson(lessonId: string) {
+    setSelectedLessonId(lessonId);
+    if (window.matchMedia("(max-width: 1023px)").matches) {
+      window.requestAnimationFrame(() => {
+        const workspace = workspaceRef.current;
+        if (!workspace) return;
+        workspace.focus({ preventScroll: true });
+        workspace.scrollIntoView({ block: "start", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+      });
+    }
+  }
 
   function openModal() {
     setIsModalOpen(true);
@@ -445,11 +442,18 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
     setSaveState("saving");
     setErrorMessage("");
 
-    const response = await fetch("/api/lessons", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(formValues),
-    });
+    let response: Response;
+    try {
+      response = await fetch("/api/lessons", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formValues),
+      });
+    } catch {
+      setSaveState("error");
+      setErrorMessage(t("saveFailed"));
+      return;
+    }
 
     if (!response.ok) {
       const body = (await response.json().catch(() => null)) as {
@@ -496,80 +500,42 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
     router.refresh();
   }
 
-  async function handleAudioUpload(event: ChangeEvent<HTMLInputElement>) {
+  async function handleAudioUpload(event: ChangeEvent<HTMLInputElement>, lessonId?: string) {
     const file = event.target.files?.[0];
     event.currentTarget.value = "";
+    if (file) await uploadAudio(file, lessonId);
+  }
 
-    if (!file) return;
-
+  async function uploadAudio(file: File, lessonId?: string) {
+    retryUploadRef.current = { file, lessonId };
     setUploadState("saving");
+    setUploadProgress({ uploadedBytes: 0, totalBytes: file.size, phase: "uploading" });
     setErrorMessage("");
-
+    const attachedLesson = lessonId ? lessons.find((lesson) => lesson.id === lessonId) : undefined;
     const recordedAt = file.lastModified ? new Date(file.lastModified) : new Date();
-    const formData = new FormData();
-    const durationSeconds = await audioDurationForFile(file);
-
-    formData.append("audio", file);
-    formData.append("title", activeLesson?.title ?? previewLessonTitle(recordedAt));
-    formData.append("teacher", activeLesson?.teacher ?? "Leo");
-    formData.append(
-      "lessonDate",
-      activeLesson?.lessonDate ?? localLessonDate(recordedAt),
-    );
-    formData.append("recordedAt", recordedAt.toISOString());
-    formData.append(
-      "summary",
-      activeLesson?.summary ||
-        "Uploaded in Practice Loop. Ready for authorised transcription.",
-    );
-    if (activeLesson) {
-      formData.append("lessonId", activeLesson.id);
-    }
-    if (durationSeconds) {
-      formData.append("durationSeconds", String(durationSeconds));
-    }
-
-    let response: Response;
-
     try {
-      response = await fetchWithTimeout(
-        "/api/lesson-recordings/upload",
-        {
-          body: formData,
-          method: "POST",
+      const durationSeconds = await audioDurationForFile(file);
+      const result = await uploadLessonAudio(file, {
+        metadata: {
+          ...(attachedLesson ? { lessonId: attachedLesson.id } : {}),
+          title: attachedLesson?.title ?? previewLessonTitle(recordedAt),
+          teacher: attachedLesson?.teacher ?? "Leo",
+          lessonDate: attachedLesson?.lessonDate ?? localLessonDate(recordedAt),
+          recordedAt: recordedAt.toISOString(),
+          summary: attachedLesson?.summary ?? "",
         },
-        AUDIO_UPLOAD_TIMEOUT_MS,
-      );
+        durationSeconds,
+        onProgress: setUploadProgress,
+      });
+      setSelectedLessonId(result.lessonId);
+      setPendingSavedLessonId(result.lessonId);
+      setUploadState("saved");
+      retryUploadRef.current = null;
+      router.refresh();
     } catch (error) {
       setUploadState("error");
-      setErrorMessage(
-        error instanceof Error && error.name === "AbortError"
-          ? t("recordingUploadTimedOut")
-          : t("recordingUploadFailed"),
-      );
-      return;
+      setErrorMessage(error instanceof Error ? error.message : t("recordingUploadFailed"));
     }
-
-    if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as {
-        error?: string;
-      } | null;
-
-      setUploadState("error");
-      setErrorMessage(body?.error ?? t("recordingUploadFailed"));
-      return;
-    }
-
-    const body = (await response.json().catch(() => null)) as {
-      lessonId?: string;
-    } | null;
-
-    if (body?.lessonId) {
-      setSelectedLessonId(body.lessonId);
-    }
-
-    setUploadState("saved");
-    router.refresh();
   }
 
   async function handleExtractAction(
@@ -696,7 +662,7 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
               {options.showSource ? (
                 <button
                   className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-stone-300 bg-white px-3 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-100"
-                  onClick={() => setSelectedLessonId(tip.lessonId)}
+                  onClick={() => selectLesson(tip.lessonId)}
                   type="button"
                 >
                   <BookOpen aria-hidden="true" className="h-4 w-4" />
@@ -768,59 +734,55 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
   }
 
   return (
-    <div className="space-y-8">
-      <div className="grid gap-4 xl:grid-cols-[24rem_minmax(0,1fr)]">
+    <div className="space-y-6">
+      <header>
+        <h1 className="text-2xl font-semibold text-stone-950">{t("lessons")}</h1>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-stone-600">{t("lessonFirstIntro")}</p>
+      </header>
+      <div className="grid gap-4 lg:grid-cols-[20rem_minmax(0,1fr)]">
         <section className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm xl:sticky xl:top-36 xl:self-start">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-emerald-800">
-                {t("lessons")}
-              </p>
-              <h1 className="mt-1 text-2xl font-semibold text-stone-950">
-                {liveRecordingPreview
-                  ? previewLessonTitle(liveRecordingPreview.startedAt)
-                  : t("lessons")}
-              </h1>
-              {liveRecordingPreview ? (
-                <p className="mt-2 text-sm text-stone-600">
-                  {localLessonDate(liveRecordingPreview.startedAt)} / Leo
-                </p>
-              ) : activeLesson ? (
-                <p className="mt-2 text-sm text-stone-600">
-                  {activeLesson.lessonDate} / {activeLesson.teacher}
-                </p>
-              ) : null}
-            </div>
-            {liveRecordingPreview ? (
-              <StatusPill
-                tone={liveRecordingPreview.phase === "saving" ? "amber" : "rose"}
-              >
-                {liveRecordingPreview.phase === "saving"
-                  ? t("savingRecording")
-                  : t("recordingNow")}
-              </StatusPill>
-            ) : activeLesson ? (
-              <StatusPill tone="green">{activeLesson.status}</StatusPill>
-            ) : null}
-          </div>
-          <p className="mt-4 whitespace-pre-line text-sm leading-6 text-stone-600">
-            {liveRecordingPreview
-              ? t("recordingWillCreateLesson")
-              : t("selectLessonOrRecord")}
-          </p>
+          <h2 className="text-lg font-semibold text-stone-950">{t("addLessonAudio")}</h2>
+          <p className="mt-2 text-sm leading-6 text-stone-600">{t("uploadCreatesLesson")}</p>
           <div className="mt-5 flex flex-col gap-2">
+            <input
+              accept="audio/*"
+              className="hidden"
+              onChange={(event) => void handleAudioUpload(event)}
+              ref={uploadInputRef}
+              type="file"
+            />
             <button
-              className="w-full disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={liveRecordingPreview !== null}
-              onClick={openModal}
+              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-md bg-emerald-950 px-3 py-3 text-sm font-semibold text-white transition hover:bg-emerald-900 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={liveRecordingPreview !== null || uploadState === "saving"}
+              onClick={() => uploadInputRef.current?.click()}
+              title={t("uploadAudioHelp")}
               type="button"
             >
-              <span className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-md bg-emerald-950 px-3 py-3 text-sm font-semibold text-white transition hover:bg-emerald-900">
-                <Plus aria-hidden="true" className="h-4 w-4" />
-                {t("createLesson")}
-              </span>
+              <Upload aria-hidden="true" className="h-4 w-4" />
+              {uploadState === "saving"
+                ? t("savingRecording")
+                : t("uploadAudio")}
             </button>
+            <p className="text-xs leading-5 text-stone-500">{t("voiceMemoFormats")}</p>
+            {uploadState === "saving" && uploadProgress ? (
+              <div role="status" className="rounded-md border border-stone-200 bg-stone-50 p-3 text-sm text-stone-700">
+                <div className="mb-2 flex justify-between gap-2"><span>{uploadProgress.phase === "finalising" ? t("finalisingAudio") : t("uploadingAudio")}</span><span>{Math.round(uploadProgress.uploadedBytes / Math.max(uploadProgress.totalBytes, 1) * 100)}%</span></div>
+                <progress aria-label={t("uploadingAudio")} className="h-2 w-full accent-emerald-800" max={uploadProgress.totalBytes || 1} value={uploadProgress.uploadedBytes} />
+                <p className="mt-2 text-xs leading-5">{t("uploadKeepOpen")}</p>
+              </div>
+            ) : uploadState === "saved" ? <p role="status" className="rounded-md bg-emerald-50 p-3 text-sm leading-6 text-emerald-900">{t("uploadSavedNext")}</p> : null}
+            {uploadState === "error" && errorMessage ? (
+              <div role="alert" className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+                <p>{errorMessage}</p>
+                {retryUploadRef.current ? <button type="button" className="mt-2 min-h-10 rounded-md border border-rose-200 bg-white px-3 py-2 font-semibold" onClick={() => { const retry = retryUploadRef.current; if (retry) void uploadAudio(retry.file, retry.lessonId); }}>{t("retryUpload")}</button> : null}
+              </div>
+            ) : null}
+            <details className="mt-2 border-t border-stone-100 pt-3">
+              <summary className="cursor-pointer py-1 text-sm font-medium text-stone-600">{t("otherCaptureOptions")}</summary>
+              <div className="mt-3 space-y-2">
             <LessonRecorder
+              emphasis="secondary"
+              disabled={uploadState === "saving"}
               onRecordingFailed={() => {
                 setLiveRecordingPreview(null);
                 setPendingSavedLessonId("");
@@ -840,60 +802,9 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
                 router.refresh();
               }}
             />
-            {showDeviceCapture ? (
-              <>
-                <input
-                  accept="audio/*"
-                  capture="user"
-                  className="hidden"
-                  onChange={(event) => void handleAudioUpload(event)}
-                  ref={captureInputRef}
-                  type="file"
-                />
-                <button
-                  className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-md border border-stone-300 bg-white px-3 py-3 text-sm font-semibold text-stone-700 transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-60"
-                  disabled={
-                    liveRecordingPreview !== null || uploadState === "saving"
-                  }
-                  onClick={() => captureInputRef.current?.click()}
-                  title={t("recordWithDeviceHelp")}
-                  type="button"
-                >
-                  <Mic2 aria-hidden="true" className="h-4 w-4" />
-                  {uploadState === "saving"
-                    ? t("savingRecording")
-                    : uploadState === "saved"
-                      ? t("audioAttached")
-                      : t("recordWithDevice")}
-                </button>
-              </>
-            ) : null}
-            <input
-              accept="audio/*"
-              className="hidden"
-              onChange={(event) => void handleAudioUpload(event)}
-              ref={uploadInputRef}
-              type="file"
-            />
-            <button
-              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-md border border-stone-300 bg-white px-3 py-3 text-sm font-semibold text-stone-700 transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={liveRecordingPreview !== null || uploadState === "saving"}
-              onClick={() => uploadInputRef.current?.click()}
-              title={t("uploadAudioHelp")}
-              type="button"
-            >
-              <Upload aria-hidden="true" className="h-4 w-4" />
-              {uploadState === "saving"
-                ? t("savingRecording")
-                : uploadState === "saved"
-                  ? t("audioAttached")
-                  : t("uploadAudio")}
-            </button>
-            {uploadState === "error" && errorMessage ? (
-              <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
-                {errorMessage}
-              </p>
-            ) : null}
+                <button className="min-h-11 w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100 disabled:opacity-60" disabled={liveRecordingPreview !== null || uploadState === "saving"} onClick={openModal} type="button">{t("createLesson")}</button>
+              </div>
+            </details>
           </div>
           <div className="mt-6 border-t border-stone-200 pt-4">
             {lessonDeleteState === "error" && errorMessage ? (
@@ -910,15 +821,9 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
               </span>
             </div>
             <div className="mt-3 max-h-80 divide-y divide-stone-200 overflow-y-auto rounded-md border border-stone-200">
+              {sortedLessons.length === 0 ? <p className="px-3 py-4 text-sm text-stone-500">{t("noLessonsYet")}</p> : null}
               {sortedLessons.map((lesson) => {
                 const recordingCount = lessonRecordings.filter(
-                  (item) => item.lessonId === lesson.id,
-                ).length;
-                const extractCount = lessonExtracts.filter(
-                  (item) =>
-                    item.lessonId === lesson.id && item.status !== "discarded",
-                ).length;
-                const transcriptCount = transcripts.filter(
                   (item) => item.lessonId === lesson.id,
                 ).length;
                 const isSelected = activeLesson?.id === lesson.id;
@@ -935,7 +840,7 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
                     <button
                       className="grid w-full grid-cols-[1fr_auto] gap-3 px-3 py-2 text-left transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-60"
                       disabled={liveRecordingPreview !== null}
-                      onClick={() => setSelectedLessonId(lesson.id)}
+                      onClick={() => selectLesson(lesson.id)}
                       type="button"
                     >
                       <span className="min-w-0">
@@ -948,10 +853,10 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
                       </span>
                       <span className="flex flex-col items-end gap-1 text-xs text-stone-500">
                         <span>
-                          {recordingCount} {t("clips")}
+                          {recordingCount} {t("recordingFile").toLowerCase()}
                         </span>
                         <span>
-                          {extractCount} {t("practiceElement")}
+                          {data.learningPoints.filter((point) => point.lessonId === lesson.id && point.status !== "discarded").length} {t("learningPoints").toLowerCase()}
                         </span>
                       </span>
                     </button>
@@ -1000,37 +905,22 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
           </div>
         </section>
 
-        <section className="min-w-0 space-y-4 rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
+        <section ref={workspaceRef} tabIndex={-1} aria-label={t("lessonWorkspace")} className="min-w-0 scroll-mt-40 space-y-4 rounded-lg border border-stone-200 bg-white p-5 shadow-sm focus:outline-none">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="text-2xl font-semibold leading-tight text-stone-950">
                 {liveRecordingPreview
                   ? t("newLessonRecording")
                   : recording
-                    ? t("latestClip")
-                    : t("recordings")}
+                    ? activeLesson?.title
+                    : pendingSavedLessonId ? t("savedRecordingPending") : t("lessonWorkspaceEmpty")}
               </h2>
               <p className="mt-1 text-sm text-stone-500">
                 {liveRecordingPreview
                   ? t("recordingWillCreateLesson")
-                  : recording?.storagePath}
+                  : activeLesson ? `${activeLesson.lessonDate} · ${activeLesson.teacher}` : t("lessonWorkspace")}
               </p>
             </div>
-            <StatusPill
-              tone={
-                liveRecordingPreview
-                  ? liveRecordingPreview.phase === "saving"
-                    ? "amber"
-                    : "rose"
-                  : "blue"
-              }
-            >
-              {liveRecordingPreview
-                ? liveRecordingPreview.phase === "saving"
-                  ? t("savingRecording")
-                  : t("recordingNow")
-                : t("ready")}
-            </StatusPill>
           </div>
           {liveRecordingPreview ? (
             <div className="rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-900">
@@ -1047,22 +937,15 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
           ) : (
             <>
               {recording ? (
-                <AudioStrip audioSrc={recordingAudioSrc} title={recording.title} />
+                <AudioStrip audioSrc={recordingAudioSrc} showWaveform={false} title={recording.title} />
               ) : null}
               {recordingsForActiveLesson.length > 1 ? (
-                <div className="space-y-2">
-                  {recordingsForActiveLesson.map((item, index) => (
-                    <div
-                      className="rounded-md border border-stone-200 p-2"
-                      key={item.id}
-                    >
-                      <AudioStrip
-                        audioSrc={audioSrcForRecording(item)}
-                        title={`${t("recordings")} ${index + 1}`}
-                      />
-                    </div>
-                  ))}
-                </div>
+                <label className="block text-sm font-medium text-stone-600">
+                  {t("recordings")}
+                  <select className="mt-2 min-h-11 w-full rounded-md border border-stone-300 bg-white px-3 py-2" value={recording?.id ?? ""} onChange={(event) => setSelectedRecordingId(event.target.value)}>
+                    {recordingsForActiveLesson.map((item, index) => <option key={item.id} value={item.id}>{index + 1}. {item.title} · {formatDuration(item.durationSeconds)}</option>)}
+                  </select>
+                </label>
               ) : null}
             </>
           )}
@@ -1070,45 +953,17 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
             <div className="grid min-h-72 place-items-center rounded-lg border border-dashed border-stone-300 bg-stone-50 px-4 py-8 text-center">
               <div className="max-w-md">
                 <p className="text-sm font-semibold text-stone-950">
-                  {t("selectLessonOrRecord")}
+                  {t("lessonWorkspaceEmpty")}
                 </p>
                 <p className="mt-2 text-sm leading-6 text-stone-600">
-                  {t("emptyLessonWorkspace")}
+                  {t("lessonWorkspaceEmptyHelp")}
                 </p>
               </div>
             </div>
           ) : null}
-          {activeLesson && recording && recordingAudioSrc ? (
-            <>
-              {segmentTranscriptsForRecording.length === 0 ? (
-                <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">
-                  <div className="flex gap-2">
-                    <AlertTriangle
-                      aria-hidden="true"
-                      className="mt-0.5 h-4 w-4 flex-none text-amber-800"
-                    />
-                    <div>
-                      <p className="font-semibold">
-                        {t("transcriptionClipFirstTitle")}
-                      </p>
-                      <p>{t("transcriptionClipFirstBody")}</p>
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-              <LessonSegmentReview
-                audioSrc={recordingAudioSrc}
-                durationSeconds={recording.durationSeconds}
-                lessonId={activeLesson.id}
-                lessonTitle={activeLesson.title}
-                onChanged={() => router.refresh()}
-                recordingId={recording.id}
-                segments={segmentsForRecording}
-              />
-            </>
-          ) : null}
           {recording ? (
             <TranscriptionGate
+              key={recording.id}
               lessonId={activeLesson?.id ?? ""}
               recordingDurationSeconds={recording.durationSeconds}
               recordingId={recording.id}
@@ -1126,9 +981,20 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
               transcriptStatus={transcript?.status}
             />
           ) : null}
+          {activeLearningPoints.length > 0 && activeLesson ? <section aria-label={t("learningPoints")} className="space-y-3 border-t border-stone-200 pt-4"><h3 className="text-lg font-semibold text-stone-950">{t("learningPoints")}</h3>{activeLearningPoints.map((point) => <LearningPointCard key={point.id} point={point} lessonTitle={activeLesson.title} lessonDate={activeLesson.lessonDate} audioSrc={audioSrcForRecording(lessonRecordings.find((item) => item.id === point.recordingId))} showLesson={false} />)}</section> : null}
+          {activeLesson && recording && recordingAudioSrc ? (
+            <details className="rounded-md border border-stone-200">
+              <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-stone-600">{t("optionalClipTools")}</summary>
+              <div className="space-y-4 border-t border-stone-200 p-3">
+                <p className="text-sm leading-6 text-stone-600">{t("optionalClipToolsHelp")}</p>
+                <LessonSegmentReview key={recording.id} audioSrc={recordingAudioSrc} durationSeconds={recording.durationSeconds} lessonId={activeLesson.id} lessonTitle={activeLesson.title} onChanged={() => router.refresh()} recordingId={recording.id} segments={segmentsForRecording} />
+              </div>
+            </details>
+          ) : null}
         </section>
       </div>
 
+      {memoryTips.length > 0 ? <details className="rounded-lg border border-stone-200 bg-white p-4"><summary className="cursor-pointer text-sm font-medium text-stone-600">{t("earlierClipMemories")}</summary><div className="mt-5 space-y-6">
       {memoryTipsForActiveRecording.length > 0 ? (
         <Section title={t("usefulClipMemories")}>
           <div className="grid gap-3">
@@ -1207,8 +1073,15 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
         </Section>
       ) : null}
 
+      </div></details> : null}
+
       {activeLesson ? (
-      <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
+      <details className="rounded-lg border border-stone-200 bg-white p-4"><summary className="cursor-pointer text-sm font-medium text-stone-600">{t("lessonDetailsAndTranscript")}</summary>
+      <div className="mt-4">
+        <input accept="audio/*" className="hidden" type="file" ref={attachInputRef} onChange={(event) => void handleAudioUpload(event, activeLesson.id)} />
+        <button type="button" disabled={uploadState === "saving" || liveRecordingPreview !== null} onClick={() => attachInputRef.current?.click()} className="min-h-10 rounded-md border border-stone-300 px-3 py-2 text-sm text-stone-700 disabled:opacity-60">{t("attachToExisting")} · {t("uploadAudio")}</button>
+      </div>
+      <div className="mt-5 grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
         <Section title={t("lessonSummary")}>
           <div className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
             {executiveSummaryItems.length > 0 ? (
@@ -1254,7 +1127,7 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
 
         {segmentTranscriptsForRecording.length === 0 ||
         unlinkedExtracts.length > 0 ? (
-          <Section title={t("extractedCandidates")}>
+          <Section title={t("previousPracticeSuggestions")}>
             <div className="space-y-3">
               {unlinkedExtracts.length === 0 ? (
                 <div className="rounded-lg border border-stone-200 bg-white p-5 text-sm leading-6 text-stone-600 shadow-sm">
@@ -1306,14 +1179,13 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
           </Section>
         ) : null}
       </div>
+      </details>
       ) : null}
 
-      {isModalOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/50 p-4">
-          <div className="w-full max-w-xl rounded-lg bg-white p-5 shadow-xl">
+      <dialog ref={createDialogRef} onCancel={closeModal} onClose={() => setIsModalOpen(false)} aria-labelledby="create-lesson-title" className="fixed inset-0 m-auto max-h-[90vh] w-[calc(100%_-_2rem)] max-w-xl overflow-y-auto rounded-lg border-0 bg-white p-5 text-stone-900 shadow-xl backdrop:bg-stone-950/50">
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
-                <h2 className="text-xl font-semibold text-stone-950">
+                <h2 id="create-lesson-title" className="text-xl font-semibold text-stone-950">
                   {t("createLesson")}
                 </h2>
                 <p className="mt-1 text-sm text-stone-600">
@@ -1429,9 +1301,7 @@ export function LessonsScreen({ data }: { data: PracticeLoopReadModel }) {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      ) : null}
+      </dialog>
     </div>
   );
 }

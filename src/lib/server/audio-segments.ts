@@ -32,14 +32,16 @@ function runFfmpeg(args: string[]) {
     const child = spawn(ffmpegPath(), args, {
       stdio: ["ignore", "ignore", "pipe"],
     });
-    const stderr: Buffer[] = [];
+    let stderr = "";
+    const timer = setTimeout(() => { child.kill("SIGKILL"); reject(new Error("Preparing this audio passage timed out. Saved passages can be retried.")); }, 90_000);
 
     child.stderr.on("data", (chunk: Buffer) => {
-      stderr.push(chunk);
+      stderr = (stderr + chunk.toString("utf8")).slice(-8000);
     });
 
-    child.on("error", reject);
+    child.on("error", (error) => { clearTimeout(timer); reject(error); });
     child.on("close", (code) => {
+      clearTimeout(timer);
       if (code === 0) {
         resolve();
         return;
@@ -47,7 +49,7 @@ function runFfmpeg(args: string[]) {
 
       reject(
         new Error(
-          `ffmpeg exited with ${code}: ${Buffer.concat(stderr).toString("utf8")}`,
+          `ffmpeg exited with ${code}: ${stderr}`,
         ),
       );
     });

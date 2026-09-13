@@ -1,8 +1,24 @@
 # Practice Loop Current State
 
-Last updated: 2026-05-25
+> **September 2026 update:** The agreed lesson-first workflow supersedes older clip-first requirements below. Analyse the whole lesson by default, retain useful learning points with audio evidence, and make practice assignments optional. See [the implementation notes](lesson-first-implementation.md) for current behaviour and rollout requirements. Earlier entries are retained as project history.
 
-Latest implementation commit: `f6638ef Add memory tip library`
+Last updated: 2026-09-13
+
+Mark's previously uncommitted August changes have been reconciled with the
+lesson-first implementation. The advanced clip studio remains available under
+optional tools. Local audio storage selection and device-copy MIME fixes are
+preserved. Mark completed the Mac folder move manually and verified the Git root
+as `/Users/moc/repos/all_things_coding/2026/markoconnorai/musica`.
+
+Mark installed the reconciled patch and passed the Mac TypeScript check. He then
+ran migration 0007 against the configured Neon database. His read-only follow-up
+confirmed eight recorded migrations and the `learning_points` table present.
+The migration is applied; it should not be repeated to obtain a CLI success line.
+The dependency maintenance described in the implementation notes is prepared in
+the implementation checkout and still needs installing on the Mac. Hosted
+deployment and a real hour-long upload and extraction remain outstanding.
+
+Latest committed baseline: `36dc83a Update memory for memory tip library`
 
 ## Working Environment
 
@@ -13,6 +29,10 @@ Latest implementation commit: `f6638ef Add memory tip library`
 - Local secrets: `.env.local`
 - Hosted secrets: Netlify environment variables
 - Current object storage on hosted app: Netlify Blobs
+- Ordinary `next dev` audio uploads use local lesson/practice audio storage,
+  even when `.env.local` contains Netlify site credentials. Netlify Blobs is
+  selected only inside the Netlify runtime or through an explicit
+  `PRACTICE_LOOP_AUDIO_STORAGE=netlify-blobs` override.
 
 Important hosted env vars:
 
@@ -45,6 +65,10 @@ Important hosted env vars:
   the accidental 2026-05-22 `local-test-audio` attachment has been removed from
   Neon, so all remaining `lesson_recordings` rows use
   `storage_bucket = netlify-blobs`.
+- The lesson entry panel now treats `Upload iPhone Voice Memo` as the recommended
+  path for full lessons. It is first, visually primary, and accepts Voice Memos,
+  M4A, MP3, and WAV files. Browser recording remains available as clearly
+  labelled secondary capture.
 - Create lessons and record live lesson audio in browser.
 - Starting a live lesson recording clears the previous lesson context and saves a
   fresh timestamped lesson when stopped.
@@ -56,19 +80,20 @@ Important hosted env vars:
   stop, and network waits are bounded so mobile browsers do not sit in
   `Saving recording` forever. If upload fails, the lesson recorder shows
   unsaved recordings with retry, download-copy, and discard actions.
-- The lesson screen also has a `Record with device` path using the mobile
-  browser/native capture-file flow. This uses the same upload route as manual
-  audio upload and accepts iOS-style audio MIME types such as `audio/x-m4a`.
-- The mobile/native capture path is now labelled as a phone/iPad recorder,
-  hidden on desktop-style browsers, and visually matched to the normal upload
-  button. Desktop review now presents `Upload audio file` as the ordinary file
-  chooser path.
+- The earlier mobile/native `Record with device` path is no longer exposed. Its
+  picker behaviour varied by browser and could open video capture on iPad. The
+  screen now offers two predictable choices: upload an existing Voice Memo or
+  use the browser microphone recorder.
 - Where the browser supports the File System Access API, lesson recording also
   offers a default-on `Also save a local file` option before recording starts.
   Unsupported browsers no longer show a disabled local-file checkbox; the
   normal browser rescue/download path remains available after a failed save.
 - The lesson screen now has a real audio upload control backed by the lesson
   recording upload route, instead of a placeholder button.
+- Local Voice Memo and browser-recording uploads no longer fail with
+  `BlobsInternalError` merely because Netlify site credentials are present.
+  Browser device-copy setup also strips codec parameters from MIME types before
+  calling the File System Access picker.
 - The old local test-audio attachment flow is removed from the normal lesson UI.
   Test fixture APIs are blocked in production and only work in non-production
   when `PRACTICE_LOOP_ENABLE_TEST_AUDIO=true`.
@@ -76,11 +101,23 @@ Important hosted env vars:
 - Hosted read-model filtering hides local-only audio records that cannot be
   served by Netlify.
 - Mark useful lesson clips before transcription.
+- Long recordings now open with a two-level audio studio: a full-lesson
+  overview plus a 15-minute, 5-minute, or 1-minute working window. Transport
+  controls include 15-second jumps, play/pause, selection preview, playback
+  speed, previous/next focus window, and a 45-second quick capture around the
+  current moment.
+- Clip boundaries can be entered as exact timecodes, nudged by 1 or 5 seconds,
+  previewed at either edge, and adjusted after a selected clip has been saved.
+  Keyboard and pointer scrubbing remain available.
 - Lesson clip review now has an audio-first scrubber and created-clip review
   queue, so saved clip titles and notes can be edited before transcription.
   The earlier artificial chapter rail has been removed from the clip-creation
   area; the visual lesson map now appears only for clips the user has actually
-  created, including discarded/transcribed state and metadata.
+  chosen. Discarded ranges remain recoverable in the review list but no longer
+  appear as chosen regions, and decorative fake waveform bars have been
+  removed.
+- Chosen clips can be listened to chronologically as a non-destructive clip
+  reel, with previous/next clip controls and total selected duration.
 - Segment transcription sends selected clips by default.
 - Full-recording transcription requires explicit confirmation if no segments are
   selected.
@@ -241,8 +278,14 @@ git diff --check
   materializes the complete object before writing the final Netlify Blob. Later
   storage can improve this further with multipart/object-compose semantics if
   needed.
-- Lesson segment editor has a first-pass chosen-clip map and review queue, but
-  still needs split, merge, true waveform data, and deeper zoom/focus editing.
+- Lesson segment editor has overview/focus navigation, exact boundary editing,
+  a chosen-clip map, and a non-destructive reel. It still needs true
+  audio-derived waveform data, split/merge operations, and an exported stitched
+  audio file if those prove useful in real lesson review.
+- Newly uploaded local audio plays from local storage. Historical Netlify Blob
+  audio may still be unavailable in ordinary local Next.js development, so
+  final playback against the production archive should be exercised on the
+  hosted app.
 - The memory-tip library currently derives topics from clip text rather than
   storing user-editable topic tags. A later pass could add editable topic/tag
   metadata if the library grows.

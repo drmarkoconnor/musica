@@ -1,5 +1,7 @@
 # Practice Loop Project Brief
 
+> **September 2026 update:** The agreed lesson-first workflow supersedes older clip-first requirements below. Analyse the whole lesson by default, retain useful learning points with audio evidence, and make practice assignments optional. See [the implementation notes](lesson-first-implementation.md) for current behaviour and rollout requirements. Earlier entries are retained as project history.
+
 Last updated: 2026-05-20
 
 ## Purpose

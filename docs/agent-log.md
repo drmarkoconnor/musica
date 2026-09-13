@@ -20,6 +20,129 @@ Keep entries concise. Put stable product truth in `project-brief.md`, current
 implementation truth in `current-state.md`, and priority sequencing in
 `roadmap.md`.
 
+## 2026-09-13 - Confirm Mac Database Migration And Prepare Dependency Fixes
+
+Branch: `feat/lesson-first-workflow`; GitHub publication remains unapproved.
+
+- Mark installed the reconciled patch, ran `npm ci` and passed TypeScript on his
+  Mac. He then ran `npm run db:migrate`. The follow-up read-only output showed
+  eight recorded migrations and the learning-points table present, confirming
+  migration 0007 is applied to his configured Neon database.
+- Updated the implementation checkout to exact Next.js 16.3.3 and Netlify Blobs
+  10.7.13, and refreshed transitive `baseline-browser-mapping` to 2.11.23. The
+  existing Drizzle versions and migration files are unchanged. Mac installation
+  commands are in `lesson-first-implementation.md`; these changes are not yet
+  confirmed on the Mac.
+- Verified the versions against the [Next.js security release](https://nextjs.org/blog/august-2026-security-release)
+  and [Netlify Blobs changelog](https://github.com/netlify/primitives/blob/main/packages/blobs/CHANGELOG.md).
+- `npm test`: 46 passing, including the 17 isolated database integration checks.
+  Production compilation and TypeScript passed. Rebuilt after the transitive
+  browser-mapping update. `npm audit --omit=dev`: zero reported vulnerabilities.
+  Development-only Drizzle/esbuild findings remain; no forced downgrade applied.
+- Next.js regenerated its `next-env.d.ts` root-parameters import. The build emits
+  three dynamic tracing warnings for existing FFmpeg spawn calls and local asset
+  reads. The inspected transcription route manifests each contained 113 files;
+  Netlify explicitly includes the FFmpeg binary through `netlify.toml`. Hosted
+  bundle behaviour still needs checking during deployment acceptance.
+
+No live database write was performed from this checkout. No code push or hosted
+deployment. Next: install the tested dependency maintenance on the Mac, review
+the local app and test a real full-lesson upload, playback and extraction. Hosted
+hour-long acceptance remains outstanding.
+
+## 2026-09-13 - Reconcile Mac Edits With Lesson-First Implementation
+
+Branch: `feat/lesson-first-workflow`
+
+Preserved snapshots: implementation `c16a4af`; supplied Mac changes `5989d9e`.
+Both started from `36dc83a`. The Mac snapshot contains exactly the twelve tracked
+files in Mark's supplied patch; `public/presentations/` was not supplied.
+
+- Retained the local audio-storage override and codec-normalised device backup.
+- Retained the advanced overview, focus windows, timecodes, boundary editing and
+  chosen-clip reel under the optional clip tools. Prevented hidden audio players
+  from preloading recordings and queued source seeks until metadata is ready.
+- Kept the lesson-first interface, resumable uploads, independent learning
+  points and recovery protection. Removed the native device picker that could
+  open video capture on iPad. Live recording remains secondary.
+- Mark completed the folder move and verified the Git root in `markoconnorai/musica`.
+- `npm test`: 46 passing tests, including local storage with dummy Netlify
+  credentials and blocked network access. TypeScript and the production build
+  passed. Browser review confirmed the optional studio opens and focus-window
+  navigation works with a synthetic 66-minute lesson; fixtures were removed.
+
+Migration 0007 and hosted full-lesson acceptance remain outstanding. No live
+database changes or deployment. GitHub publication remains unapproved. A binary
+Git update patch is generated from the preserved Mac snapshot to the reconciled
+implementation for local installation without discarding Mark's edits.
+
+## 2026-08-03 - Upload-First Long-Lesson Audio Studio
+
+Branch: `main`
+
+Committed baseline: `36dc83a Update memory for memory tip library`
+
+Work done:
+
+- Made `Upload iPhone Voice Memo` the recommended first action for full lessons
+  and moved browser recording into a clearly secondary role.
+- Removed the mobile/native `Record with device` picker because iPad could route
+  it into video capture; Voice Memo upload and browser recording are now the two
+  predictable entry paths.
+- Added a full-lesson overview plus 15-minute, 5-minute, and 1-minute working
+  windows for navigating hour-long recordings.
+- Added 15-second transport, playback speed, selection/edge previews, exact
+  timecodes, 1/5-second boundary nudges, and 45-second quick capture.
+- Added range adjustment for already saved selected clips and a chronological,
+  non-destructive chosen-clip reel.
+- Limited overview and chosen-map regions to real, non-discarded clips. Removed
+  the repeated decorative waveform bars because they were not derived from the
+  recording.
+- Improved the iPad landscape split view and verified the upload-first path at
+  desktop, iPad, and phone widths in the in-app browser.
+- Verified English/Italian parity for the revised entry controls.
+- Fixed local Voice Memo/browser-recording uploads that returned
+  `Audio storage is not available ... (BlobsInternalError)`. Netlify site
+  credentials no longer force ordinary `next dev` into Blobs; local audio is
+  used unless the app is running on Netlify or explicitly configured otherwise.
+- Normalized codec-qualified recorder MIME types such as
+  `audio/webm;codecs=opus` before passing them to the browser's local-file
+  picker.
+
+Commands run:
+
+```bash
+node ./node_modules/typescript/bin/tsc --noEmit
+node ./node_modules/next/dist/bin/next build
+/usr/local/Cellar/git/2.47.1/bin/git diff --check
+browser interaction and visual checks of /lessons at desktop, iPad, and phone widths
+local lesson-audio write/read/delete smoke
+browser device-copy MIME normalization smoke
+```
+
+Migration status: no database migration.
+
+What Mark should test next:
+
+- Upload one real iPhone Voice Memo on the hosted app and create two or three
+  clips using the overview, focus windows, timecodes, and edge previews.
+- Play the chosen clip reel and confirm the chronological listen-back feels
+  sufficient before investing in exported stitched audio.
+- Try one browser-recorded lesson on the intended iPad/browser combination to
+  confirm rescue and device-copy behaviour outside local emulation.
+- Refresh the local lesson page and either reselect the Voice Memo or use Retry
+  on a recoverable browser recording; it should now save to local audio storage.
+
+Known caveats:
+
+- Historical Netlify Blob audio can still return 404 in ordinary local Next.js
+  development. New local uploads now use playable local storage instead.
+- The current clip map is time-based and honest but not a true waveform. A real
+  waveform needs to be derived from each audio file rather than drawn as a
+  decorative approximation.
+- The work is not committed or pushed in this session. The unrelated untracked
+  `public/presentations/` folder remains untouched.
+
 ## 2026-05-25 - Recording Controls And Memory Tips Library
 
 Branch: `main`

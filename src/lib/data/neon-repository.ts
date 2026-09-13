@@ -1,6 +1,7 @@
 import { asc } from "drizzle-orm";
 import { createDatabaseClient, type PracticeLoopDatabase } from "@/db/client";
 import * as dbSchema from "@/db/schema";
+import { mapLearningPoint } from "@/lib/server/learning-points";
 import type {
   Exercise,
   Lesson,
@@ -422,6 +423,7 @@ export function createNeonPracticeLoopRepository(
       lessonSegmentTranscriptRows,
       transcriptRows,
       lessonExtractRows,
+      learningPointRows,
       practiceTasks,
       pieceAssetRows,
       practiceSessionRows,
@@ -447,6 +449,7 @@ export function createNeonPracticeLoopRepository(
         .orderBy(asc(dbSchema.lessonSegmentTranscripts.completedAt)),
       db.select().from(dbSchema.transcripts),
       db.select().from(dbSchema.lessonExtracts),
+      db.select().from(dbSchema.learningPoints).orderBy(asc(dbSchema.learningPoints.startsAtSeconds)),
       listPracticeTasks(),
       db.select().from(dbSchema.pieceAssets),
       db.select().from(dbSchema.practiceSessions),
@@ -469,6 +472,7 @@ export function createNeonPracticeLoopRepository(
       ),
       transcripts: transcriptRows.map(mapTranscript),
       lessonExtracts: lessonExtractRows.map(mapLessonExtract),
+      learningPoints: learningPointRows.map(mapLearningPoint),
       practiceTasks,
       pieceAssets: pieceAssetRows.map(mapPieceAsset),
       practiceSessions: practiceSessionRows.map(mapPracticeSession),

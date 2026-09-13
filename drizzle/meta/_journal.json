@@ -50,6 +50,13 @@
       "when": 1779401081580,
       "tag": "0006_hot_starfox",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1789313795902,
+      "tag": "0007_lesson_learning_points",
+      "breakpoints": true
     }
   ]
 }

@@ -1,5 +1,7 @@
 # Practice Loop — Product Requirements Document (PRD)
 
+> **September 2026 update:** The agreed lesson-first workflow supersedes older clip-first requirements below. Analyse the whole lesson by default, retain useful learning points with audio evidence, and make practice assignments optional. See [the implementation notes](lesson-first-implementation.md) for current behaviour and rollout requirements. Earlier entries are retained as project history.
+
 ## Version
 
 0.1 — Foundational Personal Build

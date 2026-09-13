@@ -1,6 +1,10 @@
 # Practice Loop Roadmap
 
-Last updated: 2026-05-25
+Last updated: 2026-09-13
+
+The September lesson-first implementation takes priority over the historical
+phase notes below. Whole-lesson learning-point extraction is primary; the August
+clip studio remains optional. See [implementation and rollout notes](lesson-first-implementation.md).
 
 ## Roadmap Rule
 
@@ -57,15 +61,19 @@ Done:
   recoverably instead of hanging indefinitely on `Saving recording`.
 - Live recording now starts before IndexedDB rescue setup finishes, avoiding a
   mobile start-up stall on slow browser storage APIs.
-- The lesson screen has a mobile/native `Record with device` capture-file path,
-  with iOS-style audio MIME types accepted by the upload route.
 - Browser lesson recording has a default-on `Save a device copy` option where
   supported, so a user-granted local audio file is written while recording.
 - Lesson audio upload has a first-pass real file picker backed by the lesson
   recording upload route.
-- Recording entry controls now distinguish desktop upload from the phone/iPad
-  capture fallback, and unsupported local-file writing is hidden instead of
-  shown as an unavailable checkbox.
+- `Upload iPhone Voice Memo` is now the first and recommended full-lesson path,
+  with browser recording retained as visibly secondary capture.
+- Local Next.js development now defaults new audio to local storage rather than
+  treating the presence of Netlify site credentials as a Blobs runtime. Hosted
+  Netlify deploys and explicit overrides continue to use Netlify Blobs.
+- The unpredictable mobile/native `Record with device` picker has been removed
+  from the interface. Voice Memo upload and browser microphone recording are
+  the two explicit capture paths, and unsupported local-file writing is hidden
+  instead of shown as an unavailable checkbox.
 - Normal lesson UI no longer exposes the development test-audio attachment, and
   fixture APIs are blocked in production even if the old request path is called.
 - Lesson creation and recording metadata.
@@ -77,9 +85,19 @@ Done:
 - Selected segment minute preview before transcription.
 - Server-side ffmpeg clipping before transcription.
 - Audio-first scrubber for long lesson orientation.
+- Full-lesson overview plus 15-minute, 5-minute, and 1-minute focus windows,
+  with previous/next window navigation.
+- 15-second transport, selection playback, playback speed, edge previews, exact
+  timecode entry, 1/5-second nudging, and a 45-second quick-capture action.
+- Existing selected clips can be reopened and have their start/end range
+  updated without creating a duplicate.
 - Created-clip review queue with title and note editing before transcription.
 - Chosen-clip map that visualizes only user-created clips with status and
   metadata, rather than artificial pre-analysis lesson regions.
+- Discarded ranges stay recoverable in the review list but are excluded from the
+  chosen map and overview. Decorative fake waveform bars have been removed.
+- Non-destructive chosen-clip reel with chronological playback, previous/next
+  navigation, and total selected duration.
 - Visual mockups for the next saved-clip presentation pass:
   `public/lesson-clip-choice-mockups.html`.
 - Private archive dry-run importer for `lessonrecordings/`, with exact duplicate
@@ -92,12 +110,14 @@ Next:
 
 - Review imported archive lessons in the app, create useful teaching clips, and
   transcribe selected clips only.
-- Better long-recording studio: split, merge, chunk creation, true waveform
-  data, deeper zoom/focus editing, and clearer clip states.
+- Test one real iPhone Voice Memo end to end on the hosted app, including
+  long-recording navigation, clip trimming, reel playback, and transcription.
+- Generate a true waveform from lesson audio only if the overview/focus model
+  still needs more visual detail after real use.
+- Add split/merge and exported stitched-audio support only if the
+  non-destructive reel is insufficient.
 - Consider multipart/object-compose storage later if final server assembly ever
   becomes too memory-heavy for very long recordings.
-- More nuanced start/end editing beyond the original 30 second pre-roll and 10
-  second trim idea.
 
 ## Phase 5: Transcription, Lesson Memory, And Extraction
 

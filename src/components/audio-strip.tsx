@@ -33,12 +33,9 @@ export function AudioStrip({
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackError, setPlaybackError] = useState("");
   const isCompact = density === "compact";
-  const playLabel =
-    typeof startsAtSeconds === "number"
-      ? t("listenToClip")
-      : isPlaying
-        ? t("pause")
-        : t("play");
+  const playLabel = isPlaying
+    ? t("pause")
+    : typeof startsAtSeconds === "number" ? t("listenToClip") : t("play");
 
   async function playFrom(seconds: number) {
     const player = audioRef.current;
@@ -167,19 +164,22 @@ export function AudioStrip({
             className={controlsMode === "native" ? "w-full" : "hidden"}
             controls={controlsMode === "native"}
             controlsList="nodownload"
-            onCanPlay={() => {
-              pendingSeekRef.current = null;
-            }}
             onEnded={() => setIsPlaying(false)}
             onLoadedMetadata={handleLoadedMetadata}
             onPause={() => setIsPlaying(false)}
-            onPlay={() => setIsPlaying(true)}
+            onPlay={() => {
+              document.querySelectorAll("audio").forEach((audio) => {
+                if (audio !== audioRef.current) audio.pause();
+              });
+              setIsPlaying(true);
+            }}
             onTimeUpdate={handleTimeUpdate}
             playsInline
-            preload="auto"
+            preload="none"
             ref={audioRef}
             src={audioSrc}
           />
+          {controlsMode === "buttons" || typeof startsAtSeconds === "number" || typeof endsAtSeconds === "number" ? (
           <div className={cn("grid grid-cols-2", isCompact ? "gap-1" : "gap-2")}>
             <button
               aria-label={playLabel}
@@ -212,6 +212,7 @@ export function AudioStrip({
               <span className={isCompact ? "sr-only" : ""}>{t("stopClip")}</span>
             </button>
           </div>
+          ) : null}
           {playbackError ? (
             <p className="text-xs leading-5 text-rose-700">{playbackError}</p>
           ) : null}

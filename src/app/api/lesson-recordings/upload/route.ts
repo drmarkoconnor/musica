@@ -8,9 +8,9 @@ import {
 import { createLessonRecordingMetadata } from "@/lib/server/lesson-recording-metadata";
 
 export const runtime = "nodejs";
-export const maxDuration = 300;
+export const maxDuration = 60;
 
-const MAX_AUDIO_BYTES = 250 * 1024 * 1024;
+const MAX_AUDIO_BYTES = 2 * 1024 * 1024;
 
 function todayDate() {
   return new Date().toISOString().slice(0, 10);
@@ -88,6 +88,10 @@ function isUuid(value: string) {
 }
 
 export async function POST(request: Request) {
+  const requestBytes = Number(request.headers.get("content-length"));
+  if (Number.isFinite(requestBytes) && requestBytes > MAX_AUDIO_BYTES + 64 * 1024) {
+    return NextResponse.json({ error: "This upload method accepts recordings up to 2 MiB. Refresh the app and use Add recording to upload larger files in resumable chunks." }, { status: 413 });
+  }
   const formData = await request.formData();
   const audio = formData.get("audio");
 
@@ -101,7 +105,7 @@ export async function POST(request: Request) {
 
   if (audio.size > MAX_AUDIO_BYTES) {
     return NextResponse.json(
-      { error: "Audio file is too large for local upload." },
+      { error: "Refresh the app and use Add recording to upload this file in resumable chunks (up to 512 MiB)." },
       { status: 413 },
     );
   }

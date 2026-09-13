@@ -1,9 +1,5 @@
-import { getPracticeLoopReadModel } from "@/lib/data/read-model";
-import { DashboardScreen } from "./dashboard-screen";
+import { redirect } from "next/navigation";
 
-export const dynamic = "force-dynamic";
-
-export default async function DashboardPage() {
-  const data = await getPracticeLoopReadModel();
-  return <DashboardScreen data={data} />;
+export default function HomePage() {
+  redirect("/lessons");
 }

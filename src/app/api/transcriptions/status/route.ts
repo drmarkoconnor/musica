@@ -88,6 +88,9 @@ export async function GET(request: Request) {
     job: job
       ? {
           id: job.id,
+          analysisStatus: job.analysisStatus,
+          stage: job.analysisStatus === "complete" ? "complete" : job.totalChunks > 0 && job.completedChunks === job.totalChunks ? "extracting" : "transcribing",
+          canRetryAnalysis: job.analysisStatus === "failed" && job.totalChunks > 0 && job.completedChunks === job.totalChunks,
           completedAt: job.completedAt,
           completedChunks: job.completedChunks,
           currentLabel: job.currentLabel,

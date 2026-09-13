@@ -9,14 +9,18 @@ import {
 import {
   createLessonTranscriptionJob,
   markTranscriptionJobFailed,
-  runLessonTranscriptionJob,
+  retryLessonAnalysis,
   TranscriptionRequestError,
 } from "@/lib/server/transcription-job";
+
+import { dispatchLessonTranscription } from "@/lib/server/transcription-dispatch";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 type TranscriptionRequest = {
+  jobId?: unknown;
+  retryAnalysis?: unknown;
   lessonId?: unknown;
   recordingId?: unknown;
   password?: unknown;
@@ -35,94 +39,13 @@ function safeCompare(input: string, expected: string) {
   return timingSafeEqual(inputBuffer, expectedBuffer);
 }
 
-function isLocalRequest(request: Request) {
-  const hostname = new URL(request.url).hostname;
-
-  return (
-    hostname === "localhost" ||
-    hostname === "127.0.0.1" ||
-    hostname === "[::1]"
-  );
-}
-
-function shouldUseNetlifyBackgroundFunction(request: Request) {
-  if (serverEnv("NETLIFY") === "true") return true;
-  if (serverEnv("CONTEXT") || serverEnv("DEPLOY_URL") || serverEnv("URL")) {
-    return true;
-  }
-
-  return process.env.NODE_ENV === "production" || !isLocalRequest(request);
-}
-
-function netlifyBackgroundFunctionUrl(request: Request) {
-  const siteUrl =
-    serverEnv("URL") ||
-    serverEnv("DEPLOY_PRIME_URL") ||
-    serverEnv("DEPLOY_URL") ||
-    (process.env.NODE_ENV === "production"
-      ? "https://jazzmusica.netlify.app"
-      : request.url);
-
-  return new URL(
-    "/.netlify/functions/transcribe-lesson-background",
-    siteUrl,
-  );
-}
-
-async function startTranscriptionJob({
-  expectedPassword,
-  jobId,
-  request,
-}: {
-  expectedPassword: string;
-  jobId: string;
-  request: Request;
-}) {
-  if (shouldUseNetlifyBackgroundFunction(request)) {
-    const url = netlifyBackgroundFunctionUrl(request);
-    console.info("Dispatching transcription job to Netlify background function", {
-      jobId,
-    });
-
-    const response = await fetch(url, {
-      body: JSON.stringify({ jobId, token: expectedPassword }),
-      headers: { "Content-Type": "application/json" },
-      method: "POST",
-    });
-    const contentType = response.headers.get("content-type") ?? "";
-
-    if (response.ok && contentType.includes("text/html")) {
-      throw new Error(
-        "Background transcription endpoint returned the app shell instead of starting.",
-      );
-    }
-
-    if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as {
-        error?: string;
-      } | null;
-      throw new Error(body?.error ?? "Background transcription did not start.");
-    }
-
-    return;
-  }
-
-  console.info("Dispatching transcription job to local runner", { jobId });
-  void runLessonTranscriptionJob({ jobId }).catch((error) => {
-    const errorMessage =
-      error instanceof Error ? error.message : "Transcription failed.";
-    console.error("Background transcription failed", error);
-    void markTranscriptionJobFailed({ errorMessage, jobId }).catch((markError) => {
-      console.error("Could not mark transcription job failed", markError);
-    });
-  });
-}
-
 export async function POST(request: Request) {
   let body: TranscriptionRequest;
 
   try {
-    body = (await request.json()) as TranscriptionRequest;
+    const parsed: unknown = await request.json();
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("Invalid request body.");
+    body = parsed as TranscriptionRequest;
   } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
@@ -195,19 +118,27 @@ export async function POST(request: Request) {
   }
 
   try {
-    const job = await createLessonTranscriptionJob({
-      includeFullRecording: body.includeFullRecording === true,
+    const validId = (id: unknown) => typeof id === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    if (!validId(body.lessonId) || !validId(body.recordingId) || (body.retryAnalysis === true && !validId(body.jobId))) {
+      return NextResponse.json({ error: "Valid lesson, recording and retry job identifiers are required." }, { status: 400 });
+    }
+    if (body.retryAnalysis !== undefined && typeof body.retryAnalysis !== "boolean") {
+      return NextResponse.json({ error: "retryAnalysis must be a boolean." }, { status: 400 });
+    }
+    if (body.includeFullRecording !== undefined && typeof body.includeFullRecording !== "boolean") {
+      return NextResponse.json({ error: "includeFullRecording must be a boolean." }, { status: 400 });
+    }
+    const job = body.retryAnalysis === true && typeof body.jobId === "string"
+      ? await retryLessonAnalysis({ jobId: body.jobId, lessonId: body.lessonId, recordingId: body.recordingId })
+      : await createLessonTranscriptionJob({
+      includeFullRecording: body.includeFullRecording !== false,
       lessonId: body.lessonId,
       recordingId: body.recordingId,
     });
 
     if (job.shouldStart) {
       try {
-        await startTranscriptionJob({
-          expectedPassword,
-          jobId: job.jobId,
-          request,
-        });
+        await dispatchLessonTranscription({ token: expectedPassword, jobId: job.jobId, requestUrl: request.url });
       } catch (error) {
         const errorMessage =
           error instanceof Error
@@ -221,7 +152,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         ok: true,
-        status: "queued",
+        status: job.shouldStart ? "queued" : "existing",
         lessonId: body.lessonId,
         recordingId: body.recordingId,
         ...job,

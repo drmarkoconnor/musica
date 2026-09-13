@@ -2,7 +2,24 @@
 
 Private lesson-to-practice web app for Mark's jazz piano and singing practice.
 
-## Current Scope
+## Lesson-first update — September 2026
+
+The current direction is to accept a complete lesson recording and extract
+useful, replayable learning points. Lessons, Learning points and Practice are
+the primary views. The earlier activity dashboard and supporting tools remain
+available through More.
+
+Read [the implementation and rollout notes](docs/lesson-first-implementation.md)
+before deploying this update. It includes an additive database migration; do
+not point a deployment preview at the live database for testing.
+
+The Mac's local `markoconnorai` directory can become an umbrella for independent
+projects. The guarded [folder relocation helper](docs/mac-folder-relocation.md)
+moves the whole existing checkout into `markoconnorai/musica`, preserving local
+recordings, configuration and Git history. It must be run on the Mac; the remote
+implementation does not move that folder.
+
+## Original scaffold and supporting features
 
 - Next.js App Router with TypeScript and Tailwind CSS
 - Static mocked MVP screens:

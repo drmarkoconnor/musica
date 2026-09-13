@@ -34,13 +34,15 @@ export async function transcribeAudioFile({
   }
 
   const startedAt = Date.now();
-  const client = new OpenAI({ apiKey });
+  const client = new OpenAI({ apiKey, timeout: 60_000, maxRetries: 1 });
   const transcript = await client.audio.transcriptions.create({
     file: createReadStream(filePath),
     model,
     prompt,
     response_format: "json",
   });
+
+  if (typeof transcript.text !== "string") throw new Error("The transcription provider returned no text field.");
 
   return {
     text: transcript.text,

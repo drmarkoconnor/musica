@@ -30,6 +30,7 @@ export const mockPracticeLoopReadModel: PracticeLoopReadModel = {
   lessonSegmentTranscripts,
   transcripts,
   lessonExtracts,
+  learningPoints: [],
   practiceTasks,
   pieceAssets,
   practiceSessions,

@@ -13,6 +13,9 @@ type UploadSessionRequestBody = {
   summary?: unknown;
   teacher?: unknown;
   title?: unknown;
+  fingerprint?: unknown;
+  totalBytes?: unknown;
+  chunkBytes?: unknown;
 };
 
 function text(value: unknown) {
@@ -53,7 +56,7 @@ export async function POST(request: Request) {
   const title = text(body.title) || `${teacher} lesson - ${lessonDate}`;
   const summary =
     text(body.summary) ||
-    "Recorded live in Practice Loop. Ready for authorised transcription.";
+    "Lesson recording ready for review and authorised transcription.";
   const contentType = text(body.contentType) || "audio/webm";
   const extension = text(body.extension) || "webm";
 
@@ -61,6 +64,11 @@ export async function POST(request: Request) {
     const manifest = await createLessonRecordingUploadSession({
       contentType,
       extension,
+      file: body.fingerprint !== undefined ? {
+        fingerprint: text(body.fingerprint),
+        totalBytes: Number(body.totalBytes),
+        chunkBytes: Number(body.chunkBytes),
+      } : undefined,
       metadata: {
         lessonDate,
         lessonId: rawLessonId && isUuid(rawLessonId) ? rawLessonId : undefined,

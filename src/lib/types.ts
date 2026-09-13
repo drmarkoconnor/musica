@@ -112,6 +112,29 @@ export type LessonExtract = {
   similarExtractId?: string;
 };
 
+export type LearningPointKind = "teaching" | "practice" | "repertoire" | "decision";
+
+/** A retained teaching insight stays independent of any optional practice task. */
+export type LearningPoint = {
+  id: string;
+  lessonId: string;
+  recordingId: string;
+  analysisRunId?: string;
+  sourceKey: string;
+  title: string;
+  body: string;
+  kind: LearningPointKind;
+  practiceAction?: string;
+  startsAtSeconds: number;
+  endsAtSeconds: number;
+  evidencePrecision: "approximate" | "segment";
+  evidenceText?: string;
+  status: ExtractStatus;
+  practiceTaskId?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type PracticeTask = {
   id: string;
   title: string;
