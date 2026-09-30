@@ -4,7 +4,8 @@ Last updated: 2026-09-30
 
 ## Immediate Priorities
 
-- Deploy and test the approved lesson-first workflow on the existing Netlify site.
+- Done: deployed the approved lesson-first workflow on the existing Netlify site;
+  short synthetic upload/transcription/memory acceptance passed on 30 September.
 - Test one real hour-long Voice Memo: upload/recovery, seek start/middle/end,
   whole-lesson analysis, useful teaching coverage, keep/edit/tag and source replay.
 - Compare a short real recording with local Whisper after the Mac's developer

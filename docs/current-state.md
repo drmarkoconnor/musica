@@ -27,13 +27,23 @@ Last updated: 2026-09-30
 - Verification: 54 tests, TypeScript and production build passed. A paid synthetic
   text check verified Astra request compatibility; transcription model availability
   was checked. Full-hour hosted audio acceptance still requires real testing.
-- Production release `ead2115` published. Live authentication, saved transcript
-  passages, library and existing audio range playback passed. The synthetic upload
-  check caught a hosted-runtime storage-selection defect before acceptance.
+- Production code `2b5b99e` is live at `https://jazzmusica.netlify.app` in deploy
+  `6abcd704a5715900084e53bd`. The existing app and transcription passwords are unchanged.
 - Fixed runtime detection to recognise Netlify's native environment API even
-  when the build-only `NETLIFY` flag is absent. Production storage and background
-  origin configuration are being verified. Corrected-upload acceptance is pending.
-- Current runtime-fix verification: 57 tests, TypeScript and build passed.
+  when the build-only `NETLIFY` flag is absent. Native runtime settings now select
+  Blobs and dispatch background work correctly. CLI attempts to add explicit
+  storage/origin variables did not persist; they proved unnecessary after this fix.
+- Live acceptance passed: a 30-second audible synthetic WAV, 5,292,078 bytes in
+  three chunks, exact byte replay across a chunk boundary, `gpt-transcribe`,
+  `gpt-6-astra`, three extracted memories and direct manual memory retention.
+  Keeping the memory created no practice tasks. Its estimated API cost was $0.02262.
+- Removed only synthetic test records; all 33 lessons and 32 recordings remain.
+  Private API gate, authenticated lesson/library pages, 20 saved source passages
+  and start/middle/end audio range GETs passed. Full-hour real-file acceptance remains.
+- 57 tests, TypeScript and build passed. Production dependency audit is clean.
+  Desktop/mobile source-search layout and Italian labels were reviewed locally.
+- Known hosted adapter caveat: audio HEAD returns 400; range GET playback works.
+  The app does not depend on HEAD. Investigate before adding HEAD-based clients.
 - Natural-language questions and combined multi-passage memory editing are not
   part of this release. Existing manual clip/reel tools remain available.
 
@@ -49,6 +59,7 @@ as `/Users/moc/repos/all_things_coding/2026/markoconnorai/musica`.
 GitHub baseline: `f14bf34 Restore the lesson-first workflow and reliable long-audio processing`.
 Local preservation commit: `d9c92db`. The release integrates both histories and
 retains GitHub's exact Next.js 16.3.3 and Netlify Blobs 10.7.13 dependency updates.
+Released code: `2b5b99e`; integration `523bb94`; play-button correction `ead2115`.
 
 ## Working Environment
 

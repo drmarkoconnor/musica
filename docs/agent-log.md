@@ -61,6 +61,27 @@ setting. Runtime-fix checks: 57 tests, TypeScript and build passed. Hosted setti
 and corrected-upload acceptance are being verified; real-hour testing remains.
 Private `.local/` backups and untracked `public/presentations/` are not published.
 
+### Final Live Acceptance
+
+- Pushed runtime fix `2b5b99e`; Netlify deploy `6abcd704a5715900084e53bd` is ready.
+- Native Netlify environment detection solved cloud storage and worker dispatch.
+  Attempts to set explicit storage/origin variables through the CLI did not persist;
+  the corrected runtime needs no such overrides on this deployment.
+- Verified a 30-second synthetic speech WAV (5,292,078 bytes, three chunks), exact
+  bytes across a chunk boundary, cloud transcription and Astra extraction. Three
+  memories were published and a manual memory was kept with no practice task.
+  Estimated list-price cost: audio $0.00225, analysis $0.02037, total $0.02262.
+- The first synthetic file was accidentally silent because Mac speech generation
+  needed unsandboxed access; regenerated and checked volume before acceptance.
+  Removed only these disposable test lessons/recordings, preserving counts 33/32.
+- Read-only hosted checks passed: auth gate 401, valid login, lesson/library SSR,
+  20 saved searchable passages and audio range GETs at start/middle/end. Native
+  app browser is open on the live login page for Mark, with the old password.
+- 57 regression tests, TypeScript and build passed. Production audit has no known
+  vulnerabilities. Real-hour Voice Memo acceptance remains Mark's next test.
+- Whisper CLI exploration is deferred at Mark's request; setup notes remain in
+  `local-whisper.md`. No real audio or transcripts were sent in deployment tests.
+
 ## 2026-09-13 - Confirm Mac Database Migration And Prepare Dependency Fixes
 
 Branch: `feat/lesson-first-workflow`; GitHub publication remained unapproved then.
