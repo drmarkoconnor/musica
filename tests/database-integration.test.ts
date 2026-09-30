@@ -144,7 +144,6 @@ describe("actual migrations and application SQL in isolated PostgreSQL", { concu
     const tasks = await database.postgres.query<{ count: number }>("select count(*)::integer as count from practice_tasks");
     assert.equal(tasks.rows[0].count, 0);
   });
-
   it("creates and links one practice task on repeated or interleaved clicks", async () => {
     const saved = await createLessonRecordingMetadata(uploadInput());
     const pointId = await insertPoint(saved.lessonId, saved.recordingId, { practiceAction: "Play eight bars slowly." });

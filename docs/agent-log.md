@@ -22,10 +22,12 @@ implementation truth in `current-state.md`, and priority sequencing in
 
 ## 2026-09-30 - Searchable Memories And Production Release Preparation
 
-Branch: `main`; previous baseline `36dc83a`.
+Branch: `main`; GitHub baseline `f14bf34`; local preservation commit `d9c92db`.
 
 - Preserved the pre-existing Mac reconciliation and prepared it for authorised
   Git-based deployment to the existing `jazzmusica` Netlify site.
+- Integrated the newer GitHub history and retained its dependency security
+  updates rather than publishing the older Mac dependency versions.
 - Added searchable source passages, a compact seek/speed player, direct memory
   retention, custom tags and an informational cost estimate. No billing ledger.
 - Added optional local Whisper with timestamp validation and heartbeat renewal;
@@ -43,6 +45,24 @@ Branch: `main`; previous baseline `36dc83a`.
 
 Production build verification and a real-hour hosted test remain next steps.
 Private `.local/` backups and untracked `public/presentations/` are not published.
+
+## 2026-09-13 - Confirm Mac Database Migration And Prepare Dependency Fixes
+
+Branch: `feat/lesson-first-workflow`; GitHub publication remained unapproved then.
+
+- Mark installed the reconciled patch, ran `npm ci` and passed TypeScript on his
+  Mac. He ran `npm run db:migrate`; read-only output confirmed eight migrations
+  and the learning-points table, so migration 0007 was applied.
+- Prepared exact Next.js 16.3.3 and Netlify Blobs 10.7.13, and transitive
+  `baseline-browser-mapping` 2.11.23. Drizzle and migration files were unchanged.
+- Verified the versions against the [Next.js security release](https://nextjs.org/blog/august-2026-security-release)
+  and [Netlify Blobs changelog](https://github.com/netlify/primitives/blob/main/packages/blobs/CHANGELOG.md).
+- 46 tests, production compilation and TypeScript passed. `npm audit --omit=dev`
+  reported zero vulnerabilities. Development-only Drizzle/esbuild findings remained.
+- Build tracing warnings involved existing FFmpeg spawn calls and local asset
+  reads. Netlify includes FFmpeg through `netlify.toml`; hosted acceptance remained.
+
+No live database write, code push or hosted deployment was performed in that session.
 
 ## 2026-09-13 - Reconcile Mac Edits With Lesson-First Implementation
 

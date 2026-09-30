@@ -17,7 +17,6 @@ test("custom memory tags are bounded and deduplicated without changing source ev
   assert.deepEqual(parseLearningPointUpdate({ tags: [] }), { tags: [] });
   for (const tags of ["harmony", [42], [""], ["x".repeat(41)], Array(13).fill("tag")]) assert.throws(() => parseLearningPointUpdate({ tags }), LearningPointError);
 });
-
 test("keeping or dismissing an insight does not imply a practice action", () => {
   assert.deepEqual(parseLearningPointUpdate({ status: "kept" }), { status: "kept" });
   assert.deepEqual(parseLearningPointUpdate({ status: "discarded" }), { status: "discarded" });

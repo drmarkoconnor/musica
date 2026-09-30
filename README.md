@@ -16,7 +16,6 @@ not point a deployment preview at the live database for testing.
 Optional Mac transcription is documented in [Local Whisper](docs/local-whisper.md).
 The hosted app uses OpenAI; a Mac installation is detected automatically by the
 local app. Search and replay use saved passages without a new model call.
-
 The Mac's local `markoconnorai` directory can become an umbrella for independent
 projects. The guarded [folder relocation helper](docs/mac-folder-relocation.md)
 moves the whole existing checkout into `markoconnorai/musica`, preserving local

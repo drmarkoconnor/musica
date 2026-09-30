@@ -8,7 +8,6 @@
 > Local Whisper is optional and not yet installed/benchmarked on this Intel Mac.
 > The historical rollout notes below describe the earlier implementation and do
 > not mean that these migrations remain outstanding.
-
 Implementation branch: `feat/lesson-first-workflow`. This restores the core task:
 save a complete music lesson, extract useful teaching with source passages, and
 optionally turn a point into practice. It supersedes the earlier clip-first
@@ -79,6 +78,17 @@ remain part of the working tree, combined with this implementation. Database
 migration and hosted acceptance are separate steps described below; applying
 the patch does not perform either.
 
+### Mac installation progress - 13 September 2026
+
+Mark applied the reconciled patch, installed dependencies and passed TypeScript.
+He subsequently applied migration 0007 to his configured Neon database. Read-only
+verification confirmed eight migrations and the learning-points table.
+
+The prepared dependency maintenance is now integrated: exact Next.js 16.3.3 and
+Netlify Blobs 10.7.13, plus `baseline-browser-mapping` 2.11.23. Run `npm ci` to
+install the lockfile, then `npm run dev` for local development. Hosted uploads
+must still be tested on Netlify rather than inferred from local storage checks.
+
 ## Database and deployment order
 
 The new application requires `drizzle/0007_lesson_learning_points.sql`. It adds
@@ -105,9 +115,10 @@ recordings, practice tasks or extracts.
    then deploy the reviewed application. Pause analysis while changing worker
    versions so an older worker cannot complete a new job with older semantics.
 
-No production database migration or production deployment was performed during
-implementation. An automatically created Git deploy preview may fail until its
-own database has the new migration and its required server settings.
+Initial implementation testing used an isolated database. Mark subsequently
+applied migration 0007; migration 0008 was applied on 30 September after a private
+backup. Git deploy previews still require compatible database migrations and
+their required server settings. Production acceptance is tracked in current-state.md.
 
 For rollback, stop new analysis requests and roll back the application deployment.
 Keep the additive migration and saved source data while diagnosing the issue;

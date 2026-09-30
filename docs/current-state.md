@@ -40,7 +40,9 @@ optional tools. Local audio storage selection and device-copy MIME fixes are
 preserved. Mark completed the Mac folder move manually and verified the Git root
 as `/Users/moc/repos/all_things_coding/2026/markoconnorai/musica`.
 
-Latest committed baseline: `36dc83a Update memory for memory tip library`
+GitHub baseline: `f14bf34 Restore the lesson-first workflow and reliable long-audio processing`.
+Local preservation commit: `d9c92db`. The release integrates both histories and
+retains GitHub's exact Next.js 16.3.3 and Netlify Blobs 10.7.13 dependency updates.
 
 ## Working Environment
 
