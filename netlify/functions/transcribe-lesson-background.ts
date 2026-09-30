@@ -1,96 +1,40 @@
 import { timingSafeEqual } from "node:crypto";
-import { connectLambda } from "@netlify/blobs";
 import { serverEnv } from "../../src/lib/server/env";
-import {
-  markTranscriptionJobFailed,
-  runLessonTranscriptionJob,
-} from "../../src/lib/server/transcription-job";
-
-type BackgroundEvent = {
-  blobs?: string;
-  body?: string | null;
-  headers?: Record<string, string>;
-  httpMethod?: string;
-};
-
-type BackgroundPayload = {
-  jobId?: unknown;
-  token?: unknown;
-};
+import { dispatchLessonTranscription } from "../../src/lib/server/transcription-dispatch";
+import { markTranscriptionJobFailed, runLessonTranscriptionJob } from "../../src/lib/server/transcription-job";
 
 function safeCompare(input: string, expected: string) {
-  const inputBuffer = Buffer.from(input);
-  const expectedBuffer = Buffer.from(expected);
-
-  if (inputBuffer.length !== expectedBuffer.length) {
-    return false;
-  }
-
-  return timingSafeEqual(inputBuffer, expectedBuffer);
+  const actual = Buffer.from(input);
+  const configured = Buffer.from(expected);
+  return actual.length === configured.length && timingSafeEqual(actual, configured);
 }
 
-export const handler = async (event: BackgroundEvent) => {
-  if (event.blobs && event.headers) {
-    connectLambda({ blobs: event.blobs, headers: event.headers });
-  }
-
-  if (event.httpMethod && event.httpMethod !== "POST") {
-    return {
-      body: JSON.stringify({ error: "Method not allowed." }),
-      statusCode: 405,
-    };
-  }
-
-  const expectedToken = serverEnv("TRANSCRIPTION_PASSWORD");
-
-  if (!expectedToken) {
-    return {
-      body: JSON.stringify({ error: "Transcription password is not configured." }),
-      statusCode: 503,
-    };
-  }
-
-  let payload: BackgroundPayload;
-
+// The -background suffix selects Netlify's background execution. Modern Functions
+// supply Blobs context automatically; no legacy Lambda adapter is required.
+export default async function handler(request: Request): Promise<Response> {
+  if (request.method !== "POST") return Response.json({ error: "Method not allowed." }, { status: 405 });
+  const token = serverEnv("TRANSCRIPTION_PASSWORD");
+  if (!token) return Response.json({ error: "Transcription password is not configured." }, { status: 503 });
+  let payload: Record<string, unknown>;
   try {
-    payload = JSON.parse(event.body ?? "{}") as BackgroundPayload;
+    const value: unknown = await request.json();
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid body.");
+    payload = value as Record<string, unknown>;
   } catch {
-    return {
-      body: JSON.stringify({ error: "Invalid request body." }),
-      statusCode: 400,
-    };
+    return Response.json({ error: "Invalid request body." }, { status: 400 });
   }
-
-  if (
-    typeof payload.jobId !== "string" ||
-    typeof payload.token !== "string" ||
-    !safeCompare(payload.token, expectedToken)
-  ) {
-    return {
-      body: JSON.stringify({ error: "Authorisation failed." }),
-      statusCode: 401,
-    };
-  }
-
+  if (typeof payload.token !== "string" || !safeCompare(payload.token, token)) return Response.json({ error: "Authorisation failed." }, { status: 401 });
+  if (typeof payload.jobId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(payload.jobId)) return Response.json({ error: "A valid job identifier is required." }, { status: 400 });
   try {
-    await runLessonTranscriptionJob({ jobId: payload.jobId });
-    return {
-      body: JSON.stringify({ ok: true }),
-      statusCode: 200,
-    };
+    const result = await runLessonTranscriptionJob({ jobId: payload.jobId });
+    // Continue before the 15-minute runtime limit. A fresh invocation resumes
+    // saved chunks; the job lease prevents simultaneous invocations doing work.
+    if (result.status === "queued") await dispatchLessonTranscription({ jobId: payload.jobId, token });
+    return Response.json({ ok: true, status: result.status });
   } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : "Transcription failed.";
-    console.error("Background transcription failed", error);
-    await markTranscriptionJobFailed({
-      errorMessage,
-      jobId: payload.jobId,
-    }).catch((markError) => {
-      console.error("Could not mark transcription job failed", markError);
-    });
-    return {
-      body: JSON.stringify({ error: errorMessage }),
-      statusCode: 500,
-    };
+    const errorMessage = error instanceof Error ? error.message : "Lesson processing failed.";
+    console.error("Background lesson processing failed", error);
+    await markTranscriptionJobFailed({ jobId: payload.jobId, errorMessage }).catch((markError) => console.error("Could not save worker failure", markError));
+    return Response.json({ error: errorMessage }, { status: 500 });
   }
-};
+}

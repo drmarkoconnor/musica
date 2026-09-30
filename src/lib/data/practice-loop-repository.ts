@@ -2,6 +2,7 @@ import type {
   Exercise,
   Lesson,
   LessonExtract,
+  LearningPoint,
   LessonRecording,
   LessonSegment,
   LessonSegmentTranscript,
@@ -26,6 +27,7 @@ export type PracticeLoopReadModel = {
   lessonSegmentTranscripts: LessonSegmentTranscript[];
   transcripts: Transcript[];
   lessonExtracts: LessonExtract[];
+  learningPoints: LearningPoint[];
   practiceTasks: PracticeTask[];
   pieceAssets: PieceAsset[];
   practiceSessions: PracticeSession[];

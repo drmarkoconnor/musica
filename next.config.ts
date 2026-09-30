@@ -14,6 +14,7 @@ const serverRouteTraceExcludes = [
 
 const nextConfig: NextConfig = {
   outputFileTracingExcludes: {
+    "/*": ["./tests/**/*", "./src/**/*.test.ts", "./node_modules/@electric-sql/pglite/**/*"],
     "/api/piece-assets/[assetId]/file": serverRouteTraceExcludes,
     "/api/piece-assets/upload": serverRouteTraceExcludes,
     "/api/transcriptions": serverRouteTraceExcludes,

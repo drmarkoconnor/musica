@@ -1,7 +1,9 @@
 import { and, desc, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { createDatabaseClient } from "@/db/client";
-import { transcriptionJobs, transcripts } from "@/db/schema";
+import { transcriptionJobChunks, transcriptionJobs, transcripts } from "@/db/schema";
+import { transcriptionOptions } from "@/lib/server/transcription-provider";
+import { analysisCostEstimate, transcriptionCostEstimate } from "@/lib/analysis-cost";
 import {
   isStaleQueuedTranscriptionJob,
   isStaleRunningTranscriptionJob,
@@ -83,11 +85,17 @@ export async function GET(request: Request) {
           .limit(1)
       : [];
 
+  const chunks = job ? await db.select({ model: transcriptionJobChunks.model, startsAtSeconds: transcriptionJobChunks.startsAtSeconds, endsAtSeconds: transcriptionJobChunks.endsAtSeconds, status: transcriptionJobChunks.status }).from(transcriptionJobChunks).where(eq(transcriptionJobChunks.jobId, job.id)) : [];
+  const savedCosts = chunks.filter((chunk) => chunk.status === "complete").map((chunk) => transcriptionCostEstimate(chunk.model ?? "unknown", chunk.endsAtSeconds - chunk.startsAtSeconds));
   return NextResponse.json({
     ok: true,
+    options: await transcriptionOptions(),
     job: job
       ? {
           id: job.id,
+          analysisStatus: job.analysisStatus,
+          stage: job.analysisStatus === "complete" ? "complete" : job.totalChunks > 0 && job.completedChunks === job.totalChunks ? "extracting" : "transcribing",
+          canRetryAnalysis: job.analysisStatus === "failed" && job.totalChunks > 0 && job.completedChunks === job.totalChunks,
           completedAt: job.completedAt,
           completedChunks: job.completedChunks,
           currentLabel: job.currentLabel,
@@ -96,6 +104,9 @@ export async function GET(request: Request) {
           requestedAt: job.requestedAt,
           status: job.status,
           totalChunks: job.totalChunks,
+          transcriptionProvider: job.transcriptionProvider,
+          transcriptionModel: job.transcriptionModel,
+          cost: { transcriptionUSD: savedCosts.every((cost) => cost !== null) ? savedCosts.reduce<number>((sum, cost) => sum + (cost ?? 0), 0) : null, analysisUSD: analysisCostEstimate(job.analysisUsage), analysisModel: job.analysisUsage?.model ?? null },
         }
       : null,
     progressPercent: job

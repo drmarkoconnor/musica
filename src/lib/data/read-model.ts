@@ -65,6 +65,7 @@ function createNeonCompatibleMockReadModel(): PracticeLoopReadModel {
     lessonSegments: mockPracticeLoopReadModel.lessonSegments,
     lessonSegmentTranscripts: mockPracticeLoopReadModel.lessonSegmentTranscripts,
     transcripts: mockPracticeLoopReadModel.transcripts,
+    learningPoints: mockPracticeLoopReadModel.learningPoints,
     lessonExtracts: mockPracticeLoopReadModel.lessonExtracts.map((extract) => ({
       ...extract,
       linkedPieceId: mapPieceId(extract.linkedPieceId),
@@ -127,6 +128,7 @@ function mergeWithFallback(model: PracticeLoopReadModel): PracticeLoopReadModel 
     lessonSegmentTranscripts: model.lessonSegmentTranscripts,
     transcripts: model.transcripts,
     lessonExtracts: model.lessonExtracts,
+    learningPoints: model.learningPoints,
     practiceTasks: model.practiceTasks,
     pieceAssets:
       visiblePieceAssets.length > 0 || isHostedApp

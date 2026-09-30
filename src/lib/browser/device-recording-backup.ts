@@ -53,12 +53,13 @@ export async function createDeviceRecordingBackup({
   if (!picker) return null;
 
   const fileName = `${suggestedName.replace(/\.[a-z0-9]+$/i, "")}.${extension}`;
+  const acceptedMimeType = mimeType.split(";", 1)[0]?.trim() || "audio/webm";
   const handle = await picker({
     suggestedName: fileName,
     types: [
       {
         accept: {
-          [mimeType || "audio/webm"]: [`.${extension}`],
+          [acceptedMimeType]: [`.${extension}`],
         },
         description: "Lesson audio",
       },

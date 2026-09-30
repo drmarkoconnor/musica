@@ -6,6 +6,7 @@ import {
   date,
   index,
   integer,
+  jsonb,
   numeric,
   pgEnum,
   pgTable,
@@ -294,6 +295,14 @@ export const transcriptionJobs = pgTable(
     transcriptId: uuid("transcript_id").references(() => transcripts.id, {
       onDelete: "set null",
     }),
+    requestKey: text("request_key"),
+    analysisResult: text("analysis_result"),
+    analysisStatus: text("analysis_status").notNull().default("pending"),
+    transcriptionProvider: text("transcription_provider").notNull().default("openai"),
+    transcriptionModel: text("transcription_model"),
+    analysisUsage: jsonb("analysis_usage").$type<{ model: string; inputTokens: number; outputTokens: number; cachedInputTokens: number }>(),
+    leaseToken: uuid("lease_token"),
+    leaseExpiresAt: timestamp("lease_expires_at", { mode: "string", withTimezone: true }),
     mode: transcriptionJobModeEnum("mode").notNull(),
     status: transcriptionJobStatusEnum("status").notNull().default("queued"),
     totalChunks: integer("total_chunks").notNull(),
@@ -328,7 +337,10 @@ export const transcriptionJobs = pgTable(
       table.requestedAt,
     ),
     index("transcription_jobs_status_idx").on(table.status),
-    check("transcription_jobs_total_chunks_positive", sql`${table.totalChunks} > 0`),
+    uniqueIndex("transcription_jobs_request_key_unique_idx").on(table.requestKey),
+    check("transcription_jobs_analysis_status_valid", sql`${table.analysisStatus} in ('pending', 'running', 'complete', 'failed')`),
+    check("transcription_jobs_provider_valid", sql`${table.transcriptionProvider} in ('openai', 'local-whisper')`),
+    check("transcription_jobs_total_chunks_positive", sql`${table.totalChunks} >= 0`),
     check(
       "transcription_jobs_completed_chunks_valid",
       sql`${table.completedChunks} >= 0 and ${table.completedChunks} <= ${table.totalChunks}`,
@@ -366,6 +378,7 @@ export const transcriptionJobChunks = pgTable(
     text: text("text"),
     model: text("model"),
     durationMs: integer("duration_ms"),
+    timedSegments: jsonb("timed_segments").$type<Array<{ startsAtSeconds: number; endsAtSeconds: number; text: string }>>(),
     errorMessage: text("error_message"),
     startedAt: timestamp("started_at", {
       mode: "string",
@@ -486,6 +499,8 @@ export const lessonExtracts = pgTable(
     transcriptId: uuid("transcript_id").references(() => transcripts.id, {
       onDelete: "set null",
     }),
+    analysisRunId: uuid("analysis_run_id").references(() => transcriptionJobs.id, { onDelete: "set null" }),
+    sourceKey: text("source_key"),
     title: text("title").notNull(),
     body: text("body"),
     startsAtSeconds: integer("starts_at_seconds").notNull(),
@@ -510,6 +525,7 @@ export const lessonExtracts = pgTable(
   },
   (table) => [
     index("lesson_extracts_lesson_id_idx").on(table.lessonId),
+    uniqueIndex("lesson_extracts_run_source_unique_idx").on(table.analysisRunId, table.sourceKey),
     check("lesson_extracts_start_non_negative", sql`${table.startsAtSeconds} >= 0`),
     check(
       "lesson_extracts_end_after_start",
@@ -581,6 +597,37 @@ export const practiceTasks = pgTable(
     ),
   ],
 );
+
+export const learningPoints = pgTable("learning_points", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  lessonId: uuid("lesson_id").notNull().references(() => lessons.id, { onDelete: "cascade" }),
+  recordingId: uuid("recording_id").notNull().references(() => lessonRecordings.id, { onDelete: "cascade" }),
+  analysisRunId: uuid("analysis_run_id").references(() => transcriptionJobs.id, { onDelete: "set null" }),
+  sourceKey: text("source_key").notNull(),
+  title: text("title").notNull(),
+  body: text("body").notNull(),
+  kind: text("kind").notNull().default("teaching"),
+  tags: text("tags").array().notNull().default(sql`'{}'::text[]`),
+  practiceAction: text("practice_action"),
+  startsAtSeconds: integer("starts_at_seconds").notNull(),
+  endsAtSeconds: integer("ends_at_seconds").notNull(),
+  evidencePrecision: text("evidence_precision").notNull().default("approximate"),
+  evidenceText: text("evidence_text"),
+  status: extractStatusEnum("status").notNull().default("candidate"),
+  practiceTaskId: uuid("practice_task_id").references(() => practiceTasks.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { mode: "string", withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "string", withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("learning_points_lesson_idx").on(table.lessonId),
+  index("learning_points_recording_idx").on(table.recordingId),
+  uniqueIndex("learning_points_run_source_unique_idx").on(table.analysisRunId, table.sourceKey),
+  check("learning_points_range_valid", sql`${table.startsAtSeconds} >= 0 and ${table.endsAtSeconds} > ${table.startsAtSeconds}`),
+  check("learning_points_kind_valid", sql`${table.kind} in ('teaching', 'practice', 'repertoire', 'decision')`),
+  check("learning_points_precision_valid", sql`${table.evidencePrecision} in ('approximate', 'segment', 'timed')`),
+]);
+
+export type LearningPointRow = typeof learningPoints.$inferSelect;
+export type NewLearningPointRow = typeof learningPoints.$inferInsert;
 
 export const pieceAssets = pgTable("piece_assets", {
   id: uuid("id").primaryKey().defaultRandom(),

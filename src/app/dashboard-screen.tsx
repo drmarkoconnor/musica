@@ -356,7 +356,7 @@ export function DashboardScreen({ data }: { data: PracticeLoopReadModel }) {
           </div>
           <div className="mt-5 grid grid-cols-3 gap-3">
             <div className="rounded-lg bg-emerald-50 p-3">
-              <p className="text-2xl font-semibold text-emerald-950">3</p>
+              <p className="text-2xl font-semibold text-emerald-950">{data.lessonExtracts.filter((item) => item.status === "candidate").length}</p>
               <p className="text-xs font-medium text-emerald-800">
                 {t("newFromLesson")}
               </p>

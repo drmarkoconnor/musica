@@ -3,7 +3,7 @@ import "server-only";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { serverEnv } from "./env";
+import { serverEnv, shouldUseNetlifyAudioStorage } from "./env";
 
 export const LOCAL_PRACTICE_AUDIO_BUCKET = "local-practice-audio";
 export const LOCAL_PRACTICE_AUDIO_STORAGE_PREFIX = "docs/practice-recordings/";
@@ -27,14 +27,6 @@ function bufferArrayBuffer(buffer: Buffer) {
   const arrayBuffer = new ArrayBuffer(buffer.byteLength);
   new Uint8Array(arrayBuffer).set(buffer);
   return arrayBuffer;
-}
-
-function shouldUseNetlifyBlobs() {
-  return (
-    serverEnv("PRACTICE_LOOP_AUDIO_STORAGE") === "netlify-blobs" ||
-    serverEnv("NETLIFY") === "true" ||
-    Boolean(serverEnv("SITE_ID") || serverEnv("NETLIFY_SITE_ID"))
-  );
 }
 
 async function netlifyBlobStore() {
@@ -124,7 +116,7 @@ export async function savePracticeAudio({
   contentType: string;
   fileName: string;
 }): Promise<StoredPracticeAudio> {
-  if (shouldUseNetlifyBlobs()) {
+  if (shouldUseNetlifyAudioStorage()) {
     const store = await netlifyBlobStore();
     await store.set(fileName, bufferArrayBuffer(buffer), {
       metadata: {

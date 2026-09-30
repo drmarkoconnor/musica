@@ -6,7 +6,9 @@ import {
   AudioLines,
   Archive,
   FileStack,
-  Home,
+  ChartNoAxesCombined,
+  ChevronDown,
+  Lightbulb,
   Library,
   ListMusic,
   LogOut,
@@ -34,11 +36,14 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   const navItems: NavItem[] = [
-    { href: "/", label: t("dashboard"), icon: Home },
     { href: "/lessons", label: t("lessons"), icon: Mic2 },
+    { href: "/learning-points", label: t("learningPoints"), icon: Lightbulb },
+    { href: "/practice", label: t("practice"), icon: Timer },
+  ];
+  const secondaryItems: NavItem[] = [
     { href: "/from-lessons", label: t("fromLessons"), icon: ListMusic },
     { href: "/repertoire", label: t("repertoire"), icon: Library },
-    { href: "/practice", label: t("practiceSession"), icon: Timer },
+    { href: "/activity", label: t("activityLog"), icon: ChartNoAxesCombined },
     { href: "/assets", label: t("assets"), icon: FileStack },
     { href: "/archive", label: t("archiveArea"), icon: Archive },
     { href: "/recordings", label: t("recordings"), icon: AudioLines },
@@ -76,7 +81,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               </form>
             </div>
           </div>
-          <nav className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+          <nav aria-label={t("mainNavigation")} className="-mx-1 flex flex-wrap items-center gap-1 px-1 pb-1 sm:gap-2">
             {navItems.map((item) => {
               const isActive =
                 item.href === "/"
@@ -86,19 +91,31 @@ export function AppShell({ children }: { children: ReactNode }) {
               return (
                 <Link
                   className={cn(
-                    "inline-flex min-h-11 shrink-0 items-center gap-2 rounded-md px-3.5 py-2 text-sm font-medium transition",
+                    "inline-flex min-h-11 shrink-0 items-center gap-2 rounded-md px-2 py-2 text-sm font-medium transition sm:px-3.5",
                     isActive
                       ? "bg-emerald-950 text-white"
                       : "text-stone-600 hover:bg-stone-100 hover:text-stone-950",
                   )}
                   href={item.href}
+                  aria-current={isActive ? "page" : undefined}
                   key={item.href}
                 >
-                  <Icon aria-hidden="true" className="h-4 w-4" />
+                  <Icon aria-hidden="true" className="hidden h-4 w-4 sm:block" />
                   {item.label}
                 </Link>
               );
             })}
+            <details className="group relative ml-auto" key={pathname}>
+              <summary className={cn("inline-flex min-h-11 cursor-pointer list-none items-center gap-1 rounded-md px-2 py-2 sm:px-3 text-sm font-medium [&::-webkit-details-marker]:hidden", secondaryItems.some((item) => pathname.startsWith(item.href)) ? "bg-stone-200 text-stone-950" : "text-stone-600 hover:bg-stone-100")}>
+                {t("more")}<ChevronDown aria-hidden="true" className="h-4 w-4" />
+              </summary>
+              <div className="absolute right-0 top-full z-50 mt-2 w-56 rounded-lg border border-stone-200 bg-white p-2 shadow-lg">
+                {secondaryItems.map((item) => {
+                  const Icon = item.icon;
+                  return <Link className="flex min-h-11 items-center gap-2 rounded-md px-3 py-2 text-sm text-stone-700 hover:bg-stone-100" href={item.href} key={item.href} aria-current={pathname.startsWith(item.href) ? "page" : undefined}><Icon aria-hidden="true" className="h-4 w-4" />{item.label}</Link>;
+                })}
+              </div>
+            </details>
           </nav>
         </div>
       </header>

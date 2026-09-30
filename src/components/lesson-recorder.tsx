@@ -12,7 +12,6 @@ import {
   requestPersistentRecordingStorage,
   saveLessonRecordingChunk,
   saveLessonRecordingDraft,
-  updateLessonRecordingDraft,
 } from "@/lib/browser/lesson-recording-drafts";
 import {
   createDeviceRecordingBackup,
@@ -20,6 +19,8 @@ import {
   deviceRecordingBackupSupported,
 } from "@/lib/browser/device-recording-backup";
 import { useLanguage } from "@/lib/language";
+import { uploadLessonAudio } from "@/lib/browser/upload-lesson-audio";
+import { recordingFileForDraft } from "@/lib/browser/recording-upload-file";
 import { cn, formatDuration } from "@/lib/utils";
 
 type RecordingState =
@@ -31,6 +32,12 @@ type RecordingState =
   | "error";
 
 type RecoveryState = "idle" | "saving" | "downloading" | "error";
+type PendingRecording = {
+  chunks: Array<{ blob: Blob; index: number }>;
+  draft: LessonRecordingDraft;
+  durationSeconds: number;
+  totalBytes: number;
+};
 
 const MIME_TYPE_CANDIDATES = [
   "audio/webm;codecs=opus",
@@ -40,13 +47,8 @@ const MIME_TYPE_CANDIDATES = [
   "audio/ogg;codecs=opus",
 ];
 const RECORDER_TIMESLICE_MS = 10000;
-const DIRECT_UPLOAD_MAX_BYTES = 25 * 1024 * 1024;
 const LOCAL_SAVE_SETTLE_TIMEOUT_MS = 8000;
 const STOP_EVENT_TIMEOUT_MS = 5000;
-const UPLOAD_SESSION_TIMEOUT_MS = 15000;
-const UPLOAD_CHUNK_TIMEOUT_MS = 45000;
-const UPLOAD_COMPLETE_TIMEOUT_MS = 120000;
-const DIRECT_UPLOAD_TIMEOUT_MS = 45000;
 const DEVICE_BACKUP_TIMEOUT_MS = 10000;
 
 function supportedMimeType() {
@@ -125,36 +127,10 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string)
   });
 }
 
-async function fetchWithTimeout(
-  input: RequestInfo | URL,
-  init: RequestInit,
-  timeoutMs: number,
-  timeoutMessage: string,
-) {
-  const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
-
-  try {
-    return await fetch(input, {
-      ...init,
-      signal: controller.signal,
-    });
-  } catch (error) {
-    if (
-      (error instanceof DOMException && error.name === "AbortError") ||
-      (error instanceof Error && error.name === "AbortError")
-    ) {
-      throw new Error(timeoutMessage);
-    }
-
-    throw error;
-  } finally {
-    window.clearTimeout(timeoutId);
-  }
-}
-
 export function LessonRecorder({
   className,
+  disabled = false,
+  emphasis = "primary",
   lessonId,
   onRecordingFailed,
   onRecordingSaving,
@@ -162,6 +138,8 @@ export function LessonRecorder({
   onSaved,
 }: {
   className?: string;
+  disabled?: boolean;
+  emphasis?: "primary" | "secondary";
   lessonId?: string;
   onRecordingFailed?: () => void;
   onRecordingSaving?: () => void;
@@ -173,6 +151,8 @@ export function LessonRecorder({
   const [recordingState, setRecordingState] = useState<RecordingState>("idle");
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [message, setMessage] = useState("");
+  const [uploadPercent, setUploadPercent] = useState<number | null>(null);
+  const [pendingRecording, setPendingRecording] = useState<PendingRecording | null>(null);
   const [recoverableDrafts, setRecoverableDrafts] = useState<
     LessonRecordingDraft[]
   >([]);
@@ -181,8 +161,8 @@ export function LessonRecorder({
   const [recoveryState, setRecoveryState] = useState<
     Record<string, RecoveryState>
   >({});
-  const activeDraftRef = useRef<LessonRecordingDraft | null>(null);
   const activeDraftIdRef = useRef("");
+  const activeDraftRef = useRef<LessonRecordingDraft | null>(null);
   const chunkIndexRef = useRef(0);
   const chunkSavePromisesRef = useRef<Promise<unknown>[]>([]);
   const chunksRef = useRef<Blob[]>([]);
@@ -194,11 +174,10 @@ export function LessonRecorder({
   const finishStartedRef = useRef(false);
   const localBackupAvailableRef = useRef(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const serverUploadSessionPromiseRef = useRef<Promise<string> | null>(null);
   const stopFallbackTimeoutRef = useRef<number | null>(null);
-  const uploadedServerChunkIndexesRef = useRef<Set<number>>(new Set());
   const streamRef = useRef<MediaStream | null>(null);
   const startedAtRef = useRef<Date | null>(null);
+  const isRecoverySaving = Object.values(recoveryState).some((state) => state === "saving");
 
   useEffect(() => {
     const supported = deviceRecordingBackupSupported();
@@ -224,7 +203,10 @@ export function LessonRecorder({
   }, [recordingState]);
 
   useEffect(() => {
-    if (recordingState !== "recording" && recordingState !== "saving") return;
+    if (
+      recordingState !== "recording" && recordingState !== "saving" &&
+      !pendingRecording && !isRecoverySaving
+    ) return;
 
     function handleBeforeUnload(event: BeforeUnloadEvent) {
       event.preventDefault();
@@ -233,8 +215,30 @@ export function LessonRecorder({
 
     window.addEventListener("beforeunload", handleBeforeUnload);
 
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [recordingState]);
+    function handleNavigation(event: MouseEvent) {
+      if (
+        event.defaultPrevented || event.button !== 0 || event.metaKey ||
+        event.ctrlKey || event.shiftKey || event.altKey
+      ) return;
+      const anchor = event.target instanceof Element ? event.target.closest("a[href]") : null;
+      if (
+        !(anchor instanceof HTMLAnchorElement) || anchor.hasAttribute("download") ||
+        (anchor.target && anchor.target !== "_self")
+      ) return;
+      const target = new URL(anchor.href, window.location.href);
+      if (target.pathname === window.location.pathname && target.search === window.location.search) return;
+      if (!window.confirm(t("recordingLeaveUnsavedPrompt"))) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    }
+    document.addEventListener("click", handleNavigation, true);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      document.removeEventListener("click", handleNavigation, true);
+    };
+  }, [recordingState, pendingRecording, isRecoverySaving, t]);
 
   useEffect(() => {
     return () => {
@@ -353,228 +357,6 @@ export function LessonRecorder({
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
-  async function startServerUploadSession(draft: LessonRecordingDraft) {
-    if (draft.serverUploadId) return draft.serverUploadId;
-
-    if (serverUploadSessionPromiseRef.current) {
-      return serverUploadSessionPromiseRef.current;
-    }
-
-    serverUploadSessionPromiseRef.current = (async () => {
-      const response = await fetchWithTimeout(
-        "/api/lesson-recordings/upload-session",
-        {
-          body: JSON.stringify({
-            contentType: draft.mimeType || "audio/webm",
-            extension: extensionForMimeType(draft.mimeType || "audio/webm"),
-            lessonDate: draft.lessonDate,
-            lessonId: draft.lessonId,
-            recordedAt: draft.startedAt,
-            summary: draft.summary,
-            teacher: draft.teacher,
-            title: draft.title,
-          }),
-          headers: { "Content-Type": "application/json" },
-          method: "POST",
-        },
-        UPLOAD_SESSION_TIMEOUT_MS,
-        t("recordingUploadTimedOut"),
-      );
-
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as {
-          error?: string;
-        } | null;
-
-        throw new Error(body?.error ?? t("recordingServerUploadPaused"));
-      }
-
-      const body = (await response.json().catch(() => null)) as {
-        uploadId?: string;
-      } | null;
-
-      if (!body?.uploadId) {
-        throw new Error(t("recordingServerUploadPaused"));
-      }
-
-      activeDraftRef.current = {
-        ...(activeDraftRef.current ?? draft),
-        serverUploadId: body.uploadId,
-      };
-
-      await updateLessonRecordingDraft(draft.id, {
-        serverUploadId: body.uploadId,
-      }).catch((error) => {
-        console.error("Lesson recording upload session persist failed", error);
-      });
-
-      return body.uploadId;
-    })();
-
-    try {
-      return await serverUploadSessionPromiseRef.current;
-    } catch (error) {
-      serverUploadSessionPromiseRef.current = null;
-      throw error;
-    }
-  }
-
-  async function uploadServerChunk({
-    blob,
-    chunkIndex,
-    draft,
-  }: {
-    blob: Blob;
-    chunkIndex: number;
-    draft: LessonRecordingDraft;
-  }) {
-    const uploadId = await startServerUploadSession(draft);
-    const response = await fetchWithTimeout(
-      `/api/lesson-recordings/upload-session/${uploadId}/chunks/${chunkIndex}`,
-      {
-        body: blob,
-        headers: {
-          "Content-Type": blob.type || draft.mimeType || "audio/webm",
-        },
-        method: "PUT",
-      },
-      UPLOAD_CHUNK_TIMEOUT_MS,
-      t("recordingUploadTimedOut"),
-    );
-
-    if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as {
-        error?: string;
-      } | null;
-
-      throw new Error(body?.error ?? t("recordingServerUploadPaused"));
-    }
-
-    uploadedServerChunkIndexesRef.current.add(chunkIndex);
-  }
-
-  async function uploadDraftByChunks({
-    chunks,
-    draft,
-    durationSeconds,
-  }: {
-    chunks: Array<{ blob: Blob; index: number }>;
-    draft: LessonRecordingDraft;
-    durationSeconds: number;
-  }) {
-    if (chunks.length === 0) {
-      throw new Error(t("recordingRecoveryUnavailable"));
-    }
-
-    const uploadId = await startServerUploadSession(draft);
-
-    for (const chunk of chunks) {
-      if (!uploadedServerChunkIndexesRef.current.has(chunk.index)) {
-        await uploadServerChunk({
-          blob: chunk.blob,
-          chunkIndex: chunk.index,
-          draft: {
-            ...draft,
-            serverUploadId: uploadId,
-          },
-        });
-      }
-    }
-
-    const response = await fetchWithTimeout(
-      `/api/lesson-recordings/upload-session/${uploadId}/complete`,
-      {
-        body: JSON.stringify({
-          chunkCount: chunks.length,
-          durationSeconds,
-        }),
-        headers: { "Content-Type": "application/json" },
-        method: "POST",
-      },
-      UPLOAD_COMPLETE_TIMEOUT_MS,
-      t("recordingUploadTimedOut"),
-    );
-
-    if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as {
-        error?: string;
-      } | null;
-
-      throw new Error(body?.error ?? t("recordingUploadFailedRecoverable"));
-    }
-
-    const body = (await response.json().catch(() => null)) as {
-      lessonId?: string;
-    } | null;
-
-    if (body?.lessonId) {
-      onSaved?.(body.lessonId);
-    }
-  }
-
-  async function uploadDraftDirectly({
-    chunks,
-    draft,
-    durationSeconds,
-  }: {
-    chunks: Array<{ blob: Blob; index: number }>;
-    draft: LessonRecordingDraft;
-    durationSeconds: number;
-  }) {
-    if (chunks.length === 0) {
-      throw new Error(t("recordingRecoveryUnavailable"));
-    }
-
-    const mimeType = draft.mimeType || chunks[0]?.blob.type || "audio/webm";
-    const extension = extensionForMimeType(mimeType);
-    const recordingBlob = new Blob(
-      chunks.map((chunk) => chunk.blob),
-      { type: mimeType },
-    );
-    const formData = new FormData();
-
-    formData.append(
-      "audio",
-      recordingBlob,
-      `${safeFileStem(draft.title)}.${extension}`,
-    );
-    formData.append("durationSeconds", String(durationSeconds));
-    formData.append("lessonDate", draft.lessonDate);
-    if (draft.lessonId) {
-      formData.append("lessonId", draft.lessonId);
-    }
-    formData.append("recordedAt", draft.startedAt);
-    formData.append("summary", draft.summary);
-    formData.append("teacher", draft.teacher);
-    formData.append("title", draft.title);
-
-    const response = await fetchWithTimeout(
-      "/api/lesson-recordings/upload",
-      {
-        body: formData,
-        method: "POST",
-      },
-      DIRECT_UPLOAD_TIMEOUT_MS,
-      t("recordingUploadTimedOut"),
-    );
-
-    if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as {
-        error?: string;
-      } | null;
-
-      throw new Error(body?.error ?? t("recordingUploadFailedRecoverable"));
-    }
-
-    const body = (await response.json().catch(() => null)) as {
-      lessonId?: string;
-    } | null;
-
-    if (body?.lessonId) {
-      onSaved?.(body.lessonId);
-    }
-  }
-
   async function uploadDraftRecording({
     chunks,
     draft,
@@ -586,31 +368,35 @@ export function LessonRecorder({
     durationSeconds: number;
     totalBytes: number;
   }) {
-    if (totalBytes <= DIRECT_UPLOAD_MAX_BYTES) {
-      try {
-        await uploadDraftDirectly({
-          chunks,
-          draft,
-          durationSeconds,
-        });
-        return;
-      } catch (error) {
-        console.error("Direct lesson recording upload failed", error);
-        if (
-          error instanceof Error &&
-          error.message === t("recordingUploadTimedOut")
-        ) {
-          throw error;
-        }
-        setMessage(t("recordingServerUploadPaused"));
-      }
+    let file: File;
+    try {
+      file = recordingFileForDraft(chunks, draft);
+    } catch {
+      throw new Error(t("recordingIncompleteRecovery"));
     }
-
-    await uploadDraftByChunks({
-      chunks,
-      draft,
-      durationSeconds,
-    });
+    if (file.size !== totalBytes) {
+      throw new Error(t("recordingRecoveryUnavailable"));
+    }
+    setUploadPercent(0);
+    try {
+      const result = await uploadLessonAudio(file, {
+        metadata: {
+          lessonDate: draft.lessonDate,
+          lessonId: draft.lessonId,
+          recordedAt: draft.startedAt,
+          summary: draft.summary,
+          teacher: draft.teacher,
+          title: draft.title,
+        },
+        durationSeconds,
+        onProgress: ({ uploadedBytes, totalBytes }) => {
+          setUploadPercent(Math.round((uploadedBytes / totalBytes) * 100));
+        },
+      });
+      onSaved?.(result.lessonId);
+    } finally {
+      setUploadPercent(null);
+    }
   }
 
   async function closeDeviceBackup() {
@@ -658,6 +444,7 @@ export function LessonRecorder({
   }
 
   async function finishRecording(mimeType: string) {
+    setRecordingState("saving");
     const startedAt = startedAtRef.current ?? new Date();
     const durationSeconds = Math.max(
       1,
@@ -687,21 +474,11 @@ export function LessonRecorder({
 
         draft = loaded.draft;
 
-        if (loaded.chunks.length >= chunks.length) {
+        if (loaded.chunks.length > chunks.length) {
           chunks = loaded.chunks.map((chunk) => ({
             blob: chunk.blob,
             index: chunk.index,
           }));
-        }
-
-        if (draft) {
-          draft = {
-            ...draft,
-            chunkCount: Math.max(draft.chunkCount, loaded.chunks.length),
-            durationSeconds,
-            updatedAt: new Date().toISOString(),
-          };
-          await saveLessonRecordingDraft(draft);
         }
       } catch (error) {
         console.error("Lesson recording rescue load failed", error);
@@ -717,32 +494,57 @@ export function LessonRecorder({
       return;
     }
 
+    const originalDraft = draft ?? activeDraftRef.current ?? draftForRecording(startedAt, mimeType);
+    const finalChunkCount = Math.max(chunkIndexRef.current, chunks.length);
+    const finalDraft: LessonRecordingDraft = {
+      ...originalDraft,
+      mimeType: mimeType || originalDraft.mimeType || chunks[0]?.blob.type || "audio/webm",
+      chunkCount: Math.max(originalDraft.chunkCount, finalChunkCount),
+      finalChunkCount,
+      durationSeconds,
+      updatedAt: new Date().toISOString(),
+    };
+    activeDraftRef.current = finalDraft;
+    const pending = { chunks, draft: finalDraft, durationSeconds, totalBytes };
+    // Retain the full in-memory capture until the server confirms it or the
+    // user explicitly discards it, even if browser storage has stopped working.
+    setPendingRecording(pending);
+    if (lessonRecordingDraftStorageAvailable()) {
+      await saveLessonRecordingDraft(finalDraft).catch((error) => {
+        console.error("Lesson recording final rescue metadata save failed", error);
+        localBackupAvailableRef.current = false;
+      });
+    }
+    await savePendingRecording(pending);
+  }
+
+  function clearCapturedRecording() {
+    activeDraftIdRef.current = "";
+    activeDraftRef.current = null;
+    chunkIndexRef.current = 0;
+    chunkSavePromisesRef.current = [];
+    chunksRef.current = [];
+    localBackupAvailableRef.current = false;
+    setPendingRecording(null);
+  }
+
+  async function savePendingRecording(pending: PendingRecording) {
+    const { draft, durationSeconds } = pending;
+    setRecordingState("saving");
+    setMessage("");
     try {
-      const uploadDraft =
-        draft ??
-        draftForRecording(startedAt, mimeType || chunks[0]?.blob.type || "audio/webm");
-      const deviceCopyFileName = draft?.deviceCopyFileName;
+      if (disabled) throw new Error(t("recordingOtherUploadActive"));
+      const deviceCopyFileName = draft.deviceCopyFileName;
       const deviceCopyStatus = deviceBackupStatusRef.current;
 
-      await uploadDraftRecording({
-        chunks,
-        draft: uploadDraft,
-        durationSeconds,
-        totalBytes,
-      });
-      if (draftId) {
-        await deleteLessonRecordingDraft(draftId).catch((error) => {
+      await uploadDraftRecording(pending);
+      if (lessonRecordingDraftStorageAvailable()) {
+        await deleteLessonRecordingDraft(draft.id).catch((error) => {
           console.error("Lesson recording rescue cleanup failed", error);
         });
       }
-      activeDraftRef.current = null;
-      activeDraftIdRef.current = "";
-      chunkIndexRef.current = 0;
-      chunkSavePromisesRef.current = [];
-      chunksRef.current = [];
-      serverUploadSessionPromiseRef.current = null;
-      uploadedServerChunkIndexesRef.current = new Set();
-      localBackupAvailableRef.current = false;
+
+      clearCapturedRecording();
       await refreshRecoverableDrafts();
       setElapsedSeconds(durationSeconds);
       setRecordingState("saved");
@@ -759,7 +561,7 @@ export function LessonRecorder({
       router.refresh();
     } catch (error) {
       const errorMessage =
-        draftId && localBackupAvailableRef.current
+        localBackupAvailableRef.current
           ? t("recordingUploadFailedRecoverable")
           : error instanceof Error
             ? error.message
@@ -776,6 +578,35 @@ export function LessonRecorder({
     }
   }
 
+  async function retryPendingRecording() {
+    if (!pendingRecording || disabled || isRecoverySaving || recordingState === "saving") return;
+    await savePendingRecording(pendingRecording);
+  }
+
+  function downloadPendingRecording() {
+    if (!pendingRecording) return;
+    const { draft, chunks } = pendingRecording;
+    downloadBlob(new Blob(chunks.map(({ blob }) => blob), { type: draft.mimeType }), draft);
+    // A download cannot prove the browser wrote a file, so retain this copy.
+  }
+
+  async function discardPendingRecording() {
+    if (!pendingRecording || recordingState === "saving" || isRecoverySaving) return;
+    if (!window.confirm(t("recordingDiscardUnsavedPrompt"))) return;
+    setRecordingState("saving");
+    if (lessonRecordingDraftStorageAvailable()) {
+      await deleteLessonRecordingDraft(pendingRecording.draft.id).catch((error) => {
+        console.error("Discarding the browser recording copy failed", error);
+      });
+    }
+    clearCapturedRecording();
+    deviceBackupStatusRef.current = "idle";
+    setElapsedSeconds(0);
+    setRecordingState("idle");
+    setMessage("");
+    await refreshRecoverableDrafts();
+  }
+
   async function finishRecordingOnce(mimeType: string) {
     if (finishStartedRef.current) return;
 
@@ -790,6 +621,10 @@ export function LessonRecorder({
   }
 
   async function startRecording() {
+    if (
+      disabled || pendingRecording || chunksRef.current.length > 0 || isRecoverySaving ||
+      recordingState === "requesting" || recordingState === "saving"
+    ) return;
     setMessage("");
 
     if (
@@ -835,8 +670,8 @@ export function LessonRecorder({
         mimeType ? { mimeType } : undefined,
       );
 
-      activeDraftRef.current = draft;
       activeDraftIdRef.current = draft.id;
+      activeDraftRef.current = draft;
       chunkIndexRef.current = 0;
       chunkSavePromisesRef.current = [];
       chunksRef.current = [];
@@ -847,8 +682,7 @@ export function LessonRecorder({
       deviceBackupWritePromiseRef.current = Promise.resolve();
       finishStartedRef.current = false;
       localBackupAvailableRef.current = false;
-      serverUploadSessionPromiseRef.current = null;
-      uploadedServerChunkIndexesRef.current = new Set();
+
       streamRef.current = stream;
       mediaRecorderRef.current = mediaRecorder;
       startedAtRef.current = startedAt;
@@ -904,6 +738,10 @@ export function LessonRecorder({
   }
 
   async function retryDraftSave(draftId: string) {
+    if (
+      disabled || pendingRecording || isRecoverySaving || recordingState === "recording" ||
+      recordingState === "requesting" || recordingState === "saving"
+    ) return;
     setRecoveryState((current) => ({ ...current, [draftId]: "saving" }));
     setMessage("");
 
@@ -913,18 +751,6 @@ export function LessonRecorder({
       if (!draft || chunks.length === 0) {
         throw new Error(t("recordingRecoveryUnavailable"));
       }
-
-      const retryDraft = { ...draft, serverUploadId: undefined };
-
-      await updateLessonRecordingDraft(draft.id, {
-        serverUploadId: undefined,
-      }).catch((error) => {
-        console.error("Lesson recording retry session reset failed", error);
-      });
-
-      activeDraftRef.current = retryDraft;
-      serverUploadSessionPromiseRef.current = null;
-      uploadedServerChunkIndexesRef.current = new Set();
 
       const retryChunks = chunks.map((chunk) => ({
         blob: chunk.blob,
@@ -937,14 +763,12 @@ export function LessonRecorder({
 
       await uploadDraftRecording({
         chunks: retryChunks,
-        draft: retryDraft,
+        draft,
         durationSeconds: durationForDraft(draft),
         totalBytes,
       });
       await deleteLessonRecordingDraft(draftId);
-      activeDraftRef.current = null;
-      serverUploadSessionPromiseRef.current = null;
-      uploadedServerChunkIndexesRef.current = new Set();
+
       setRecoveryState((current) => ({ ...current, [draftId]: "idle" }));
       setMessage(t("liveRecordingSaved"));
       await refreshRecoverableDrafts();
@@ -1008,7 +832,7 @@ export function LessonRecorder({
   }
 
   const isBusy =
-    recordingState === "requesting" || recordingState === "saving";
+    recordingState === "requesting" || recordingState === "saving" || isRecoverySaving;
   const isRecording = recordingState === "recording";
   const buttonLabel = isRecording
     ? t("stopAndSaveLesson")
@@ -1017,6 +841,7 @@ export function LessonRecorder({
       : recordingState === "saving"
         ? t("savingRecording")
         : t("startLiveLessonRecording");
+  const visibleRecoverableDrafts = recoverableDrafts.filter((draft) => draft.id !== pendingRecording?.draft.id);
 
   return (
     <div className={cn("space-y-2", className)}>
@@ -1025,9 +850,11 @@ export function LessonRecorder({
           "inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-md px-3 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60",
           isRecording
             ? "bg-rose-700 text-white hover:bg-rose-800"
-            : "bg-emerald-950 text-white hover:bg-emerald-900",
+            : emphasis === "secondary"
+              ? "border border-stone-300 bg-white text-stone-800 hover:bg-stone-100"
+              : "bg-emerald-950 text-white hover:bg-emerald-900",
         )}
-        disabled={isBusy}
+        disabled={isBusy || (!isRecording && (disabled || pendingRecording !== null))}
         onClick={() => {
           if (isRecording) {
             stopRecording();
@@ -1080,8 +907,22 @@ export function LessonRecorder({
         </p>
       ) : null}
 
+      {uploadPercent !== null ? (
+        <div className="space-y-1 text-sm text-stone-700" role="status" aria-live="polite">
+          <p>{t("savingRecording")} {uploadPercent}%</p>
+          <progress
+            aria-label={t("savingRecording")}
+            className="h-2 w-full accent-emerald-900"
+            max={100}
+            value={uploadPercent}
+          />
+        </div>
+      ) : null}
+
       {message ? (
         <p
+          role="status"
+          aria-live="polite"
           className={cn(
             "rounded-md border px-3 py-2 text-sm",
             recordingState === "saved"
@@ -1093,14 +934,49 @@ export function LessonRecorder({
         </p>
       ) : null}
 
-      {recoverableDrafts.length > 0 ? (
+      {pendingRecording && recordingState !== "saving" ? (
+        <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+          <p className="font-semibold">{t("recordingPendingOnPage")}</p>
+          <p>{t("recordingPendingOnPageHelp")}</p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              className="inline-flex min-h-10 items-center gap-1.5 rounded-md bg-emerald-950 px-3 py-2 font-semibold text-white disabled:opacity-50"
+              disabled={disabled || isBusy}
+              onClick={() => void retryPendingRecording()}
+              type="button"
+            >
+              <RotateCcw aria-hidden="true" className="h-4 w-4" />
+              {t("retrySavingRecording")}
+            </button>
+            <button
+              className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-stone-300 bg-white px-3 py-2 font-semibold text-stone-800"
+              onClick={downloadPendingRecording}
+              type="button"
+            >
+              <Download aria-hidden="true" className="h-4 w-4" />
+              {t("downloadRecoveryCopy")}
+            </button>
+            <button
+              className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-rose-200 bg-white px-3 py-2 text-rose-800 disabled:opacity-50"
+              disabled={isBusy}
+              onClick={() => void discardPendingRecording()}
+              type="button"
+            >
+              <Trash2 aria-hidden="true" className="h-4 w-4" />
+              {t("discardRecoveryCopy")}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {visibleRecoverableDrafts.length > 0 ? (
         <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-950">
           <div>
             <p className="font-semibold">{t("recoverableRecordings")}</p>
             <p className="mt-1 leading-6">{t("recordingRescueReady")}</p>
           </div>
           <div className="space-y-2">
-            {recoverableDrafts.map((draft) => {
+            {visibleRecoverableDrafts.map((draft) => {
               const state = recoveryState[draft.id] ?? "idle";
               const isWorking = state === "saving" || state === "downloading";
               const startedAt = new Date(draft.startedAt);
@@ -1135,7 +1011,7 @@ export function LessonRecorder({
                     <div className="flex flex-wrap gap-1.5">
                       <button
                         className="inline-flex items-center justify-center gap-1.5 rounded-md bg-emerald-950 px-2.5 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-900 disabled:cursor-not-allowed disabled:opacity-60"
-                        disabled={isWorking}
+                        disabled={isWorking || disabled || isBusy || isRecording || pendingRecording !== null}
                         onClick={() => void retryDraftSave(draft.id)}
                         type="button"
                       >
@@ -1151,7 +1027,7 @@ export function LessonRecorder({
                       </button>
                       <button
                         className="inline-flex items-center justify-center gap-1.5 rounded-md border border-stone-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-stone-700 transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-60"
-                        disabled={isWorking}
+                        disabled={isWorking || isBusy}
                         onClick={() => void downloadDraft(draft.id)}
                         type="button"
                       >
@@ -1167,7 +1043,7 @@ export function LessonRecorder({
                       </button>
                       <button
                         className="inline-flex items-center justify-center gap-1.5 rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-xs font-semibold text-rose-800 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
-                        disabled={isWorking}
+                        disabled={isWorking || isBusy || isRecording}
                         onClick={() => void discardDraft(draft.id)}
                         type="button"
                       >

@@ -11,6 +11,8 @@ const IDB_OPERATION_TIMEOUT_MS = 10000;
 export type LessonRecordingDraft = {
   id: string;
   chunkCount: number;
+  /** Written when capture stops; absent on older or still-recording drafts. */
+  finalChunkCount?: number;
   createdAt: string;
   durationSeconds?: number;
   deviceCopyFileName?: string;

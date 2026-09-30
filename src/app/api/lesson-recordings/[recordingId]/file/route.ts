@@ -1,116 +1,54 @@
-import path from "node:path";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { createDatabaseClient } from "@/db/client";
 import { lessonRecordings } from "@/db/schema";
-import { readLessonAudioBuffer } from "@/lib/server/lesson-audio-storage";
+import { describeLessonAudio, MAX_AUDIO_RESPONSE_BYTES, readLessonAudioRange } from "@/lib/server/lesson-audio-storage";
 
-function contentTypeForPath(storagePath: string) {
-  const extension = path.extname(storagePath).toLowerCase();
-
-  if (extension === ".m4a" || extension === ".mp4") return "audio/mp4";
-  if (extension === ".aac") return "audio/aac";
-  if (extension === ".mp3") return "audio/mpeg";
-  if (extension === ".ogg") return "audio/ogg";
-  if (extension === ".wav") return "audio/wav";
-  if (extension === ".webm") return "audio/webm";
-
-  return "application/octet-stream";
+export const runtime = "nodejs";
+export const maxDuration = 60;
+export function parseRangeHeader(header: string, fileSize: number) {
+  const match = /^bytes=(\d*)-(\d*)$/.exec(header);
+  if (!match || (!match[1] && !match[2]) || fileSize <= 0) return null;
+  const [, first, last] = match;
+  let start = first ? Number(first) : Math.max(0, fileSize - Number(last));
+  let end = first && last ? Number(last) : fileSize - 1;
+  if (!first && Number(last) <= 0) return null;
+  if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 0 || start >= fileSize || end < start) return null;
+  end = Math.min(end, fileSize - 1);
+  // A server may return a smaller contiguous subrange. Media elements request
+  // the next range, keeping each buffered response safely below Netlify limits.
+  end = Math.min(end, start + MAX_AUDIO_RESPONSE_BYTES - 1);
+  return { start, end };
 }
-
-function parseRangeHeader(rangeHeader: string, fileSize: number) {
-  const match = /^bytes=(\d*)-(\d*)$/.exec(rangeHeader);
-  if (!match) return null;
-
-  const [, startValue, endValue] = match;
-  let start = startValue ? Number(startValue) : 0;
-  let end = endValue ? Number(endValue) : fileSize - 1;
-
-  if (!startValue && endValue) {
-    const suffixLength = Number(endValue);
-    start = Math.max(fileSize - suffixLength, 0);
-    end = fileSize - 1;
-  }
-
-  if (
-    !Number.isInteger(start) ||
-    !Number.isInteger(end) ||
-    start < 0 ||
-    end < start ||
-    start >= fileSize
-  ) {
-    return null;
-  }
-
-  return { start, end: Math.min(end, fileSize - 1) };
-}
-
-export async function GET(
-  request: Request,
-  context: { params: Promise<{ recordingId: string }> },
-) {
+async function respond(request: Request, context: { params: Promise<{ recordingId: string }> }, head: boolean) {
   const { recordingId } = await context.params;
+  if (!/^[0-9a-f-]{36}$/i.test(recordingId)) return NextResponse.json({ error: "Invalid recording." }, { status: 400 });
   const db = createDatabaseClient();
-  const [recording] = await db
-    .select()
-    .from(lessonRecordings)
-    .where(eq(lessonRecordings.id, recordingId));
-
-  if (!recording) {
-    return NextResponse.json({ error: "Recording not found." }, { status: 404 });
-  }
-
+  const [recording] = await db.select().from(lessonRecordings).where(eq(lessonRecordings.id, recordingId));
+  if (!recording) return NextResponse.json({ error: "Recording not found." }, { status: 404 });
+  const headers: Record<string, string> = { "Accept-Ranges": "bytes", "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" };
   try {
-    const file = await readLessonAudioBuffer({
-      storageBucket: recording.storageBucket,
-      storagePath: recording.storagePath,
-    });
-
-    if (!file) {
-      return NextResponse.json(
-        { error: "Recording audio is not available." },
-        { status: 404 },
-      );
+    const audio = await describeLessonAudio(recording);
+    if (!audio) return NextResponse.json({ error: "Recording audio is not available." }, { status: 404, headers });
+    const { fileSize, contentType } = audio;
+    headers["Content-Type"] = contentType;
+    if (head) return new Response(null, { headers: { ...headers, "Content-Length": String(fileSize) } });
+    const rawRange = request.headers.get("range");
+    if (!rawRange && fileSize > MAX_AUDIO_RESPONSE_BYTES) {
+      // A complete large 200 response cannot fit Netlify's response envelope.
+      // Browsers use Range for media; non-media callers must explicitly do so.
+      return NextResponse.json({ error: "Request this recording with a Range header, for example bytes=0-." }, { status: 400, headers: { "Accept-Ranges": "bytes", "Cache-Control": "private, no-store" } });
     }
-
-    const fileSize = file.length;
-    const contentType = contentTypeForPath(recording.storagePath);
-    const rangeHeader = request.headers.get("range");
-
-    if (rangeHeader) {
-      const range = parseRangeHeader(rangeHeader, fileSize);
-      if (!range) {
-        return new Response(null, {
-          status: 416,
-          headers: {
-            "Content-Range": `bytes */${fileSize}`,
-          },
-        });
-      }
-
-      const chunk = file.subarray(range.start, range.end + 1);
-
-      return new Response(new Uint8Array(chunk), {
-        status: 206,
-        headers: {
-          "Accept-Ranges": "bytes",
-          "Cache-Control": "private, max-age=0, must-revalidate",
-          "Content-Length": String(range.end - range.start + 1),
-          "Content-Range": `bytes ${range.start}-${range.end}/${fileSize}`,
-          "Content-Type": contentType,
-        },
-      });
-    }
-
-    return new Response(new Uint8Array(file), {
-      headers: {
-        "Accept-Ranges": "bytes",
-        "Cache-Control": "private, max-age=0, must-revalidate",
-        "Content-Length": String(fileSize),
-        "Content-Type": contentType,
-      },
-    });
+    const range = rawRange ? parseRangeHeader(rawRange, fileSize) : { start: 0, end: fileSize - 1 };
+    if (!range) return new Response(null, { status: 416, headers: { ...headers, "Content-Range": `bytes */${fileSize}` } });
+    const chunk = await readLessonAudioRange(recording, range.start, range.end, audio.manifest);
+    if (!chunk || chunk.length !== range.end - range.start + 1) throw new Error("Recording range is incomplete.");
+    headers["Content-Length"] = String(chunk.length);
+    if (rawRange) headers["Content-Range"] = `bytes ${range.start}-${range.end}/${fileSize}`;
+    return new Response(Uint8Array.from(chunk), { status: rawRange ? 206 : 200, headers });
   } catch {
-    return NextResponse.json({ error: "Recording file not found." }, { status: 404 });
+    return NextResponse.json({ error: "Recording audio could not be read. Please retry." }, { status: 502, headers: { "Cache-Control": "private, no-store" } });
   }
 }
+export async function GET(request: Request, context: { params: Promise<{ recordingId: string }> }) { return respond(request, context, false); }
+export async function HEAD(request: Request, context: { params: Promise<{ recordingId: string }> }) { return respond(request, context, true); }

@@ -7,7 +7,7 @@ import {
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const MAX_CHUNK_BYTES = 12 * 1024 * 1024;
+const MAX_CHUNK_BYTES = 2 * 1024 * 1024;
 
 function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -57,15 +57,31 @@ export async function PUT(
     );
   }
 
-  const buffer = Buffer.from(await request.arrayBuffer());
-
-  if (buffer.length <= 0 || buffer.length > MAX_CHUNK_BYTES) {
-    return NextResponse.json({ error: "Invalid chunk size." }, { status: 413 });
+  const reader = request.body?.getReader();
+  if (!reader) return NextResponse.json({ error: "Empty recording chunk." }, { status: 400 });
+  const parts: Uint8Array[] = [];
+  let receivedBytes = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      receivedBytes += value.byteLength;
+      if (receivedBytes > MAX_CHUNK_BYTES) {
+        await reader.cancel();
+        return NextResponse.json({ error: "Recording chunks must not exceed 2 MiB." }, { status: 413 });
+      }
+      parts.push(value);
+    }
+  } finally {
+    reader.releaseLock();
   }
+  if (receivedBytes <= 0) return NextResponse.json({ error: "Empty recording chunk." }, { status: 400 });
+  const buffer = Buffer.concat(parts);
 
   try {
-    await saveLessonRecordingUploadChunk({
+    const receipt = await saveLessonRecordingUploadChunk({
       buffer,
+      sha256: request.headers.get("x-chunk-sha256") ?? undefined,
       chunkIndex,
       contentType:
         request.headers.get("content-type") ||
@@ -73,6 +89,7 @@ export async function PUT(
         "application/octet-stream",
       uploadId,
     });
+    return NextResponse.json({ ...receipt, ok: true });
   } catch (error) {
     const detail = error instanceof Error ? error.message : "Unknown error";
 
@@ -82,5 +99,4 @@ export async function PUT(
     );
   }
 
-  return NextResponse.json({ chunkIndex, ok: true });
 }
