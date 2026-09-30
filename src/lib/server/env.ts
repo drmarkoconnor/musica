@@ -1,5 +1,15 @@
+type NetlifyRuntime = { env?: { get?: (key: string) => string | undefined } };
+
+function netlifyRuntime() {
+  return (globalThis as typeof globalThis & { Netlify?: NetlifyRuntime }).Netlify;
+}
+
 export function serverEnv(key: string) {
-  return (process.env as Record<string, string | undefined>)[key];
+  return netlifyRuntime()?.env?.get?.(key) ?? process.env[key];
+}
+
+export function isNetlifyRuntime() {
+  return typeof netlifyRuntime()?.env?.get === "function" || serverEnv("NETLIFY") === "true";
 }
 
 export function shouldUseNetlifyAudioStorage() {
@@ -8,5 +18,5 @@ export function shouldUseNetlifyAudioStorage() {
   if (configuredStorage === "netlify-blobs") return true;
   if (configuredStorage === "local") return false;
 
-  return serverEnv("NETLIFY") === "true";
+  return isNetlifyRuntime();
 }

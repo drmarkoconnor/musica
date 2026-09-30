@@ -27,7 +27,13 @@ Last updated: 2026-09-30
 - Verification: 54 tests, TypeScript and production build passed. A paid synthetic
   text check verified Astra request compatibility; transcription model availability
   was checked. Full-hour hosted audio acceptance still requires real testing.
-- Production deployment verification is pending while the Git build runs.
+- Production release `ead2115` published. Live authentication, saved transcript
+  passages, library and existing audio range playback passed. The synthetic upload
+  check caught a hosted-runtime storage-selection defect before acceptance.
+- Fixed runtime detection to recognise Netlify's native environment API even
+  when the build-only `NETLIFY` flag is absent. Production storage and background
+  origin configuration are being verified. Corrected-upload acceptance is pending.
+- Current runtime-fix verification: 57 tests, TypeScript and build passed.
 - Natural-language questions and combined multi-passage memory editing are not
   part of this release. Existing manual clip/reel tools remain available.
 
@@ -69,6 +75,7 @@ Important hosted env vars:
   Blobs
 - `NETLIFY_BLOBS_TOKEN` optional fallback
 - `PRACTICE_LOOP_AUDIO_STORAGE=netlify-blobs` optional local override
+- `PRACTICE_LOOP_SITE_URL` trusted hosted origin for background processing
 - `PRACTICE_LOOP_ASSET_STORAGE=netlify-blobs` optional local override
 
 ## Live Now

@@ -1,10 +1,10 @@
-import { serverEnv } from "@/lib/server/env";
+import { isNetlifyRuntime, serverEnv } from "@/lib/server/env";
 import { runLessonTranscriptionJob } from "@/lib/server/transcription-job";
 
 export async function dispatchLessonTranscription({ jobId, token, requestUrl }: { jobId: string; token: string; requestUrl?: string }) {
-  const configuredSite = serverEnv("DEPLOY_URL") || serverEnv("DEPLOY_PRIME_URL") || serverEnv("URL");
+  const configuredSite = serverEnv("PRACTICE_LOOP_SITE_URL") || serverEnv("DEPLOY_URL") || serverEnv("DEPLOY_PRIME_URL") || serverEnv("URL");
   const local = requestUrl && ["localhost", "127.0.0.1", "[::1]"].includes(new URL(requestUrl).hostname);
-  if (local && serverEnv("NETLIFY") !== "true") {
+  if (local && !isNetlifyRuntime()) {
     // Development only. Hosted processing always uses durable background invocations.
     void (async () => {
       let result;

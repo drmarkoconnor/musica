@@ -3,7 +3,7 @@ import { access, mkdtemp, readFile, rm } from "node:fs/promises";
 import { constants } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { serverEnv } from "@/lib/server/env";
+import { isNetlifyRuntime, serverEnv } from "@/lib/server/env";
 import type { AudioTranscriptionResult } from "@/lib/server/openai-transcription";
 
 export function localWhisperModelPath() {
@@ -11,7 +11,7 @@ export function localWhisperModelPath() {
 }
 
 export async function localWhisperConfiguration() {
-  if (serverEnv("NETLIFY") === "true") return null;
+  if (isNetlifyRuntime()) return null;
   const modelPath = localWhisperModelPath();
   try { await access(modelPath, constants.R_OK); } catch { return null; }
   const candidates = serverEnv("WHISPER_CLI_PATH")

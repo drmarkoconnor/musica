@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { mockPracticeLoopReadModel } from "./mock-repository";
 import { createPracticeLoopRepository } from "./index";
 import type { PracticeLoopReadModel } from "./practice-loop-repository";
+import { isNetlifyRuntime } from "../server/env";
 
 function stableUuid(input: string) {
   const bytes = createHash("sha1")
@@ -103,7 +104,7 @@ function createNeonCompatibleMockReadModel(): PracticeLoopReadModel {
 
 function mergeWithFallback(model: PracticeLoopReadModel): PracticeLoopReadModel {
   const fallback = createNeonCompatibleMockReadModel();
-  const isHostedApp = process.env.NETLIFY === "true";
+  const isHostedApp = isNetlifyRuntime();
   const visiblePieceAssets = isHostedApp
     ? model.pieceAssets.filter((asset) => asset.storageBucket !== "local-docs")
     : model.pieceAssets;

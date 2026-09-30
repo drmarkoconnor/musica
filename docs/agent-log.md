@@ -48,7 +48,17 @@ Branch: `main`; GitHub baseline `f14bf34`; local preservation commit `d9c92db`.
 - Local Whisper installation was attempted but blocked by incomplete Mac
   Command Line Tools. No local accuracy/speed claim; documented setup separately.
 
-Production build verification and a real-hour hosted test remain next steps.
+Release `ead2115` published in Netlify deploy `6abcd0b89fe17f00084420b2`.
+Authenticated live checks passed for 33 lessons, the library, 20 saved transcript
+passages and start/middle/end audio byte ranges. Desktop/mobile layout and Italian
+labels were reviewed locally. HEAD audio metadata currently returns 400 on the
+hosted adapter; range GET playback works and the app does not depend on HEAD.
+
+A disposable synthetic upload caught missing hosted runtime detection: the
+build-only `NETLIFY` flag was absent, so a new upload tried read-only local disk.
+Added native runtime environment detection and a trusted background-origin
+setting. Runtime-fix checks: 57 tests, TypeScript and build passed. Hosted settings
+and corrected-upload acceptance are being verified; real-hour testing remains.
 Private `.local/` backups and untracked `public/presentations/` are not published.
 
 ## 2026-09-13 - Confirm Mac Database Migration And Prepare Dependency Fixes
