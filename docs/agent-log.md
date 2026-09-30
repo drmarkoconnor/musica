@@ -28,6 +28,11 @@ Branch: `main`; GitHub baseline `f14bf34`; local preservation commit `d9c92db`.
   Git-based deployment to the existing `jazzmusica` Netlify site.
 - Integrated the newer GitHub history and retained its dependency security
   updates rather than publishing the older Mac dependency versions.
+- Pushed tested integration `523bb94` to `main`; production Git build started.
+  Visual review caught and corrected conflicting background classes on Play.
+- Integrated-release checks: 54 tests, TypeScript and production build passed;
+  `npm audit --omit=dev` reported zero vulnerabilities. The existing relocation
+  helper's separate tests require Python 3.9+; the Mac's default 3.8 cannot run them.
 - Added searchable source passages, a compact seek/speed player, direct memory
   retention, custom tags and an informational cost estimate. No billing ledger.
 - Added optional local Whisper with timestamp validation and heartbeat renewal;
